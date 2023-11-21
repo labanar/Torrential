@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Torrential.Runner": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONEMENT": "Development"
+      }
+    }
+  }
+}
