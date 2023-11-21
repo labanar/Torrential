@@ -21,7 +21,7 @@ public sealed class PeerWireState
 
 public sealed class PeerWireClient : IDisposable
 {
-    private static readonly int PIECE_SEGMENT_REQUEST_SIZE = 16384;
+    private const int PIECE_SEGMENT_REQUEST_SIZE = 16384;
     private readonly PeerWireState _state;
     private readonly IPeerWireConnection _connection;
     private readonly ILogger _logger;
@@ -44,6 +44,8 @@ public sealed class PeerWireClient : IDisposable
         SingleWriter = false
     });
     private CancellationTokenSource _processCts;
+    private BitfieldManager _bitfields;
+    private InfoHash _infoHash;
 
     public PeerWireState State => _state;
 
@@ -65,8 +67,11 @@ public sealed class PeerWireClient : IDisposable
             }
         }
     }
-    public async Task Process(CancellationToken cancellationToken)
+    public async Task Process(TorrentMetadata meta, BitfieldManager bitfields, CancellationToken cancellationToken)
     {
+        _bitfields = bitfields;
+        _infoHash = meta.InfoHash;
+        _state.Bitfield = new Bitfield(meta.NumberOfPieces);
         _processCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var readerTask = ProcessReads(_processCts.Token);
         var writeTask = ProcessWrites(_processCts.Token);
@@ -319,7 +324,7 @@ public sealed class PeerWireClient : IDisposable
         return true;
     }
 
-    public async Task SendBitfield(Bitfield2 bitfield)
+    public async Task SendBitfield(Bitfield bitfield)
     {
         WriteBitfield(bitfield);
     }
@@ -332,7 +337,7 @@ public sealed class PeerWireClient : IDisposable
     public async Task SendChoke() => await SendMessageAsync(PeerWireMessageType.Choke);
     public async Task SendUnchoke() => await SendMessageAsync(PeerWireMessageType.Unchoke);
     public async Task SendHave(int pieceIndex) => await SendMessageAsync(PeerWireMessageType.Have, pieceIndex);
-    public async Task SendPieceRequest(int pieceIndex, int begin, int length)
+    public async Task SendPieceRequest(int pieceIndex, int begin, int length = PIECE_SEGMENT_REQUEST_SIZE)
     {
         await _pieceRequestLimit.WaitAsync(_processCts.Token);
         await SendMessageAsync(PeerWireMessageType.Request, pieceIndex, begin, length);
@@ -376,14 +381,14 @@ public sealed class PeerWireClient : IDisposable
         WritePacket(messageId, payload);
     }
 
-    private void WriteBitfield(Bitfield2 bitfield)
+    private void WriteBitfield(Bitfield bitfield)
     {
-        var pak = new PreparedPacket(bitfield.Value.Length + 5);
-        var buffer = pak.AsSpan();
-        buffer.TryWriteBigEndian(bitfield.Value.Length);
-        buffer[4] = PeerWireMessageType.Bitfield;
-        bitfield.Value.CopyTo(buffer[5..]);
-        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
+        //var pak = new PreparedPacket(bitfield..Length + 5);
+        //var buffer = pak.AsSpan();
+        //buffer.TryWriteBigEndian(bitfield.Value.Length);
+        //buffer[4] = PeerWireMessageType.Bitfield;
+        //bitfield.Value.CopyTo(buffer[5..]);
+        //OUTBOUND_MESSAGES.Writer.TryWrite(pak);
     }
     private void WriteKeepAlive()
     {

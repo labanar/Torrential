@@ -7,6 +7,7 @@ using Serilog.Core;
 using Serilog.Sinks.Grafana.Loki;
 using Torrential;
 using Torrential.Peers;
+using Torrential.Peers.Pieces;
 using Torrential.Trackers;
 
 
@@ -14,10 +15,10 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(BuildLogger(builder.Configuration));
 builder.Services.AddTorrential();
+builder.Services.AddSingleton<PieceSelector>();
 builder.Services.AddSingleton<PeerManager>();
+builder.Services.AddSingleton<BitfieldManager>();
 builder.Services.AddHostedService<Runner>();
-
-
 
 var app = builder.Build();
 app.Run();
@@ -41,38 +42,29 @@ static Logger BuildLogger(IConfiguration configuration)
     return config.CreateLogger();
 }
 
-internal class Runner : BackgroundService
+internal class Runner(PeerManager peerMgr, IPeerService peerService, IEnumerable<ITrackerClient> trackerClients, BitfieldManager bitfieldMgr, PieceSelector pieceSelector, ILogger<Runner> logger)
+    : BackgroundService
 {
-    private readonly PeerManager _peerMgr;
-    private IEnumerable<ITrackerClient> _trackerClients;
-    private readonly IPeerService _peerService;
-    private readonly ILogger<Runner> _logger;
-
-    public Runner(PeerManager peerMgr, IPeerService peerService, IEnumerable<ITrackerClient> trackerClients, ILogger<Runner> logger)
-    {
-        _peerMgr = peerMgr;
-        _trackerClients = trackerClients;
-        _peerService = peerService;
-        _logger = logger;
-    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var meta = TorrentMetadataParser.FromFile("./debian-12.0.0-amd64-netinst.iso.torrent");
-        foreach (var tracker in _trackerClients)
+        foreach (var tracker in trackerClients)
         {
             if (!tracker.IsValidAnnounceForClient(meta.AnnounceList.First())) continue;
             var announceResponse = await tracker.Announce(new AnnounceRequest
             {
                 InfoHash = meta.InfoHash,
-                PeerId = _peerService.Self.Id,
+                PeerId = peerService.Self.Id,
                 Url = meta.AnnounceList.First(),
                 NumWant = 50
             });
 
-            await _peerMgr.ConnectToPeers(meta, announceResponse, 50);
+            await peerMgr.ConnectToPeers(meta, announceResponse, 50);
+            bitfieldMgr.Initialize(meta.InfoHash, meta.NumberOfPieces);
+
             var tasks = new List<Task>();
-            foreach (var peer in _peerMgr.ConnectedPeers[meta.InfoHash])
+            foreach (var peer in peerMgr.ConnectedPeers[meta.InfoHash])
             {
                 tasks.Add(InitiatePeer(meta, peer));
             }
@@ -82,43 +74,54 @@ internal class Runner : BackgroundService
 
     public async Task InitiatePeer(TorrentMetadata meta, PeerWireClient peer)
     {
-        var processor = peer.Process(CancellationToken.None);
+        //Send in the runtime deps here
+        //Piece selection strategy
+        //Piece queue
+        //Rate limiting service
+
+        //After a piece goes through the verification queue, we need to update our bitfield
+        //We also need to broadcast to each peer that we now have this new piece
+        //This is after an ENTIRE piece is downloaded and verified (not a segment of a piece, but the full piece)
+        var processor = peer.Process(meta, bitfieldMgr, CancellationToken.None);
 
         //await peer.SendBitfield(new Bitfield2(meta.NumberOfPieces));
         while (peer.State.Bitfield == null)
-        {
-            //_logger.LogInformation("Waiting for peer Bitfield");
             await Task.Delay(100);
-        }
-
 
         await peer.SendIntereted();
         while (peer.State.AmChoked)
-        {
             await Task.Delay(100);
-        }
 
-        //Start asking for pieces, wait for us to get a piece back then ask for the next piece
-        var requestSize = (int)Math.Pow(2, 14);
-        for (int pieceIndex = 0; pieceIndex < meta.NumberOfPieces; pieceIndex++)
+
+
+        while (!peer.State.AmChoked)
         {
-            var remainder = (int)meta.PieceSize;
+            //Start asking for pieces, wait for us to get a piece back then ask for the next piece
+            var idx = pieceSelector.SuggestNextPiece(meta.InfoHash, peer.State.Bitfield);
+            if (idx == null)
+            {
+                await Task.Delay(250);
+                continue;
+            }
 
+            var requestSize = (int)Math.Pow(2, 14);
+            var remainder = (int)meta.PieceSize;
             while (remainder > 0)
             {
                 var offset = (int)meta.PieceSize - remainder;
-
-                //there is an internal queue that will block once full, so we can just hammer away with piece requests
-                await peer.SendPieceRequest(pieceIndex, offset, requestSize);
+                await peer.SendPieceRequest(idx.Value, offset, requestSize);
                 remainder -= requestSize;
             }
+
+            //TODO - this responsibility should be handled after we verify that the piece hash is good
+            //For now I'll artificially set the piece to high in our bitfield
+            if (bitfieldMgr.TryGetBitfield(meta.InfoHash, out var myBitfield))
+                myBitfield.MarkHave(idx.Value);
         }
 
         await processor;
     }
 }
-
-
 
 internal class PeerManager
 {
@@ -171,3 +174,19 @@ internal class PeerManager
     }
 }
 
+
+
+
+internal class PieceSelector(BitfieldManager bitfieldManager)
+{
+    public int? SuggestNextPiece(InfoHash infohash, Bitfield peerBitfield)
+    {
+        if (!bitfieldManager.TryGetBitfield(infohash, out var myBitfield))
+            return null;
+
+
+        //Find the intersection of a piece I do not have, but the peer does?
+        return myBitfield.SuggestPieceToDownload(peerBitfield);
+    }
+
+}
