@@ -2,23 +2,31 @@
 
 namespace Torrential.Peers;
 
-internal sealed class PooledPieceSegment : IDisposable
+public sealed class PooledPieceSegment : IDisposable
 {
     private readonly ArrayPool<byte> _pool;
+    private readonly int _size;
     private readonly byte[] _buffer;
+    public ReadOnlySpan<byte> Buffer => _buffer.AsSpan().Slice(0, _size);
 
-    public byte[] Buffer => _buffer;
+    public InfoHash InfoHash { get; private set; }
+    public int Index { get; private set; }
+    public int Offset { get; private set; }
 
-    public static PooledPieceSegment FromReadOnlySequence(ref ReadOnlySequence<byte> sequence)
+    public static PooledPieceSegment FromReadOnlySequence(ref ReadOnlySequence<byte> sequence, InfoHash infoHash, int index, int offset)
     {
-        var segment = new PooledPieceSegment((int)sequence.Length, ArrayPool<byte>.Shared);
+        var segment = new PooledPieceSegment((int)sequence.Length, ArrayPool<byte>.Shared, infoHash, index, offset);
         segment.Fill(ref sequence);
         return segment;
     }
 
-    private PooledPieceSegment(int size, ArrayPool<byte> pool)
+    private PooledPieceSegment(int size, ArrayPool<byte> pool, InfoHash infoHash, int index, int offset)
     {
+        InfoHash = infoHash;
+        Index = index;
+        Offset = offset;
         _pool = pool;
+        _size = size;
         _buffer = _pool.Rent(size);
     }
 

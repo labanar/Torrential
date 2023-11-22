@@ -29,8 +29,8 @@ public readonly record struct InfoHash(long P1, long P2, int P3)
         for (int i = 0; i < hash.Length; i++)
         {
             encoded[i * 3] = '%';
-            encoded[i * 3 + 1] = HexDigit(hash[i] >> 4);
-            encoded[i * 3 + 2] = HexDigit(hash[i] & 0x0F);
+            encoded[(i * 3) + 1] = HexDigit(hash[i] >> 4);
+            encoded[(i * 3) + 2] = HexDigit(hash[i] & 0x0F);
         }
     }
 

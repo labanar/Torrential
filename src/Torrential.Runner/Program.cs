@@ -6,8 +6,8 @@ using Serilog;
 using Serilog.Core;
 using Serilog.Sinks.Grafana.Loki;
 using Torrential;
+using Torrential.Files;
 using Torrential.Peers;
-using Torrential.Peers.Pieces;
 using Torrential.Trackers;
 
 
@@ -18,6 +18,7 @@ builder.Services.AddTorrential();
 builder.Services.AddSingleton<PieceSelector>();
 builder.Services.AddSingleton<PeerManager>();
 builder.Services.AddSingleton<BitfieldManager>();
+builder.Services.AddSingleton<TorrentMetadataCache>();
 builder.Services.AddHostedService<Runner>();
 
 var app = builder.Build();
@@ -42,13 +43,15 @@ static Logger BuildLogger(IConfiguration configuration)
     return config.CreateLogger();
 }
 
-internal class Runner(PeerManager peerMgr, IPeerService peerService, IEnumerable<ITrackerClient> trackerClients, BitfieldManager bitfieldMgr, PieceSelector pieceSelector, ILogger<Runner> logger)
+internal class Runner(PeerManager peerMgr, IPeerService peerService, IEnumerable<ITrackerClient> trackerClients, BitfieldManager bitfieldMgr, PieceSelector pieceSelector, IFileSegmentSaveService segmentSaveService, TorrentMetadataCache cache, ILogger<Runner> logger)
     : BackgroundService
 {
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var meta = TorrentMetadataParser.FromFile("./debian-12.0.0-amd64-netinst.iso.torrent");
+        cache.Add(meta);
+
         foreach (var tracker in trackerClients)
         {
             if (!tracker.IsValidAnnounceForClient(meta.AnnounceList.First())) continue;
@@ -82,7 +85,7 @@ internal class Runner(PeerManager peerMgr, IPeerService peerService, IEnumerable
         //After a piece goes through the verification queue, we need to update our bitfield
         //We also need to broadcast to each peer that we now have this new piece
         //This is after an ENTIRE piece is downloaded and verified (not a segment of a piece, but the full piece)
-        var processor = peer.Process(meta, bitfieldMgr, CancellationToken.None);
+        var processor = peer.Process(meta, bitfieldMgr, segmentSaveService, CancellationToken.None);
 
         //await peer.SendBitfield(new Bitfield2(meta.NumberOfPieces));
         while (peer.State.Bitfield == null)
@@ -91,7 +94,6 @@ internal class Runner(PeerManager peerMgr, IPeerService peerService, IEnumerable
         await peer.SendIntereted();
         while (peer.State.AmChoked)
             await Task.Delay(100);
-
 
 
         while (!peer.State.AmChoked)
@@ -159,8 +161,6 @@ internal class PeerManager
 
             //Based on the extensions in the handshake, we should know enough to wire up any runtime dependencies
             //1) Piece selection strategy
-            //2) 
-
 
             numConnected++;
             _logger.LogInformation("Connected to peer");
@@ -185,8 +185,6 @@ internal class PieceSelector(BitfieldManager bitfieldManager)
             return null;
 
 
-        //Find the intersection of a piece I do not have, but the peer does?
         return myBitfield.SuggestPieceToDownload(peerBitfield);
     }
-
 }

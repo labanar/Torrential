@@ -1,5 +1,4 @@
 ﻿using System.Collections.Concurrent;
-using Torrential.Peers.Pieces;
 
 namespace Torrential.Peers
 {

@@ -3,7 +3,7 @@ using System.Buffers;
 using System.IO.Pipelines;
 using System.Net.Sockets;
 using System.Threading.Channels;
-using Torrential.Peers.Pieces;
+using Torrential.Files;
 
 namespace Torrential.Peers;
 
@@ -43,9 +43,18 @@ public sealed class PeerWireClient : IDisposable
         SingleReader = true,
         SingleWriter = false
     });
+
+
+    private readonly Channel<PooledPieceSegment> PIECE_SEGMENT_CHANNEL = Channel.CreateUnbounded<PooledPieceSegment>(new UnboundedChannelOptions()
+    {
+        SingleReader = true,
+        SingleWriter = true
+    });
+
     private CancellationTokenSource _processCts;
     private BitfieldManager _bitfields;
     private InfoHash _infoHash;
+    private IFileSegmentSaveService _fileSegmentSaveService;
 
     public PeerWireState State => _state;
 
@@ -67,16 +76,33 @@ public sealed class PeerWireClient : IDisposable
             }
         }
     }
-    public async Task Process(TorrentMetadata meta, BitfieldManager bitfields, CancellationToken cancellationToken)
+    public async Task Process(TorrentMetadata meta, BitfieldManager bitfields, IFileSegmentSaveService fileSegmentSaveService, CancellationToken cancellationToken)
     {
         _bitfields = bitfields;
         _infoHash = meta.InfoHash;
+        _fileSegmentSaveService = fileSegmentSaveService;
         _state.Bitfield = new Bitfield(meta.NumberOfPieces);
         _processCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var readerTask = ProcessReads(_processCts.Token);
         var writeTask = ProcessWrites(_processCts.Token);
+        var savingTask = ProcessSegments(_processCts.Token);
         await readerTask;
         await writeTask;
+        await savingTask;
+    }
+
+    private async Task ProcessSegments(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await foreach (var segment in PIECE_SEGMENT_CHANNEL.Reader.ReadAllAsync(cancellationToken))
+            {
+                using (segment)
+                {
+                    _fileSegmentSaveService.SaveSegment(segment);
+                }
+            }
+        }
     }
 
     private async Task ProcessReads(CancellationToken cancellationToken)
@@ -292,14 +318,11 @@ public sealed class PeerWireClient : IDisposable
 
         _logger.LogInformation("Piece received from peer {Index} {Offset} {Length}", pieceIndex, pieceOffset, PIECE_SEGMENT_REQUEST_SIZE);
 
-        var segment = PooledPieceSegment.FromReadOnlySequence(ref segmentSequence);
-        segment.Dispose();
-
+        var segment = PooledPieceSegment.FromReadOnlySequence(ref segmentSequence, _infoHash, pieceIndex, pieceOffset);
+        PIECE_SEGMENT_CHANNEL.Writer.TryWrite(segment);
         _state.PiecesReceived += 1;
 
-        //Decrement the semaphore
         _pieceRequestLimit.Release();
-
         return true;
     }
     private bool HandleCancel(ReadOnlySequence<byte> payload)

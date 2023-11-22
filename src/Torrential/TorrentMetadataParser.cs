@@ -26,6 +26,11 @@ public static class TorrentMetadataParser
     public static TorrentMetadata FromFile(string fileName)
     {
         using var fs = File.OpenRead(fileName);
+        return FromStream(fs);
+    }
+
+    public static TorrentMetadata FromStream(Stream fs)
+    {
         var parser = new BencodeParser();
         var torrent = parser.Parse<Torrent>(fs);
         fs.Seek(0, SeekOrigin.Begin);
