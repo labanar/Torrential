@@ -4,6 +4,7 @@ using System.IO.Pipelines;
 using System.Net.Sockets;
 using System.Threading.Channels;
 using Torrential.Files;
+using Torrential.Torrents;
 
 namespace Torrential.Peers;
 
@@ -138,7 +139,9 @@ public sealed class PeerWireClient : IDisposable
             }
             catch (OperationCanceledException)
             {
-
+                _processCts.Cancel();
+                _connection.Dispose();
+                return;
             }
             catch (IOException)
             {

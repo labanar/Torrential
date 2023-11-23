@@ -1,5 +1,6 @@
 ﻿using System.Buffers;
 using Torrential.Peers;
+using Torrential.Torrents;
 
 namespace Torrential.Files
 {
@@ -26,11 +27,6 @@ namespace Torrential.Files
         }
     }
 
-    //Piece message needs the following
-    //Info hash
-    //Piece Index
-    //Offset
-    //Length
     public sealed class PieceSegment
         : IAsyncDisposable, IDisposable
     {

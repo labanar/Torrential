@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Torrential.Peers;
+using Torrential.Torrents;
 using Torrential.Trackers;
 using Torrential.Trackers.Http;
 

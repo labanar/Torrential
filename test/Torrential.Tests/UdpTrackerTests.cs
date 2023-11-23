@@ -1,4 +1,5 @@
-﻿using Torrential.Trackers;
+﻿using Torrential.Torrents;
+using Torrential.Trackers;
 using Torrential.Trackers.Udp;
 
 namespace Torrential.Tests;

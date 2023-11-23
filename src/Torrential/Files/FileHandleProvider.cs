@@ -1,6 +1,7 @@
 ﻿using Microsoft.Win32.SafeHandles;
 using System.Collections.Concurrent;
 using System.Text;
+using Torrential.Torrents;
 
 namespace Torrential.Files
 {
@@ -9,7 +10,6 @@ namespace Torrential.Files
     {
         private ConcurrentDictionary<InfoHash, SafeFileHandle> _fileHandles = new ConcurrentDictionary<InfoHash, SafeFileHandle>();
         private SemaphoreSlim _fileCreationSemaphore = new SemaphoreSlim(1, 1);
-
 
         public SafeFileHandle GetFileHandle(InfoHash hash)
         {

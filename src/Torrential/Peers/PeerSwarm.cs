@@ -8,7 +8,6 @@ namespace Torrential.Peers
     /// 1) Re-announcing on some cadence
     /// 2) Keeping the swarm healthy (removing bad peers, connecting to new ones when we're under the limit)
     /// 3) Central place for us to dispatch have messages to peers (once we downlod a piece we need to inform the peers we have it now)
-    /// 4) 
     /// 
     /// </summary>
     public sealed class PeerSwarm

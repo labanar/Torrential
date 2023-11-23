@@ -1,18 +1,21 @@
 ﻿using BencodeNET.Objects;
 using BencodeNET.Parsing;
 using BencodeNET.Torrents;
+using System.Collections.Concurrent;
 
-namespace Torrential;
+namespace Torrential.Torrents;
 
 public class TorrentMetadataCache
 {
-    private readonly Dictionary<InfoHash, TorrentMetadata> _torrents = [];
+    private readonly ConcurrentDictionary<InfoHash, TorrentMetadata> _torrents = [];
     public void Add(TorrentMetadata meta)
     {
-        if (_torrents.ContainsKey(meta.InfoHash))
-            return;
+        _torrents.TryAdd(meta.InfoHash, meta);
+    }
 
-        _torrents.Add(meta.InfoHash, meta);
+    public bool TryAdd(TorrentMetadata meta)
+    {
+        return _torrents.TryAdd(meta.InfoHash, meta);
     }
 
     public bool TryGet(InfoHash hash, out TorrentMetadata meta)

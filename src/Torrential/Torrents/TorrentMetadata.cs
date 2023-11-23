@@ -1,6 +1,6 @@
-﻿namespace Torrential;
+﻿namespace Torrential.Torrents;
 
-public class TorrentMetadata : IDisposable
+public class TorrentMetadata
 {
     public required string Name { get; init; }
     public string[] UrlList { get; init; } = Array.Empty<string>();
@@ -23,7 +23,7 @@ public class TorrentMetadata : IDisposable
         {
             _pieceHashesConcat = value;
             _numberOfPieces = value.Length / 20;
-            _numberOfPieces += (value.Length % 20 == 0) ? 0 : 1;
+            _numberOfPieces += value.Length % 20 == 0 ? 0 : 1;
         }
     }
 
@@ -31,10 +31,6 @@ public class TorrentMetadata : IDisposable
     {
         var offset = pieceIndex * 20;
         return _pieceHashesConcat.AsSpan().Slice(offset, 20);
-    }
-
-    public void Dispose()
-    {
     }
 }
 
