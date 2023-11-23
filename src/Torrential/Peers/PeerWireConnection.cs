@@ -37,16 +37,16 @@ public class PeerWireConnection : IPeerWireConnection
         _logger = logger;
     }
 
-    public async Task<PeerConnectionResult> Connect(InfoHash infoHash, PeerInfo peer, TimeSpan timeout)
+    public async Task<PeerConnectionResult> Connect(InfoHash infoHash, PeerInfo peer, CancellationToken cancellationToken)
     {
-        if (!await TryEstablishConnection(peer, timeout))
+        if (!await TryEstablishConnection(peer, cancellationToken))
         {
             _client.Dispose();
             return PeerConnectionResult.Failure;
         }
         _peerReader = PipeReader.Create(_client.GetStream());
         _peerWriter = PipeWriter.Create(_client.GetStream());
-        var handshakeResult = await Handshake(infoHash, timeout);
+        var handshakeResult = await Handshake(infoHash, cancellationToken);
         if (!handshakeResult.Success)
         {
             _client.Dispose();
@@ -58,15 +58,13 @@ public class PeerWireConnection : IPeerWireConnection
         IsConnected = true;
         return PeerConnectionResult.FromHandshake(handshakeResult);
     }
-    private async Task<bool> TryEstablishConnection(PeerInfo peer, TimeSpan timeout)
+    private async Task<bool> TryEstablishConnection(PeerInfo peer, CancellationToken cancellationToken)
     {
         var endpoint = new IPEndPoint(peer.Ip, peer.Port);
-        var cts = new CancellationTokenSource();
-        cts.CancelAfter(timeout);
 
         try
         {
-            await _client.ConnectAsync(endpoint, cts.Token);
+            await _client.ConnectAsync(endpoint, cancellationToken);
             _logger.LogInformation("Connection establied {Ip}:{Port}", peer.Ip, peer.Port);
             return true;
         }
@@ -94,24 +92,27 @@ public class PeerWireConnection : IPeerWireConnection
         return false;
     }
 
-    private async Task<HandshakeResponse> Handshake(InfoHash infoHash, TimeSpan timeout)
+    private async Task<HandshakeResponse> Handshake(InfoHash infoHash, CancellationToken cancellationToken)
     {
         await SendHandshake(_peerWriter, infoHash);
-        return await WaitForHandshake(infoHash, timeout);
+        return await WaitForHandshake(infoHash, cancellationToken);
     }
 
-    private async Task<HandshakeResponse> WaitForHandshake(InfoHash infoHash, TimeSpan timeout)
+    private async Task<HandshakeResponse> WaitForHandshake(InfoHash infoHash, CancellationToken cancellationToken)
     {
         var sw = Stopwatch.StartNew();
-        while (sw.Elapsed < timeout)
+        while (!cancellationToken.IsCancellationRequested)
         {
-
-            ReadResult result = default;
-            ReadOnlySequence<byte> buffer = default;
+            ReadOnlySequence<byte> buffer;
+            ReadResult result;
             try
             {
-                result = await _peerReader.ReadAsync();
+                result = await _peerReader.ReadAsync(cancellationToken);
                 buffer = result.Buffer;
+            }
+            catch (OperationCanceledException)
+            {
+                return new HandshakeResponse(HandshakeError.CANCELLED);
             }
             catch (Exception e)
             {
@@ -260,6 +261,7 @@ internal enum HandshakeError : byte
     HASH_NOT_RECEIVED,
     INVALID_HASH,
     PEER_ID_NOT_RECEIVED,
+    CANCELLED,
     FATAL = byte.MaxValue,
 }
 

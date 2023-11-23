@@ -73,7 +73,7 @@ public sealed class PeerWireClient : IDisposable
             using (pak)
             {
                 _connection.Writer.Write(pak.AsSpan());
-                await _connection.Writer.FlushAsync();
+                await _connection.Writer.FlushAsync(cancellationToken);
             }
         }
     }
@@ -113,7 +113,7 @@ public sealed class PeerWireClient : IDisposable
         {
             try
             {
-                ReadResult result = await _connection.Reader.ReadAsync();
+                ReadResult result = await _connection.Reader.ReadAsync(cancellationToken);
                 ReadOnlySequence<byte> buffer = result.Buffer;
 
                 while (TryReadMessage(ref buffer, out var messageSize, out var messageId, out ReadOnlySequence<byte> payload))

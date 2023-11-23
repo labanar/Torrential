@@ -20,7 +20,7 @@ namespace Torrential.Torrents
                     NumWant = 50
                 });
 
-                await peerMgr.ConnectToPeers(infoHash, announceResponse, 50);
+                await peerMgr.ConnectToPeers(infoHash, announceResponse, 50, cancellationToken);
                 bitfieldMgr.Initialize(meta.InfoHash, meta.NumberOfPieces);
 
                 var tasks = new List<Task>();
@@ -34,26 +34,18 @@ namespace Torrential.Torrents
 
         private async Task InitiatePeer(TorrentMetadata meta, PeerWireClient peer, CancellationToken cancellationToken)
         {
-            //Send in the runtime deps here
-            //Piece selection strategy
-            //Piece queue
-            //Rate limiting service
-
-            //After a piece goes through the verification queue, we need to update our bitfield
-            //We also need to broadcast to each peer that we now have this new piece
-            //This is after an ENTIRE piece is downloaded and verified (not a segment of a piece, but the full piece)
             var processor = peer.Process(meta, bitfieldMgr, segmentSaveService, cancellationToken);
 
             //await peer.SendBitfield(new Bitfield2(meta.NumberOfPieces));
-            while (peer.State.Bitfield == null)
+            while (peer.State.Bitfield == null && !cancellationToken.IsCancellationRequested)
                 await Task.Delay(100);
 
             await peer.SendIntereted();
-            while (peer.State.AmChoked)
+            while (peer.State.AmChoked && !cancellationToken.IsCancellationRequested)
                 await Task.Delay(100);
 
 
-            while (!peer.State.AmChoked)
+            while (!peer.State.AmChoked && !cancellationToken.IsCancellationRequested)
             {
                 //Start asking for pieces, wait for us to get a piece back then ask for the next piece
                 var idx = pieceSelector.SuggestNextPiece(meta.InfoHash, peer.State.Bitfield);

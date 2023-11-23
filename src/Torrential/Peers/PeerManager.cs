@@ -17,13 +17,16 @@ namespace Torrential.Peers
             _logger = logger;
         }
 
-        public async Task ConnectToPeers(InfoHash infoHash, AnnounceResponse announceResponse, int maxPeers)
+        public async Task ConnectToPeers(InfoHash infoHash, AnnounceResponse announceResponse, int maxPeers, CancellationToken cancellationToken)
         {
+            var timedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timedCts.CancelAfter(5_000);
+
             var peerConnectionDict = new Dictionary<PeerWireConnection, Task<PeerConnectionResult>>(announceResponse.Peers.Count);
             for (int i = 0; i < announceResponse.Peers.Count; i++)
             {
                 var conn = new PeerWireConnection(_peerService, new System.Net.Sockets.TcpClient(), _loggerFactory.CreateLogger<PeerWireConnection>());
-                peerConnectionDict.Add(conn, conn.Connect(infoHash, announceResponse.Peers.ElementAt(i), TimeSpan.FromSeconds(5)));
+                peerConnectionDict.Add(conn, conn.Connect(infoHash, announceResponse.Peers.ElementAt(i), timedCts.Token));
             }
             await Task.WhenAll(peerConnectionDict.Values);
 
