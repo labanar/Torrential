@@ -79,13 +79,12 @@
             var byteIndex = index / 8;
             var bitIndex = index % 8;
 
-
             await _semaphores[byteIndex].WaitAsync(cancellationToken);
             _bitfield[byteIndex] |= (byte)(1 << bitIndex);
             _semaphores[byteIndex].Release();
         }
 
-        private async Task UnmarkHaveAsync(int index, CancellationToken cancellationToken)
+        public async Task UnmarkHaveAsync(int index, CancellationToken cancellationToken)
         {
             if (index < 0 || index >= _numOfPieces)
             {

@@ -49,10 +49,10 @@ namespace Torrential.Torrents
             while (!peer.State.AmChoked && !cancellationToken.IsCancellationRequested)
             {
                 //Start asking for pieces, wait for us to get a piece back then ask for the next piece
-                var idx = pieceSelector.SuggestNextPiece(meta.InfoHash, peer.State.Bitfield);
+                var idx = await pieceSelector.SuggestNextPieceAsync(meta.InfoHash, peer.State.Bitfield);
                 if (idx == null)
                 {
-                    await Task.Delay(250);
+                    await Task.Delay(50);
                     continue;
                 }
 

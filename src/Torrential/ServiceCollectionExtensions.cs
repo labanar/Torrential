@@ -25,7 +25,7 @@ namespace Torrential
             services.AddSingleton<TorrentRunner>();
             services.AddSingleton<TorrentManager>();
             services.AddHostedService<PieceValidator>();
-            //services.AddHostedService<PieceSaveService>();
+            services.AddSingleton<PieceReservationService>();
         }
     }
 }

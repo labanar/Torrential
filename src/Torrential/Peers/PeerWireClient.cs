@@ -27,7 +27,6 @@ public sealed class PeerWireClient : IDisposable
     private readonly IPeerWireConnection _connection;
     private readonly ILogger _logger;
 
-
     private SemaphoreSlim _pieceRequestLimit = new SemaphoreSlim(10, 10);
 
     private readonly Channel<PreparedPacket> OUTBOUND_MESSAGES = Channel.CreateBounded<PreparedPacket>(new BoundedChannelOptions(10)
@@ -45,13 +44,6 @@ public sealed class PeerWireClient : IDisposable
         SingleWriter = false
     });
 
-
-    //private readonly Channel<PooledPieceSegment> PIECE_SEGMENT_CHANNEL = Channel.CreateUnbounded<PooledPieceSegment>(new UnboundedChannelOptions()
-    //{
-    //    SingleReader = false,
-    //    SingleWriter = true
-    //});
-
     private readonly Channel<PooledPieceSegment> PIECE_SEGMENT_CHANNEL = Channel.CreateBounded<PooledPieceSegment>(new BoundedChannelOptions(10)
     {
         SingleReader = false,
@@ -62,7 +54,6 @@ public sealed class PeerWireClient : IDisposable
     private BitfieldManager _bitfields;
     private InfoHash _infoHash;
     private IFileSegmentSaveService _fileSegmentSaveService;
-
     public PeerWireState State => _state;
 
     public PeerWireClient(IPeerWireConnection connection, ILogger logger)
@@ -87,12 +78,11 @@ public sealed class PeerWireClient : IDisposable
         await writeTask;
         await savingTask;
 
-
         OUTBOUND_MESSAGES.Writer.Complete();
         PIECE_SEGMENT_CHANNEL.Writer.Complete();
         INBOUND_MESSAGES.Writer.Complete();
 
-        //Drain and dispose all queues
+        //Clear out any disposables stuck in the channels
         await foreach (var pak in OUTBOUND_MESSAGES.Reader.ReadAllAsync())
             pak.Dispose();
 
@@ -253,18 +243,8 @@ public sealed class PeerWireClient : IDisposable
                 return true;
         }
 
-
         //Return false here when we cannot process the message. It tells the main loop to disconnect and stop comms with this peer
-
         return true;
-
-        //Put this into a generic packet format
-        //var packet = new PeerPacket(messageId, messageSize - 1);
-        //if (messageSize > 1)
-        //    packet.Fill(payload);
-
-        ////Place this in the reader channel
-        //INBOUND_MESSAGES.Writer.TryWrite(packet);
     }
 
     private bool HandleChoke()
