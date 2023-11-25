@@ -38,7 +38,7 @@
 
             var byteIndex = index / 8;
             var bitIndex = index % 8;
-            return (_bitfield[byteIndex] & 1 << bitIndex) != 0;
+            return (_bitfield[byteIndex] & (1 << bitIndex)) != 0;
         }
 
         public void MarkHave(int index)
@@ -61,7 +61,11 @@
             if (_numOfPieces != otherBitfield._numOfPieces)
                 throw new ArgumentException("Bitfields must be of the same size.");
 
-            for (int i = 0; i < _sizeInBytes; i++)
+            //Randomize the offset
+            var byteSlice = Random.Shared.Next(0, _sizeInBytes);
+
+
+            for (int i = byteSlice; i < _sizeInBytes; i++)
             {
                 var myByte = _bitfield[i];
                 var otherByte = otherBitfield._bitfield[i];
@@ -71,11 +75,23 @@
                 if (diff != 0)
                 {
                     // Find the index of the first set bit in diff
-                    for (var bit = 0; bit < 8; bit++)
+                    var bitSlice = Random.Shared.Next(0, 8);
+                    for (var bit = bitSlice; bit < 8; bit++)
                     {
-                        if ((diff & 1 << bit) != 0)
+                        if ((diff & (1 << bit)) != 0)
                         {
-                            var pieceIndex = i * 8 + bit;
+                            var pieceIndex = (i * 8) + bit;
+                            if (pieceIndex < _numOfPieces) // Ensure it's a valid piece index
+                            {
+                                return pieceIndex;
+                            }
+                        }
+                    }
+                    for (var bit = 0; bit < bitSlice; bit++)
+                    {
+                        if ((diff & (1 << bit)) != 0)
+                        {
+                            var pieceIndex = (i * 8) + bit;
                             if (pieceIndex < _numOfPieces) // Ensure it's a valid piece index
                             {
                                 return pieceIndex;
@@ -85,7 +101,43 @@
                 }
             }
 
-            return null; // No suitable piece found
+            for (int i = 0; i < byteSlice; i++)
+            {
+                var myByte = _bitfield[i];
+                var otherByte = otherBitfield._bitfield[i];
+
+                // Find a piece that exists in otherByte but not in myByte
+                var diff = (byte)(otherByte & ~myByte);
+                if (diff != 0)
+                {
+                    // Find the index of the first set bit in diff
+                    var bitSlice = Random.Shared.Next(0, 8);
+                    for (var bit = 0; bit < bitSlice; bit++)
+                    {
+                        if ((diff & (1 << bit)) != 0)
+                        {
+                            var pieceIndex = (i * 8) + bit;
+                            if (pieceIndex < _numOfPieces) // Ensure it's a valid piece index
+                            {
+                                return pieceIndex;
+                            }
+                        }
+                    }
+                    for (var bit = bitSlice; bit < 8; bit++)
+                    {
+                        if ((diff & (1 << bit)) != 0)
+                        {
+                            var pieceIndex = (i * 8) + bit;
+                            if (pieceIndex < _numOfPieces) // Ensure it's a valid piece index
+                            {
+                                return pieceIndex;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return null;
         }
     }
 }

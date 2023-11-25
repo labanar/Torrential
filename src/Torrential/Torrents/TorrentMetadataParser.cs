@@ -57,8 +57,8 @@ public static class TorrentMetadataParser
         }
         else if (torrent.File != null)
         {
-            files = new TorrentMetadataFile[1]
-            {
+            files =
+            [
                 new TorrentMetadataFile
                 {
                     Id = 0,
@@ -66,7 +66,7 @@ public static class TorrentMetadataParser
                     Filename = torrent.File.FileName,
                     FileSize = torrent.TotalSize,
                 }
-            };
+            ];
         }
         else
         {

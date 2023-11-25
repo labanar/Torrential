@@ -10,7 +10,7 @@ public sealed class PooledPieceSegment : IDisposable
     public ReadOnlySpan<byte> Buffer => _buffer.AsSpan().Slice(0, _size);
 
     public InfoHash InfoHash { get; private set; }
-    public int Index { get; private set; }
+    public int PieceIndex { get; private set; }
     public int Offset { get; private set; }
 
     public static PooledPieceSegment FromReadOnlySequence(ref ReadOnlySequence<byte> sequence, InfoHash infoHash, int index, int offset)
@@ -23,7 +23,7 @@ public sealed class PooledPieceSegment : IDisposable
     private PooledPieceSegment(int size, ArrayPool<byte> pool, InfoHash infoHash, int index, int offset)
     {
         InfoHash = infoHash;
-        Index = index;
+        PieceIndex = index;
         Offset = offset;
         _pool = pool;
         _size = size;

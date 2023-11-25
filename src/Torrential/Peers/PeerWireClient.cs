@@ -118,7 +118,7 @@ public sealed class PeerWireClient : IDisposable
 
                 while (TryReadMessage(ref buffer, out var messageSize, out var messageId, out ReadOnlySequence<byte> payload))
                 {
-                    _logger.LogInformation("GOT A MESSAGE - {MessageId} {MessageSize}", messageId, messageSize);
+                    //_logger.LogInformation("GOT A MESSAGE - {MessageId} {MessageSize}", messageId, messageSize);
                     if (!Process(messageSize, messageId, ref payload))
                     {
                         _logger.LogInformation("Disconnecting from Peer: failed to process message - {MessageId} {MessageSize}", messageId, messageSize);
@@ -319,7 +319,7 @@ public sealed class PeerWireClient : IDisposable
             return false;
         }
 
-        _logger.LogInformation("Piece received from peer {Index} {Offset} {Length}", pieceIndex, pieceOffset, PIECE_SEGMENT_REQUEST_SIZE);
+        //_logger.LogInformation("Piece received from peer {Index} {Offset} {Length}", pieceIndex, pieceOffset, PIECE_SEGMENT_REQUEST_SIZE);
 
         var segment = PooledPieceSegment.FromReadOnlySequence(ref segmentSequence, _infoHash, pieceIndex, pieceOffset);
         PIECE_SEGMENT_CHANNEL.Writer.TryWrite(segment);

@@ -1,4 +1,6 @@
-﻿using System.Buffers;
+﻿using Microsoft.Extensions.Logging;
+using System.Buffers;
+using System.Collections.Concurrent;
 using Torrential.Peers;
 using Torrential.Torrents;
 
@@ -9,9 +11,13 @@ namespace Torrential.Files
         void SaveSegment(PooledPieceSegment segment);
     }
 
-    public class FileSegmentSaveService(IFileHandleProvider fileHandleProvider, TorrentMetadataCache metaCache)
+    public class FileSegmentSaveService(IFileHandleProvider fileHandleProvider, TorrentMetadataCache metaCache, ILogger<FileSegmentSaveService> logger)
         : IFileSegmentSaveService
     {
+
+        private static readonly int SEGMENT_LENGTH = (int)Math.Pow(2, 14);
+        private ConcurrentDictionary<InfoHash, Bitfield> _segmentFields = [];
+
         public void SaveSegment(PooledPieceSegment segment)
         {
             using (segment)
@@ -21,9 +27,46 @@ namespace Torrential.Files
 
                 var fileHandle = fileHandleProvider.GetFileHandle(segment.InfoHash);
 
-                long fileOffset = (segment.Index * meta.PieceSize) + segment.Offset;
+                long fileOffset = (segment.PieceIndex * meta.PieceSize) + segment.Offset;
                 RandomAccess.Write(fileHandle, segment.Buffer, fileOffset);
+
+                var pieceSize = meta.PieceSize;
+                var numSegmentsPerPiece = (int)(pieceSize / SEGMENT_LENGTH);
+                var remainder = pieceSize % SEGMENT_LENGTH;
+                if (remainder > 0)
+                    numSegmentsPerPiece += 1;
+
+
+                var segmentField = _segmentFields.GetOrAdd(segment.InfoHash, (_) =>
+                {
+                    return new Bitfield(numSegmentsPerPiece * meta.NumberOfPieces);
+                });
+
+
+                var segmentFieldIndex = segment.PieceIndex * numSegmentsPerPiece;
+                var offsetIdx = segment.Offset / SEGMENT_LENGTH;
+                segmentFieldIndex += offsetIdx;
+                segmentField.MarkHave(segmentFieldIndex);
+
+                if (HasAllSegmentsForPiece(segment.InfoHash, segment.PieceIndex, numSegmentsPerPiece))
+                {
+                    logger.LogInformation("FULLY DOWNLOADED {PIECE}", segment.PieceIndex);
+                }
             }
+        }
+
+        public bool HasAllSegmentsForPiece(InfoHash infoHah, int pieceIndex, int segmentsPerPiece)
+        {
+            if (!_segmentFields.TryGetValue(infoHah, out var segmentField))
+                return false;
+
+            var segmentIndex = pieceIndex * segmentsPerPiece;
+            for (int i = 0; i < segmentsPerPiece; i++)
+            {
+                if (!segmentField.HasPiece(segmentIndex)) return false;
+            }
+
+            return true;
         }
     }
 

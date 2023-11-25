@@ -1,10 +1,11 @@
-﻿using Torrential.Files;
+﻿using Microsoft.Extensions.Logging;
+using Torrential.Files;
 using Torrential.Peers;
 using Torrential.Trackers;
 
 namespace Torrential.Torrents
 {
-    public class TorrentRunner(TorrentMetadataCache metaCache, IEnumerable<ITrackerClient> trackerClients, IPeerService peerService, PeerManager peerMgr, BitfieldManager bitfieldMgr, IFileSegmentSaveService segmentSaveService, PieceSelector pieceSelector)
+    public class TorrentRunner(ILogger<TorrentRunner> logger, TorrentMetadataCache metaCache, IEnumerable<ITrackerClient> trackerClients, IPeerService peerService, PeerManager peerMgr, BitfieldManager bitfieldMgr, IFileSegmentSaveService segmentSaveService, PieceSelector pieceSelector)
     {
         public async Task Run(InfoHash infoHash, CancellationToken cancellationToken)
         {
@@ -55,9 +56,10 @@ namespace Torrential.Torrents
                     continue;
                 }
 
+                logger.LogInformation("Requesting {Piece} from peer", idx);
                 var requestSize = (int)Math.Pow(2, 14);
                 var remainder = (int)meta.PieceSize;
-                while (remainder > 0)
+                while (remainder > 0 && !cancellationToken.IsCancellationRequested)
                 {
                     var offset = (int)meta.PieceSize - remainder;
                     await peer.SendPieceRequest(idx.Value, offset, requestSize);
