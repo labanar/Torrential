@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 namespace Torrential.Utilities;
 internal static class Sha1Helper
 {
-    private static readonly int CHUNK_SIZE = 1 << 14;
+    public static readonly int CHUNK_SIZE = 1 << 14;
     public static async Task<bool> VerifyHash(PipeReader reader, byte[] expectedHash, int CHUNK_SIZE)
     {
         using var hasher = SHA1.Create();

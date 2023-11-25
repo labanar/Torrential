@@ -46,9 +46,15 @@ public sealed class PeerWireClient : IDisposable
     });
 
 
-    private readonly Channel<PooledPieceSegment> PIECE_SEGMENT_CHANNEL = Channel.CreateUnbounded<PooledPieceSegment>(new UnboundedChannelOptions()
+    //private readonly Channel<PooledPieceSegment> PIECE_SEGMENT_CHANNEL = Channel.CreateUnbounded<PooledPieceSegment>(new UnboundedChannelOptions()
+    //{
+    //    SingleReader = false,
+    //    SingleWriter = true
+    //});
+
+    private readonly Channel<PooledPieceSegment> PIECE_SEGMENT_CHANNEL = Channel.CreateBounded<PooledPieceSegment>(new BoundedChannelOptions(10)
     {
-        SingleReader = true,
+        SingleReader = false,
         SingleWriter = true
     });
 
@@ -66,17 +72,7 @@ public sealed class PeerWireClient : IDisposable
         _state = new PeerWireState();
     }
 
-    private async Task ProcessWrites(CancellationToken cancellationToken)
-    {
-        await foreach (var pak in OUTBOUND_MESSAGES.Reader.ReadAllAsync(cancellationToken))
-        {
-            using (pak)
-            {
-                _connection.Writer.Write(pak.AsSpan());
-                await _connection.Writer.FlushAsync(cancellationToken);
-            }
-        }
-    }
+
     public async Task Process(TorrentMetadata meta, BitfieldManager bitfields, IFileSegmentSaveService fileSegmentSaveService, CancellationToken cancellationToken)
     {
         _bitfields = bitfields;
@@ -90,19 +86,40 @@ public sealed class PeerWireClient : IDisposable
         await readerTask;
         await writeTask;
         await savingTask;
+
+
+        OUTBOUND_MESSAGES.Writer.Complete();
+        PIECE_SEGMENT_CHANNEL.Writer.Complete();
+        INBOUND_MESSAGES.Writer.Complete();
+
+        //Drain and dispose all queues
+        await foreach (var pak in OUTBOUND_MESSAGES.Reader.ReadAllAsync())
+            pak.Dispose();
+
+        await foreach (var pak in PIECE_SEGMENT_CHANNEL.Reader.ReadAllAsync())
+            pak.Dispose();
+
+        await foreach (var pak in INBOUND_MESSAGES.Reader.ReadAllAsync())
+            pak.Dispose();
+    }
+
+    private async Task ProcessWrites(CancellationToken cancellationToken)
+    {
+        await foreach (var pak in OUTBOUND_MESSAGES.Reader.ReadAllAsync(cancellationToken))
+        {
+            using (pak)
+            {
+                _connection.Writer.Write(pak.AsSpan());
+                await _connection.Writer.FlushAsync(cancellationToken);
+            }
+        }
     }
 
     private async Task ProcessSegments(CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        await foreach (var segment in PIECE_SEGMENT_CHANNEL.Reader.ReadAllAsync(cancellationToken))
         {
-            await foreach (var segment in PIECE_SEGMENT_CHANNEL.Reader.ReadAllAsync(cancellationToken))
-            {
-                using (segment)
-                {
-                    _fileSegmentSaveService.SaveSegment(segment);
-                }
-            }
+            _fileSegmentSaveService.SaveSegment(segment);
         }
     }
 

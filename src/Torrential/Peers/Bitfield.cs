@@ -3,6 +3,7 @@
     public sealed class Bitfield
     {
         private int _numOfPieces;
+        private readonly SemaphoreSlim[] _semaphores;
         private int _sizeInBytes;
         private byte[] _bitfield;
 
@@ -11,7 +12,16 @@
             var fullBytes = numOfPieces / 8;
             var remaining = numOfPieces % 8;
             _numOfPieces = numOfPieces;
+
+
             _sizeInBytes = remaining == 0 ? fullBytes : fullBytes + 1;
+            _semaphores = new SemaphoreSlim[_sizeInBytes];
+
+            for (var i = 0; i < _sizeInBytes; i++)
+            {
+                _semaphores[i] = new SemaphoreSlim(1, 1);
+            }
+
             _bitfield = new byte[_sizeInBytes];
         }
 
@@ -19,6 +29,12 @@
         {
             _sizeInBytes = data.Length;
             _numOfPieces = _sizeInBytes * 8;
+            _semaphores = new SemaphoreSlim[_sizeInBytes];
+
+            for (var i = 0; i < _sizeInBytes; i++)
+            {
+                _semaphores[i] = new SemaphoreSlim(1, 1);
+            }
             _bitfield = new byte[_sizeInBytes];
             data.CopyTo(_bitfield);
         }
@@ -51,6 +67,38 @@
             var byteIndex = index / 8;
             var bitIndex = index % 8;
             _bitfield[byteIndex] |= (byte)(1 << bitIndex);
+        }
+
+        public async Task MarkHaveAsync(int index, CancellationToken cancellationToken)
+        {
+            if (index < 0 || index >= _numOfPieces)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            var byteIndex = index / 8;
+            var bitIndex = index % 8;
+
+
+            await _semaphores[byteIndex].WaitAsync(cancellationToken);
+            _bitfield[byteIndex] |= (byte)(1 << bitIndex);
+            _semaphores[byteIndex].Release();
+        }
+
+        private async Task UnmarkHaveAsync(int index, CancellationToken cancellationToken)
+        {
+            if (index < 0 || index >= _numOfPieces)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            var byteIndex = index / 8;
+            var bitIndex = index % 8;
+
+
+            await _semaphores[byteIndex].WaitAsync(cancellationToken);
+            _bitfield[byteIndex] &= (byte)~(1 << bitIndex);
+            _semaphores[byteIndex].Release();
         }
 
         public int? SuggestPieceToDownload(Bitfield otherBitfield)

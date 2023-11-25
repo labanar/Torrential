@@ -65,11 +65,6 @@ namespace Torrential.Torrents
                     await peer.SendPieceRequest(idx.Value, offset, requestSize);
                     remainder -= requestSize;
                 }
-
-                //TODO - this responsibility should be handled after we verify that the piece hash is good
-                //For now I'll artificially set the piece to high in our bitfield
-                if (bitfieldMgr.TryGetBitfield(meta.InfoHash, out var myBitfield))
-                    myBitfield.MarkHave(idx.Value);
             }
 
             await processor;

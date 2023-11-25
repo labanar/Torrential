@@ -2,7 +2,15 @@
 
 namespace Torrential.Peers;
 
-public sealed class PooledPieceSegment : IDisposable
+public interface IPieceSegment
+{
+    public ReadOnlySpan<byte> Buffer { get; }
+    public InfoHash InfoHash { get; }
+    public int PieceIndex { get; }
+    public int Offset { get; }
+}
+
+public sealed class PooledPieceSegment : IPieceSegment, IDisposable
 {
     private readonly ArrayPool<byte> _pool;
     private readonly int _size;
