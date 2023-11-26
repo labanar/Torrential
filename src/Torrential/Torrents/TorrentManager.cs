@@ -21,6 +21,14 @@ namespace Torrential.Torrents
             }
 
             metaCache.Add(torrentMetadata);
+            TorrentEventDispatcher.EventWriter.TryWrite(new TorrentAddedEvent
+            {
+                InfoHash = torrentMetadata.InfoHash,
+                AnnounceList = torrentMetadata.AnnounceList,
+                Files = torrentMetadata.Files,
+                Name = torrentMetadata.Name,
+                PieceSize = torrentMetadata.PieceSize
+            });
             _torrents[torrentMetadata.InfoHash] = "Idle";
             return new() { InfoHash = torrentMetadata.InfoHash, Success = true };
         }

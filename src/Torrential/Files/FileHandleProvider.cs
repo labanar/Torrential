@@ -26,15 +26,15 @@ namespace Torrential.Files
 
             try
             {
-                var fileName = $"{Math.Abs(hash.P1)}_{Math.Abs(hash.P2)}_{Math.Abs(hash.P3)}";
                 if (!metaCache.TryGet(hash, out var meta))
                 {
                     //Not ideal to throw here, but doing it for now
                     throw new ArgumentException("Torrent metadata not found in cache");
                 }
+
                 var pieceSize = (int)meta.PieceSize;
                 var numberOfPieces = meta.NumberOfPieces;
-                var filePath = CreateTorrentPartFile(fileName, pieceSize, numberOfPieces);
+                var filePath = CreateTorrentPartFile(meta.InfoHash.AsString(), pieceSize, numberOfPieces);
                 return _fileHandles.GetOrAdd(hash, (torrentId) => File.OpenHandle(filePath.FullName, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous));
             }
             finally

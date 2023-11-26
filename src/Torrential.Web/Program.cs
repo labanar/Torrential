@@ -1,8 +1,6 @@
 using Serilog;
 using Serilog.Core;
 using Serilog.Sinks.Grafana.Loki;
-using System.Text;
-using System.Text.Json;
 using Torrential;
 using Torrential.Extensions.SignalR;
 using Torrential.Torrents;
@@ -21,20 +19,20 @@ app.UseSwagger();
 app.UseSwaggerUI();
 app.MapHub<TorrentHub>("/torrents/hub");
 
-app
-    .MapGet("/torrents/events", async (HttpContext context) =>
-    {
-        context.Response.Headers.Append("Content-Type", "text/event-stream");
-        context.Response.Headers.Append("Cache-Control", "no-cache");
-        context.Response.Headers.Append("Connection", "keep-alive");
-        await foreach (var item in TorrentEventDispatcher.EventReader.ReadAllAsync(context.RequestAborted))
-        {
-            await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes("data: "));
-            await JsonSerializer.SerializeAsync(context.Response.Body, item);
-            await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes("\n\n"));
-            await context.Response.Body.FlushAsync();
-        }
-    });
+//app
+//    .MapGet("/torrents/events", async (HttpContext context) =>
+//    {
+//        context.Response.Headers.Append("Content-Type", "text/event-stream");
+//        context.Response.Headers.Append("Cache-Control", "no-cache");
+//        context.Response.Headers.Append("Connection", "keep-alive");
+//        await foreach (var item in TorrentEventDispatcher.EventReader.ReadAllAsync(context.RequestAborted))
+//        {
+//            await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes("data: "));
+//            await JsonSerializer.SerializeAsync(context.Response.Body, item);
+//            await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes("\n\n"));
+//            await context.Response.Body.FlushAsync();
+//        }
+//    });
 
 app.MapPost(
     "/torrents/add",

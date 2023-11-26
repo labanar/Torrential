@@ -5,49 +5,49 @@ namespace Torrential.Extensions.SignalR
 {
     public interface ITorrentClient
     {
-        Task TorrentAdded(TorrentMetadata infoHash);
-        Task TorrentRemoved(InfoHash infoHash);
-        Task TorrentCompleted(InfoHash infoHash);
-        Task TorrentStarted(InfoHash infoHash);
+        Task TorrentAdded(TorrentAddedEvent @event);
+        Task TorrentRemoved(TorrentRemovedEvent @event);
+        Task TorrentCompleted(TorrentCompleteEvent @event);
+        Task TorrentStarted(TorrentStartedEvent @event);
 
-        Task TorrentStopped(InfoHash infoHash);
+        Task TorrentStopped(TorrentStoppedEvent @event);
 
-        Task PieceDownloaded(InfoHash infoHash, int pieceIndex);
-        Task PieceVerified(InfoHash infoHash, int pieceIndex);
+        Task PieceDownloaded(TorrentPieceDownloadedEvent @event);
+        Task PieceVerified(TorrentPieceVerifiedEvent @event);
 
-        Task PeerConnected(InfoHash infoHash);
-        Task PeerDisconnected(InfoHash infoHash);
+        Task PeerConnected(PeerConnectedEvent @event);
+        Task PeerDisconnected(PeerDisconnectedEvent @event);
     }
 
 
 
     public sealed class TorrentHub : Hub<ITorrentClient>
     {
-        public async Task TorrentAdded(TorrentMetadata metadata)
-            => await Clients.All.TorrentAdded(metadata);
+        public async Task TorrentAdded(TorrentAddedEvent @event)
+            => await Clients.All.TorrentAdded(@event);
 
-        public async Task TorrentRemoved(InfoHash infoHash)
-            => await Clients.All.TorrentRemoved(infoHash);
+        public async Task TorrentRemoved(TorrentRemovedEvent @event)
+            => await Clients.All.TorrentRemoved(@event);
 
-        public async Task TorrentCompleted(InfoHash infoHash)
-            => await Clients.All.TorrentCompleted(infoHash);
+        public async Task TorrentCompleted(TorrentCompleteEvent @event)
+            => await Clients.All.TorrentCompleted(@event);
 
-        public async Task TorrentStarted(InfoHash infoHash)
-            => await Clients.All.TorrentStarted(infoHash);
+        public async Task TorrentStarted(TorrentStartedEvent @event)
+            => await Clients.All.TorrentStarted(@event);
 
-        public async Task TorrentStopped(InfoHash infoHash)
-            => await Clients.All.TorrentStopped(infoHash);
+        public async Task TorrentStopped(TorrentStoppedEvent @event)
+            => await Clients.All.TorrentStopped(@event);
 
-        public async Task PieceDownloaded(InfoHash infoHash, int pieceIndex)
-            => await Clients.All.PieceDownloaded(infoHash, pieceIndex);
+        public async Task PieceDownloaded(TorrentPieceDownloadedEvent @event)
+            => await Clients.All.PieceDownloaded(@event);
 
-        public async Task PieceVerified(InfoHash infoHash, int pieceIndex)
-            => await Clients.All.PieceVerified(infoHash, pieceIndex);
+        public async Task PieceVerified(TorrentPieceVerifiedEvent @event)
+            => await Clients.All.PieceVerified(@event);
 
-        public async Task PeerConnected(InfoHash infoHash)
-            => await Clients.All.PeerConnected(infoHash);
+        public async Task PeerConnected(PeerConnectedEvent @event)
+            => await Clients.All.PeerConnected(@event);
 
-        public async Task PeerDisconnected(InfoHash infoHash)
-            => await Clients.All.PeerDisconnected(infoHash);
+        public async Task PeerDisconnected(PeerDisconnectedEvent @event)
+            => await Clients.All.PeerDisconnected(@event);
     }
 }

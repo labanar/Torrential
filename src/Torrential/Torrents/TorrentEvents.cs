@@ -12,6 +12,7 @@ namespace Torrential.Torrents
     }
 
 
+    [JsonDerivedType(typeof(TorrentAddedEvent), "torrent_added")]
     [JsonDerivedType(typeof(TorrentStoppedEvent), "torrent_stopped")]
     [JsonDerivedType(typeof(TorrentStartedEvent), "torrent_started")]
     [JsonDerivedType(typeof(TorrentRemovedEvent), "torrent_removed")]
@@ -23,6 +24,15 @@ namespace Torrential.Torrents
     public interface ITorrentEvent
     {
         InfoHash InfoHash { get; }
+    }
+
+    public class TorrentAddedEvent : ITorrentEvent
+    {
+        public required InfoHash InfoHash { get; init; }
+        public required string Name { get; init; }
+        public required long PieceSize { get; set; }
+        public required ICollection<string> AnnounceList { get; set; } = Array.Empty<string>();
+        public required ICollection<TorrentMetadataFile> Files { get; set; } = Array.Empty<TorrentMetadataFile>();
     }
 
     public class TorrentStoppedEvent : ITorrentEvent
