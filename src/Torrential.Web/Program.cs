@@ -4,6 +4,7 @@ using Serilog.Sinks.Grafana.Loki;
 using System.Text;
 using System.Text.Json;
 using Torrential;
+using Torrential.Extensions.SignalR;
 using Torrential.Torrents;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,10 +13,13 @@ builder.Logging.AddSerilog(BuildLogger(builder.Configuration));
 builder.Services.AddTorrential();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSignalR();
+builder.Services.AddHostedService<TorrentHubMessageDispatcher>();
 
 var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
+app.MapHub<TorrentHub>("/torrents/hub");
 
 app
     .MapGet("/torrents/events", async (HttpContext context) =>

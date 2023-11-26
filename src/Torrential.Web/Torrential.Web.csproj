@@ -19,6 +19,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\Torrential.Extensions.SignalR\Torrential.Extensions.SignalR.csproj" />
 		<ProjectReference Include="..\Torrential\Torrential.csproj" />
 	</ItemGroup>
 
