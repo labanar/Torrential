@@ -25,7 +25,7 @@ namespace Torrential.Torrents
             return new() { InfoHash = torrentMetadata.InfoHash, Success = true };
         }
 
-        public TorrentManagerResponse Remove(InfoHash infoHash)
+        public async Task<TorrentManagerResponse> Remove(InfoHash infoHash)
         {
             if (!_torrents.TryGetValue(infoHash, out var status))
             {
@@ -37,8 +37,9 @@ namespace Torrential.Torrents
                 };
             }
 
+            await Stop(infoHash);
             _torrents.Remove(infoHash, out _);
-
+            await TorrentEventDispatcher.EventWriter.WriteAsync(new TorrentRemovedEvent { InfoHash = infoHash });
             return new() { InfoHash = infoHash, Success = true };
         }
 
@@ -68,6 +69,7 @@ namespace Torrential.Torrents
             var cts = new CancellationTokenSource();
             _torrentTokens[infoHash] = cts;
             _torrentTasks[infoHash] = runner.Run(infoHash, cts.Token);
+            TorrentEventDispatcher.EventWriter.TryWrite(new TorrentStartedEvent { InfoHash = infoHash });
             return new()
             {
                 InfoHash = infoHash,
@@ -114,6 +116,7 @@ namespace Torrential.Torrents
 
             _torrentTasks.Remove(infoHash, out _);
             _torrentTokens.Remove(infoHash, out _);
+            await TorrentEventDispatcher.EventWriter.WriteAsync(new TorrentStoppedEvent { InfoHash = infoHash });
 
             return new()
             {

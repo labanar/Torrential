@@ -1,7 +1,10 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Torrential;
 
+[JsonConverter(typeof(InfoHashJsonConverter))]
 public readonly record struct InfoHash(long P1, long P2, int P3) : IParsable<InfoHash>
 {
     public static readonly InfoHash None = new InfoHash(long.MaxValue, long.MaxValue, int.MaxValue);
@@ -83,6 +86,22 @@ public readonly record struct InfoHash(long P1, long P2, int P3) : IParsable<Inf
         return new string(encoded);
     }
 
+    public void CopyHexString(Span<char> destination)
+    {
+        Span<byte> hash = stackalloc byte[20];
+        CopyTo(hash);
+
+        Span<char> encoded = stackalloc char[40];
+        for (int i = 0; i < hash.Length; i++)
+        {
+            encoded[i * 2] = HexDigit(hash[i] >> 4);
+            encoded[(i * 2) + 1] = HexDigit(hash[i] & 0x0F);
+        }
+
+        encoded.CopyTo(destination);
+    }
+
+
     public static InfoHash Parse(string s, IFormatProvider? provider) =>
           FromHexString(s);
 
@@ -99,6 +118,23 @@ public readonly record struct InfoHash(long P1, long P2, int P3) : IParsable<Inf
             return false;
         }
     }
-
 }
+
+public class InfoHashJsonConverter : JsonConverter<InfoHash>
+{
+    public override InfoHash Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        Span<char> chars = stackalloc char[40];
+        reader.CopyString(chars);
+        return InfoHash.FromHexString(chars);
+    }
+
+    public override void Write(Utf8JsonWriter writer, InfoHash value, JsonSerializerOptions options)
+    {
+        Span<char> chars = stackalloc char[40];
+        value.CopyHexString(chars);
+        writer.WriteStringValue(chars);
+    }
+}
+
 

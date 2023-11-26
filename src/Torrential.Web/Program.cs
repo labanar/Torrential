@@ -1,6 +1,8 @@
 using Serilog;
 using Serilog.Core;
 using Serilog.Sinks.Grafana.Loki;
+using System.Text;
+using System.Text.Json;
 using Torrential;
 using Torrential.Torrents;
 
@@ -14,6 +16,21 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app
+    .MapGet("/torrents/events", async (HttpContext context) =>
+    {
+        context.Response.Headers.Append("Content-Type", "text/event-stream");
+        context.Response.Headers.Append("Cache-Control", "no-cache");
+        context.Response.Headers.Append("Connection", "keep-alive");
+        await foreach (var item in TorrentEventDispatcher.EventReader.ReadAllAsync(context.RequestAborted))
+        {
+            await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes("data: "));
+            await JsonSerializer.SerializeAsync(context.Response.Body, item);
+            await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes("\n\n"));
+            await context.Response.Body.FlushAsync();
+        }
+    });
 
 app.MapPost(
     "/torrents/add",
@@ -49,8 +66,8 @@ app.MapPost("torrents/{infoHash}/stop",
         await torrentManager.Stop(infoHash));
 
 app.MapPatch("torrents/{infoHash}/delete",
-    (InfoHash infoHash, TorrentManager torrentManager) =>
-        torrentManager.Remove(infoHash));
+    async (InfoHash infoHash, TorrentManager torrentManager) =>
+       await torrentManager.Remove(infoHash));
 
 app.Run();
 

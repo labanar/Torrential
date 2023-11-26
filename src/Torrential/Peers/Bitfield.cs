@@ -45,6 +45,45 @@
             data.CopyTo(_bitfield);
         }
 
+        public bool HasAll()
+        {
+            for (int i = 0; i < _sizeInBytes; i++)
+            {
+                // If any byte is not fully set, return false
+                if (_bitfield[i] != 0xFF)
+                {
+                    return false;
+                }
+            }
+
+            // Check the remaining bits in the last byte if the number of pieces is not a multiple of 8
+            int extraBits = _numOfPieces % 8;
+            if (extraBits != 0)
+            {
+                byte lastByteMask = (byte)(0xFF << (8 - extraBits));
+                if ((_bitfield[^1] & lastByteMask) != lastByteMask)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public bool HasNone()
+        {
+            for (int i = 0; i < _sizeInBytes; i++)
+            {
+                // If any byte is set, return false
+                if (_bitfield[i] != 0)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         public bool HasPiece(int index)
         {
             if (index < 0 || index >= _numOfPieces)

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Torrential.Torrents;
 using Torrential.Trackers;
 
 namespace Torrential.Peers
@@ -39,6 +40,9 @@ namespace Torrential.Peers
                     conn.Dispose();
                     continue;
                 }
+
+                await TorrentEventDispatcher.EventWriter.WriteAsync(new PeerConnectedEvent { InfoHash = infoHash }, cancellationToken);
+
 
                 //Based on the extensions in the handshake, we should know enough to wire up any runtime dependencies
                 //1) Piece selection strategy
