@@ -8,7 +8,6 @@ namespace Torrential.Torrents
         private static Channel<ITorrentEvent> _events = Channel.CreateUnbounded<ITorrentEvent>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
         public static ChannelWriter<ITorrentEvent> EventWriter = _events.Writer;
         public static ChannelReader<ITorrentEvent> EventReader = _events.Reader;
-
     }
 
 
@@ -31,6 +30,7 @@ namespace Torrential.Torrents
         public required InfoHash InfoHash { get; init; }
         public required string Name { get; init; }
         public required long PieceSize { get; set; }
+        public required int NumberOfPieces { get; set; }
         public required ICollection<string> AnnounceList { get; set; } = Array.Empty<string>();
         public required ICollection<TorrentMetadataFile> Files { get; set; } = Array.Empty<TorrentMetadataFile>();
     }

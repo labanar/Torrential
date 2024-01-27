@@ -67,8 +67,10 @@ namespace Torrential.Tests
             Assert.NotEqual(0, resp.Interval);
             Assert.NotEmpty(resp.Peers);
 
+            //TODO - lift timeout to config
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
             var conn = new PeerWireConnection(peerService, new System.Net.Sockets.TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
-            var result = await conn.Connect(meta.InfoHash, resp.Peers.First(), TimeSpan.FromSeconds(2));
+            var result = await conn.Connect(meta.InfoHash, resp.Peers.First(), cts.Token);
             Assert.True(result.Success);
         }
     }

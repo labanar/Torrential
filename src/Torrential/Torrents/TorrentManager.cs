@@ -27,6 +27,7 @@ namespace Torrential.Torrents
                 AnnounceList = torrentMetadata.AnnounceList,
                 Files = torrentMetadata.Files,
                 Name = torrentMetadata.Name,
+                NumberOfPieces = torrentMetadata.NumberOfPieces,
                 PieceSize = torrentMetadata.PieceSize
             });
             _torrents[torrentMetadata.InfoHash] = "Idle";
