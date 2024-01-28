@@ -1,10 +1,9 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using MassTransit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32.SafeHandles;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.IO.Pipelines;
-using System.Threading.Channels;
 using Torrential.Peers;
 using Torrential.Torrents;
 using Torrential.Utilities;
@@ -13,16 +12,16 @@ namespace Torrential.Files
 {
     public interface IFileSegmentSaveService
     {
-        void SaveSegment(PooledPieceSegment segment);
+        Task SaveSegment(PooledPieceSegment segment);
     }
 
-    public class FileSegmentSaveService(IFileHandleProvider fileHandleProvider, TorrentMetadataCache metaCache, ILogger<FileSegmentSaveService> logger, BitfieldManager bitfieldManager)
+    public class FileSegmentSaveService(IFileHandleProvider fileHandleProvider, TorrentMetadataCache metaCache, ILogger<FileSegmentSaveService> logger, BitfieldManager bitfieldManager, IBus bus)
         : IFileSegmentSaveService
     {
         private static readonly int SEGMENT_LENGTH = (int)Math.Pow(2, 14);
         private ConcurrentDictionary<InfoHash, Bitfield> _segmentFields = [];
 
-        public void SaveSegment(PooledPieceSegment segment)
+        public async Task SaveSegment(PooledPieceSegment segment)
         {
             using (segment)
             {
@@ -62,8 +61,8 @@ namespace Torrential.Files
                 segmentField.MarkHave(segmentFieldIndex);
                 if (HasAllSegmentsForPiece(segment.InfoHash, segment.PieceIndex, numSegmentsPerPiece))
                 {
-                    PieceValidator.REQUEST_CHANNEL.TryWrite(new() { InfoHash = segment.InfoHash, PieceIndex = segment.PieceIndex });
-                    TorrentEventDispatcher.EventWriter.TryWrite(new TorrentPieceDownloadedEvent { InfoHash = segment.InfoHash, PieceIndex = segment.PieceIndex });
+                    await bus.Publish(new PieceValidationRequest { InfoHash = segment.InfoHash, PieceIndex = segment.PieceIndex });
+                    await bus.Publish(new TorrentPieceDownloadedEvent { InfoHash = segment.InfoHash, PieceIndex = segment.PieceIndex });
                 }
             }
         }
@@ -125,58 +124,43 @@ namespace Torrential.Files
     }
 
 
-    public class PieceValidator(ILogger<PieceValidator> logger, TorrentMetadataCache metaCache, IFileHandleProvider fileHandleProvider, BitfieldManager bitfieldMgr)
-        : BackgroundService
+    public class PieceValidator(ILogger<PieceValidator> logger, TorrentMetadataCache metaCache, IFileHandleProvider fileHandleProvider, BitfieldManager bitfieldMgr, IBus bus)
+        : IConsumer<PieceValidationRequest>
     {
-        private static Channel<PieceValidationRequest> VALIDATION_CHANNEL = Channel.CreateUnbounded<PieceValidationRequest>(new UnboundedChannelOptions
+        public async Task Consume(ConsumeContext<PieceValidationRequest> context)
         {
-            SingleWriter = false,
-            SingleReader = true
-        });
+            var request = context.Message;
 
-        public static ChannelWriter<PieceValidationRequest> REQUEST_CHANNEL = VALIDATION_CHANNEL.Writer;
+            //Have we already verified this piece?
+            if (!bitfieldMgr.TryGetBitfield(request.InfoHash, out var bitfield))
+                return;
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            await foreach (var request in VALIDATION_CHANNEL.Reader.ReadAllAsync(stoppingToken))
+            if (bitfield.HasPiece(request.PieceIndex))
+                logger.LogInformation("Already verified piece {Piece} - ignoring", request.PieceIndex);
+
+
+            if (!metaCache.TryGet(request.InfoHash, out var meta))
+                logger.LogError("Could not find torrent metadata");
+
+            var fileHandle = fileHandleProvider.GetFileHandle(request.InfoHash);
+            var buffer = ArrayPool<byte>.Shared.Rent(20);
+            meta.GetPieceHash(request.PieceIndex).CopyTo(buffer);
+
+            var pipe = new System.IO.Pipelines.Pipe();
+            var fillTask = FillPipeWithPiece(fileHandle, pipe.Writer, request.PieceIndex, (int)meta.PieceSize).ConfigureAwait(true);
+            var result = await Sha1Helper.VerifyHash(pipe.Reader, buffer, Sha1Helper.CHUNK_SIZE);
+            ArrayPool<byte>.Shared.Return(buffer);
+            await fillTask;
+            logger.LogInformation("Validation result for {Piece}: {Result}", request.PieceIndex, result);
+
+            if (result)
             {
-                //Have we already verified this piece?
-                if (!bitfieldMgr.TryGetBitfield(request.InfoHash, out var bitfield))
-                    continue;
-
-                if (bitfield.HasPiece(request.PieceIndex))
+                bitfield.MarkHave(request.PieceIndex);
+                await bus.Publish(new TorrentPieceVerifiedEvent { InfoHash = request.InfoHash, PieceIndex = request.PieceIndex });
+                if (bitfield.HasAll())
                 {
-                    logger.LogInformation("Already verified piece {Piece} - ignoring", request.PieceIndex);
-                    continue;
-                }
-
-
-                if (!metaCache.TryGet(request.InfoHash, out var meta))
-                {
-                    logger.LogError("Could not find torrent metadata");
-                    continue;
-                }
-
-                var fileHandle = fileHandleProvider.GetFileHandle(request.InfoHash);
-                var buffer = ArrayPool<byte>.Shared.Rent(20);
-                meta.GetPieceHash(request.PieceIndex).CopyTo(buffer);
-
-                var pipe = new Pipe();
-                var fillTask = FillPipeWithPiece(fileHandle, pipe.Writer, request.PieceIndex, (int)meta.PieceSize).ConfigureAwait(true);
-                var result = await Sha1Helper.VerifyHash(pipe.Reader, buffer, Sha1Helper.CHUNK_SIZE);
-                ArrayPool<byte>.Shared.Return(buffer);
-                await fillTask;
-                logger.LogInformation("Validation result for {Piece}: {Result}", request.PieceIndex, result);
-
-                if (result)
-                {
-                    bitfield.MarkHave(request.PieceIndex);
-                    TorrentEventDispatcher.EventWriter.TryWrite(new TorrentPieceVerifiedEvent { InfoHash = request.InfoHash, PieceIndex = request.PieceIndex });
-                    if (bitfield.HasAll())
-                    {
-                        logger.LogInformation("ALL PIECES ACQUIRED!");
-                        TorrentEventDispatcher.EventWriter.TryWrite(new TorrentCompleteEvent { InfoHash = request.InfoHash });
-                    }
+                    logger.LogInformation("ALL PIECES ACQUIRED!");
+                    await bus.Publish(new TorrentCompleteEvent { InfoHash = request.InfoHash });
                 }
             }
         }
