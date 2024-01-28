@@ -48,6 +48,4 @@ namespace Torrential.Peers
             peerConnectionDict.Clear();
         }
     }
-
-
 }

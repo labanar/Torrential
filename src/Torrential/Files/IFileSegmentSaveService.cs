@@ -46,7 +46,7 @@ namespace Torrential.Files
                 });
 
 
-                var fileHandle = fileHandleProvider.GetFileHandle(segment.InfoHash);
+                var fileHandle = fileHandleProvider.GetPartFileHandle(segment.InfoHash);
 
                 long fileOffset = (segment.PieceIndex * meta.PieceSize) + segment.Offset;
                 RandomAccess.Write(fileHandle, segment.Buffer, fileOffset);
@@ -142,7 +142,7 @@ namespace Torrential.Files
             if (!metaCache.TryGet(request.InfoHash, out var meta))
                 logger.LogError("Could not find torrent metadata");
 
-            var fileHandle = fileHandleProvider.GetFileHandle(request.InfoHash);
+            var fileHandle = fileHandleProvider.GetPartFileHandle(request.InfoHash);
             var buffer = ArrayPool<byte>.Shared.Rent(20);
             meta.GetPieceHash(request.PieceIndex).CopyTo(buffer);
 

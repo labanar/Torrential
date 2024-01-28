@@ -4,6 +4,8 @@ namespace Torrential.Files
 {
     public interface IFileHandleProvider
     {
-        public SafeFileHandle GetFileHandle(InfoHash infoHash);
+        public SafeFileHandle GetPartFileHandle(InfoHash infoHash);
+
+        public string GetPartFilePath(InfoHash infoHash);
     }
 }
