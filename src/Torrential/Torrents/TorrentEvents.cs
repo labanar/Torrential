@@ -11,6 +11,8 @@ namespace Torrential.Torrents
     [JsonDerivedType(typeof(TorrentPieceVerifiedEvent), "piece_verified")]
     [JsonDerivedType(typeof(PeerConnectedEvent), "peer_connected")]
     [JsonDerivedType(typeof(PeerDisconnectedEvent), "peer_disconnected")]
+    [JsonDerivedType(typeof(TorrentFileCopyStartedEvent), "file_copy_started")]
+    [JsonDerivedType(typeof(TorrentFileCopyCompletedEvent), "file_copy_completed")]
     public interface ITorrentEvent
     {
         InfoHash InfoHash { get; }
@@ -68,4 +70,18 @@ namespace Torrential.Torrents
     {
         public required InfoHash InfoHash { get; init; }
     }
+
+    public class TorrentFileCopyStartedEvent : ITorrentEvent
+    {
+        public required InfoHash InfoHash { get; init; }
+        public required string FileName { get; init; }
+    }
+
+    public class TorrentFileCopyCompletedEvent : ITorrentEvent
+    {
+        public required InfoHash InfoHash { get; init; }
+        public required string FileName { get; init; }
+    }
+
+
 }
