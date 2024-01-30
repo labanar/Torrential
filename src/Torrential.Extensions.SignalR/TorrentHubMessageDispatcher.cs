@@ -1,49 +1,45 @@
-﻿using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Hosting;
+﻿using MassTransit;
+using Microsoft.AspNetCore.SignalR;
 using Torrential.Torrents;
 
 namespace Torrential.Extensions.SignalR
 {
     public sealed class TorrentHubMessageDispatcher(IHubContext<TorrentHub, ITorrentClient> hubContext)
-        : BackgroundService
+        : IConsumer<TorrentAddedEvent>,
+        IConsumer<TorrentStartedEvent>,
+        IConsumer<TorrentStoppedEvent>,
+        IConsumer<TorrentCompleteEvent>,
+        IConsumer<TorrentRemovedEvent>,
+        IConsumer<TorrentPieceDownloadedEvent>,
+        IConsumer<TorrentPieceVerifiedEvent>,
+        IConsumer<PeerConnectedEvent>,
+        IConsumer<PeerDisconnectedEvent>
     {
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            await foreach (var item in TorrentEventDispatcher.EventReader.ReadAllAsync(stoppingToken))
-            {
-                switch (item)
-                {
-                    case TorrentAddedEvent added:
-                        await hubContext.Clients.All.TorrentAdded(added);
-                        break;
-                    case TorrentStartedEvent started:
-                        await hubContext.Clients.All.TorrentStarted(started);
-                        break;
-                    case TorrentStoppedEvent stopped:
-                        await hubContext.Clients.All.TorrentStopped(stopped);
-                        break;
-                    case TorrentCompleteEvent completed:
-                        await hubContext.Clients.All.TorrentCompleted(completed);
-                        break;
-                    case TorrentRemovedEvent removed:
-                        await hubContext.Clients.All.TorrentRemoved(removed);
-                        break;
-                    case TorrentPieceDownloadedEvent pieceDownloaded:
-                        await hubContext.Clients.All.PieceDownloaded(pieceDownloaded);
-                        break;
-                    case TorrentPieceVerifiedEvent pieceVerified:
-                        await hubContext.Clients.All.PieceVerified(pieceVerified);
-                        break;
-                    case PeerConnectedEvent peerConnected:
-                        await hubContext.Clients.All.PeerConnected(peerConnected);
-                        break;
-                    case PeerDisconnectedEvent peerDisconnected:
-                        await hubContext.Clients.All.PeerDisconnected(peerDisconnected);
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
+        public async Task Consume(ConsumeContext<TorrentAddedEvent> context) =>
+            await hubContext.Clients.All.TorrentAdded(context.Message);
+
+        public async Task Consume(ConsumeContext<TorrentStartedEvent> context) =>
+            await hubContext.Clients.All.TorrentStarted(context.Message);
+
+        public async Task Consume(ConsumeContext<TorrentStoppedEvent> context) =>
+            await hubContext.Clients.All.TorrentStopped(context.Message);
+
+        public async Task Consume(ConsumeContext<TorrentCompleteEvent> context) =>
+            await hubContext.Clients.All.TorrentCompleted(context.Message);
+
+        public async Task Consume(ConsumeContext<TorrentRemovedEvent> context) =>
+            await hubContext.Clients.All.TorrentRemoved(context.Message);
+
+        public async Task Consume(ConsumeContext<TorrentPieceDownloadedEvent> context) =>
+            await hubContext.Clients.All.PieceDownloaded(context.Message);
+
+        public async Task Consume(ConsumeContext<TorrentPieceVerifiedEvent> context) =>
+            await hubContext.Clients.All.PieceVerified(context.Message);
+
+        public async Task Consume(ConsumeContext<PeerConnectedEvent> context) =>
+            await hubContext.Clients.All.PeerConnected(context.Message);
+
+        public async Task Consume(ConsumeContext<PeerDisconnectedEvent> context) =>
+            await hubContext.Clients.All.PeerDisconnected(context.Message);
     }
 }

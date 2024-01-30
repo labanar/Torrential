@@ -1,8 +1,10 @@
+using MassTransit;
 using Serilog;
 using Serilog.Core;
 using Serilog.Sinks.Grafana.Loki;
 using Torrential;
 using Torrential.Extensions.SignalR;
+using Torrential.Files;
 using Torrential.Torrents;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,7 +14,14 @@ builder.Services.AddTorrential();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
-builder.Services.AddHostedService<TorrentHubMessageDispatcher>();
+builder.Services.AddMassTransit(x =>
+{
+    x.AddConsumers(typeof(TorrentHubMessageDispatcher).Assembly, typeof(PieceValidator).Assembly);
+    x.UsingInMemory((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
+});
 
 var app = builder.Build();
 app.UseSwagger();
@@ -39,7 +48,7 @@ app.MapPost(
     async (IFormFile file, TorrentManager manager) =>
     {
         var meta = TorrentMetadataParser.FromStream(file.OpenReadStream());
-        return manager.Add(meta);
+        return await manager.Add(meta);
     })
     .DisableAntiforgery();
 
@@ -60,8 +69,8 @@ app.MapGet(
 
 app.MapPost(
     "torrents/{infoHash}/start",
-    (InfoHash infoHash, TorrentManager torrentManager) =>
-        torrentManager.Start(infoHash));
+    async (InfoHash infoHash, TorrentManager torrentManager) =>
+       await torrentManager.Start(infoHash));
 
 app.MapPost("torrents/{infoHash}/stop",
     async (InfoHash infoHash, TorrentManager torrentManager) =>

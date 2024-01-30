@@ -1,16 +1,7 @@
 ﻿using System.Text.Json.Serialization;
-using System.Threading.Channels;
 
 namespace Torrential.Torrents
 {
-    public class TorrentEventDispatcher
-    {
-        private static Channel<ITorrentEvent> _events = Channel.CreateUnbounded<ITorrentEvent>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
-        public static ChannelWriter<ITorrentEvent> EventWriter = _events.Writer;
-        public static ChannelReader<ITorrentEvent> EventReader = _events.Reader;
-    }
-
-
     [JsonDerivedType(typeof(TorrentAddedEvent), "torrent_added")]
     [JsonDerivedType(typeof(TorrentStoppedEvent), "torrent_stopped")]
     [JsonDerivedType(typeof(TorrentStartedEvent), "torrent_started")]
@@ -20,6 +11,8 @@ namespace Torrential.Torrents
     [JsonDerivedType(typeof(TorrentPieceVerifiedEvent), "piece_verified")]
     [JsonDerivedType(typeof(PeerConnectedEvent), "peer_connected")]
     [JsonDerivedType(typeof(PeerDisconnectedEvent), "peer_disconnected")]
+    [JsonDerivedType(typeof(TorrentFileCopyStartedEvent), "file_copy_started")]
+    [JsonDerivedType(typeof(TorrentFileCopyCompletedEvent), "file_copy_completed")]
     public interface ITorrentEvent
     {
         InfoHash InfoHash { get; }
@@ -77,4 +70,18 @@ namespace Torrential.Torrents
     {
         public required InfoHash InfoHash { get; init; }
     }
+
+    public class TorrentFileCopyStartedEvent : ITorrentEvent
+    {
+        public required InfoHash InfoHash { get; init; }
+        public required string FileName { get; init; }
+    }
+
+    public class TorrentFileCopyCompletedEvent : ITorrentEvent
+    {
+        public required InfoHash InfoHash { get; init; }
+        public required string FileName { get; init; }
+    }
+
+
 }

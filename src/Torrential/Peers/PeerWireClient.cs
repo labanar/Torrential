@@ -109,7 +109,7 @@ public sealed class PeerWireClient : IDisposable
     {
         await foreach (var segment in PIECE_SEGMENT_CHANNEL.Reader.ReadAllAsync(cancellationToken))
         {
-            _fileSegmentSaveService.SaveSegment(segment);
+            await _fileSegmentSaveService.SaveSegment(segment);
         }
     }
 

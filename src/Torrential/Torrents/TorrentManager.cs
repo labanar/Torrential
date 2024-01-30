@@ -1,14 +1,15 @@
-﻿using System.Collections.Concurrent;
+﻿using MassTransit;
+using System.Collections.Concurrent;
 
 namespace Torrential.Torrents
 {
-    public class TorrentManager(TorrentMetadataCache metaCache, TorrentRunner runner)
+    public class TorrentManager(TorrentMetadataCache metaCache, TorrentRunner runner, IBus bus)
     {
         private ConcurrentDictionary<InfoHash, string> _torrents = [];
         private ConcurrentDictionary<InfoHash, Task> _torrentTasks = [];
         private ConcurrentDictionary<InfoHash, CancellationTokenSource> _torrentTokens = [];
 
-        public TorrentManagerResponse Add(TorrentMetadata torrentMetadata)
+        public async Task<TorrentManagerResponse> Add(TorrentMetadata torrentMetadata)
         {
             if (_torrents.ContainsKey(torrentMetadata.InfoHash))
             {
@@ -21,7 +22,7 @@ namespace Torrential.Torrents
             }
 
             metaCache.Add(torrentMetadata);
-            TorrentEventDispatcher.EventWriter.TryWrite(new TorrentAddedEvent
+            await bus.Publish(new TorrentAddedEvent
             {
                 InfoHash = torrentMetadata.InfoHash,
                 AnnounceList = torrentMetadata.AnnounceList,
@@ -48,12 +49,12 @@ namespace Torrential.Torrents
 
             await Stop(infoHash);
             _torrents.Remove(infoHash, out _);
-            await TorrentEventDispatcher.EventWriter.WriteAsync(new TorrentRemovedEvent { InfoHash = infoHash });
+            await bus.Publish(new TorrentRemovedEvent { InfoHash = infoHash });
             return new() { InfoHash = infoHash, Success = true };
         }
 
 
-        public TorrentManagerResponse Start(InfoHash infoHash)
+        public async Task<TorrentManagerResponse> Start(InfoHash infoHash)
         {
             if (!_torrents.TryGetValue(infoHash, out var status))
             {
@@ -78,7 +79,7 @@ namespace Torrential.Torrents
             var cts = new CancellationTokenSource();
             _torrentTokens[infoHash] = cts;
             _torrentTasks[infoHash] = runner.Run(infoHash, cts.Token);
-            TorrentEventDispatcher.EventWriter.TryWrite(new TorrentStartedEvent { InfoHash = infoHash });
+            await bus.Publish(new TorrentStartedEvent { InfoHash = infoHash });
             return new()
             {
                 InfoHash = infoHash,
@@ -125,7 +126,7 @@ namespace Torrential.Torrents
 
             _torrentTasks.Remove(infoHash, out _);
             _torrentTokens.Remove(infoHash, out _);
-            await TorrentEventDispatcher.EventWriter.WriteAsync(new TorrentStoppedEvent { InfoHash = infoHash });
+            await bus.Publish(new TorrentStoppedEvent { InfoHash = infoHash });
 
             return new()
             {
