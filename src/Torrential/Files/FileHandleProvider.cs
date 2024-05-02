@@ -2,11 +2,12 @@
 using Microsoft.Win32.SafeHandles;
 using System.Collections.Concurrent;
 using System.Text;
+using System.Text.Json;
 using Torrential.Torrents;
 
 namespace Torrential.Files
 {
-    internal class FileHandleProvider(TorrentMetadataCache metaCache, IMemoryCache cache)
+    public class FileHandleProvider(TorrentMetadataCache metaCache, IMemoryCache cache)
         : IFileHandleProvider
     {
         public ConcurrentDictionary<InfoHash, SafeFileHandle> _partFiles = new ConcurrentDictionary<InfoHash, SafeFileHandle>();
@@ -45,6 +46,37 @@ namespace Torrential.Files
             }
         }
 
+        public async ValueTask SaveMetadata(TorrentMetadata metaData)
+        {
+            if (!cache.TryGetValue<FileSettings>("settings.file", out var settings) || settings == null)
+                throw new InvalidOperationException("Settings not found");
+
+            var torrentName = Path.GetFileNameWithoutExtension(GetPathSafeFileName(metaData.Name));
+            var filePath = Path.Combine(settings.DownloadPath, torrentName, $"{metaData.InfoHash.AsString()}.metadata");
+
+            TouchFile(filePath);
+
+            await using var fs = File.Open(filePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+            await JsonSerializer.SerializeAsync(fs, metaData);
+        }
+
+        public async IAsyncEnumerable<TorrentMetadata> GetAllMetadataFiles()
+        {
+            if (!cache.TryGetValue<FileSettings>("settings.file", out var settings) || settings == null)
+                throw new InvalidOperationException("Settings not found");
+
+            var inProgressMetas = Directory.GetFiles(settings.DownloadPath, "*.metadata", SearchOption.AllDirectories);
+            var completedMetas = Directory.GetFiles(settings.CompletedPath, "*.metadata", SearchOption.AllDirectories);
+
+            foreach (var file in inProgressMetas.Concat(completedMetas))
+            {
+                await using var fs = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                var meta = await JsonSerializer.DeserializeAsync<TorrentMetadata>(fs);
+                if (meta == null) continue;
+                yield return meta;
+            }
+        }
+
         public async ValueTask<SafeFileHandle> GetCompletedFileHandle(InfoHash infoHash, TorrentMetadataFile file)
         {
             if (!cache.TryGetValue<FileSettings>("settings.file", out var settings))
@@ -61,7 +93,7 @@ namespace Torrential.Files
             return File.OpenHandle(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous);
         }
 
-        public static FileInfo TouchFile(string path, long fileSize = -1)
+        private static FileInfo TouchFile(string path, long fileSize = -1)
         {
             if (File.Exists(path))
                 return new FileInfo(path);
@@ -78,7 +110,7 @@ namespace Torrential.Files
             return new FileInfo(path);
         }
 
-        public static string GetPathSafeFileName(string fileName)
+        private static string GetPathSafeFileName(string fileName)
         {
             var invalidChars = Path.GetInvalidFileNameChars();
             var fileNameBuilder = new StringBuilder();

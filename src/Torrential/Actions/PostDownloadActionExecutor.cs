@@ -17,6 +17,8 @@ namespace Torrential.Pipelines
                     var result = await action.ExecuteAsync(context.Message.InfoHash, context.CancellationToken);
                     if (!result.Success && !action.ContinueOnFailure)
                         throw new Exception($"Post download action {action.Name} failed");
+
+                    logger.LogInformation("Post download action {Action} executed successfully", action.Name);
                 }
                 catch (Exception e)
                 {

@@ -22,6 +22,8 @@ namespace Torrential.Torrents
             }
 
             metaCache.Add(torrentMetadata);
+
+
             await bus.Publish(new TorrentAddedEvent
             {
                 InfoHash = torrentMetadata.InfoHash,
@@ -85,11 +87,6 @@ namespace Torrential.Torrents
                 InfoHash = infoHash,
                 Success = true
             };
-
-
-            //Start a long running task to essentially run this torrent
-            //Create a CTS and pass it into the processor
-            //Stop should technically stop everything immediately
         }
 
 
