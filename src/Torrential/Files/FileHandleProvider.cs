@@ -1,83 +1,93 @@
-﻿using Microsoft.Win32.SafeHandles;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Win32.SafeHandles;
 using System.Collections.Concurrent;
 using System.Text;
 using Torrential.Torrents;
 
 namespace Torrential.Files
 {
-    internal class FileHandleProvider(TorrentMetadataCache metaCache)
+    internal class FileHandleProvider(TorrentMetadataCache metaCache, IMemoryCache cache)
         : IFileHandleProvider
     {
-        private ConcurrentDictionary<InfoHash, SafeFileHandle> _partFileHandles = new ConcurrentDictionary<InfoHash, SafeFileHandle>();
-        private SemaphoreSlim _fileCreationSemaphore = new SemaphoreSlim(1, 1);
+        public ConcurrentDictionary<InfoHash, SafeFileHandle> _partFiles = new ConcurrentDictionary<InfoHash, SafeFileHandle>();
+        public SemaphoreSlim _creationSemaphore = new SemaphoreSlim(1, 1);
 
-        public SafeFileHandle GetPartFileHandle(InfoHash hash)
+        public async ValueTask<SafeFileHandle> GetPartFileHandle(InfoHash hash)
         {
-            if (_partFileHandles.TryGetValue(hash, out SafeFileHandle handle))
+            if (_partFiles.TryGetValue(hash, out SafeFileHandle handle))
                 return handle;
 
-            _fileCreationSemaphore.Wait();
-
-            if (_partFileHandles.TryGetValue(hash, out handle))
+            await _creationSemaphore.WaitAsync();
+            if (_partFiles.TryGetValue(hash, out handle))
             {
-                _fileCreationSemaphore.Release();
+                _creationSemaphore.Release();
                 return handle;
             }
 
             try
             {
+                if (!cache.TryGetValue<FileSettings>("settings.file", out var settings))
+                    throw new InvalidOperationException("Settings not found");
+
                 if (!metaCache.TryGet(hash, out var meta))
-                {
-                    //Not ideal to throw here, but doing it for now
                     throw new ArgumentException("Torrent metadata not found in cache");
-                }
 
                 var pieceSize = (int)meta.PieceSize;
                 var numberOfPieces = meta.NumberOfPieces;
-                var filePath = CreateTorrentPartFile(meta.InfoHash.AsString(), pieceSize, numberOfPieces);
-                return _partFileHandles.GetOrAdd(hash, (torrentId) => File.OpenHandle(filePath.FullName, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous));
+                var torrentName = Path.GetFileNameWithoutExtension(GetPathSafeFileName(meta.Name));
+                var filePath = Path.Combine(settings.DownloadPath, torrentName, $"{meta.InfoHash.AsString()}.part");
+                TouchFile(filePath, pieceSize * numberOfPieces);
+                return _partFiles.GetOrAdd(hash, (torrentId) => File.OpenHandle(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous));
             }
             finally
             {
-                _fileCreationSemaphore.Release();
+                _creationSemaphore.Release();
             }
         }
 
-        public static FileInfo CreateTorrentPartFile(string torrentId, int pieceSize, int numberOfPieces)
+        public async ValueTask<SafeFileHandle> GetCompletedFileHandle(InfoHash infoHash, TorrentMetadataFile file)
         {
-            var filePath = GetTorrentPartFilePath(torrentId);
+            if (!cache.TryGetValue<FileSettings>("settings.file", out var settings))
+                throw new InvalidOperationException("Settings not found");
 
-            if (File.Exists(filePath))
-                return new FileInfo(filePath);
+            if (!metaCache.TryGet(infoHash, out var meta))
+                throw new ArgumentException("Torrent metadata not found in cache");
 
-            using var fs = File.Create(filePath);
-            fs.SetLength(pieceSize * numberOfPieces);
+            //Check if file exists
+            var torrentName = Path.GetFileNameWithoutExtension(GetPathSafeFileName(meta.Name));
+            var filePath = Path.Combine(settings.CompletedPath, torrentName, file.Filename);
+
+            TouchFile(filePath, file.FileSize);
+            return File.OpenHandle(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous);
+        }
+
+        public static FileInfo TouchFile(string path, long fileSize = -1)
+        {
+            if (File.Exists(path))
+                return new FileInfo(path);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+
+            using var fs = File.Create(path);
+
+            if (fileSize > 0)
+                fs.SetLength(fileSize);
+
             fs.Close();
 
-            return new FileInfo(filePath);
+            return new FileInfo(path);
         }
 
-        public string GetPartFilePath(InfoHash infoHash)
+        public static string GetPathSafeFileName(string fileName)
         {
-            return GetTorrentPartFilePath(infoHash.AsString());
-        }
-
-
-        public static string GetTorrentPartFilePath(string torrentId)
-        {
-            var tempFilePath = Path.GetTempPath();
-
             var invalidChars = Path.GetInvalidFileNameChars();
             var fileNameBuilder = new StringBuilder();
-            foreach (var c in torrentId)
+            foreach (var c in fileName)
             {
                 if (invalidChars.Contains(c)) continue;
                 fileNameBuilder.Append(c);
             }
-
-            fileNameBuilder.Append(".part");
-            var filePath = Path.Combine(tempFilePath, fileNameBuilder.ToString());
-            return filePath;
+            return fileName.ToString();
         }
     }
 }

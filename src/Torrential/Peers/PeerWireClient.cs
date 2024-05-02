@@ -16,7 +16,7 @@ public sealed class PeerWireState
     public bool AmInterested { get; set; } = false;
     public bool PeerInterested { get; set; } = false;
     public int PiecesReceived { get; set; } = 0;
-    public Bitfield? Bitfield { get; set; } = null;
+    public Bitfield? PeerBitfield { get; set; } = null;
     public DateTimeOffset PeerLastInterestedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
@@ -56,6 +56,9 @@ public sealed class PeerWireClient : IDisposable
     private IFileSegmentSaveService _fileSegmentSaveService;
     public PeerWireState State => _state;
 
+    public long BytesUploaded { get; private set; }
+    public long BytesDownloaded { get; private set; }
+
     public PeerWireClient(IPeerWireConnection connection, ILogger logger)
     {
         _connection = connection;
@@ -69,7 +72,7 @@ public sealed class PeerWireClient : IDisposable
         _bitfields = bitfields;
         _infoHash = meta.InfoHash;
         _fileSegmentSaveService = fileSegmentSaveService;
-        _state.Bitfield = new Bitfield(meta.NumberOfPieces);
+        _state.PeerBitfield = new Bitfield(meta.NumberOfPieces);
         _processCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var readerTask = ProcessReads(_processCts.Token);
         var writeTask = ProcessWrites(_processCts.Token);
@@ -241,6 +244,9 @@ public sealed class PeerWireClient : IDisposable
             case PeerWireMessageType.Bitfield:
                 HandleBitfield(payload);
                 return true;
+            case PeerWireMessageType.Have:
+                HandleHave(payload);
+                return true;
         }
 
         //Return false here when we cannot process the message. It tells the main loop to disconnect and stop comms with this peer
@@ -275,14 +281,14 @@ public sealed class PeerWireClient : IDisposable
         if (!sequenceReader.TryReadBigEndian(out int index))
             return false;
 
-        _state.Bitfield?.MarkHave(index);
+        _state.PeerBitfield?.MarkHave(index);
         return true;
     }
     private bool HandleBitfield(ReadOnlySequence<byte> payload)
     {
         Span<byte> buffer = stackalloc byte[(int)payload.Length];
         payload.CopyTo(buffer);
-        _state.Bitfield = new Bitfield(buffer);
+        _state.PeerBitfield = new Bitfield(buffer);
         return true;
     }
     private bool HandleRequest(ReadOnlySequence<byte> payload)
@@ -320,8 +326,8 @@ public sealed class PeerWireClient : IDisposable
 
         var segment = PooledPieceSegment.FromReadOnlySequence(ref segmentSequence, _infoHash, pieceIndex, pieceOffset);
         PIECE_SEGMENT_CHANNEL.Writer.TryWrite(segment);
+        BytesDownloaded += segment.Buffer.Length;
         _state.PiecesReceived += 1;
-
         _pieceRequestLimit.Release();
         return true;
     }

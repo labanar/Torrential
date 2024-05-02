@@ -60,7 +60,7 @@
             int extraBits = _numOfPieces % 8;
             if (extraBits != 0)
             {
-                byte lastByteMask = (byte)(0xFF << (8 - extraBits));
+                byte lastByteMask = (byte)(0xFF >> (8 - extraBits));
                 if ((_bitfield[^1] & lastByteMask) != lastByteMask)
                 {
                     return false;
@@ -138,13 +138,12 @@
             _bitfield[byteIndex] &= (byte)~(1 << bitIndex);
             _semaphores[byteIndex].Release();
         }
-
         public int? SuggestPieceToDownload(Bitfield otherBitfield)
         {
             if (otherBitfield == null)
                 throw new ArgumentNullException(nameof(otherBitfield));
 
-            if (_numOfPieces != otherBitfield._numOfPieces)
+            if (_numOfPieces > otherBitfield._numOfPieces)
                 throw new ArgumentException("Bitfields must be of the same size.");
 
             //Randomize the offset

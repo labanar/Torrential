@@ -19,7 +19,7 @@ namespace Torrential.Files
         : IFileSegmentSaveService
     {
         private static readonly int SEGMENT_LENGTH = (int)Math.Pow(2, 14);
-        private ConcurrentDictionary<InfoHash, Bitfield> _segmentFields = [];
+        private static ConcurrentDictionary<InfoHash, Bitfield> _segmentFields = [];
 
         public async Task SaveSegment(PooledPieceSegment segment)
         {
@@ -46,7 +46,7 @@ namespace Torrential.Files
                 });
 
 
-                var fileHandle = fileHandleProvider.GetPartFileHandle(segment.InfoHash);
+                var fileHandle = await fileHandleProvider.GetPartFileHandle(segment.InfoHash);
 
                 long fileOffset = (segment.PieceIndex * meta.PieceSize) + segment.Offset;
                 RandomAccess.Write(fileHandle, segment.Buffer, fileOffset);
@@ -142,7 +142,7 @@ namespace Torrential.Files
             if (!metaCache.TryGet(request.InfoHash, out var meta))
                 logger.LogError("Could not find torrent metadata");
 
-            var fileHandle = fileHandleProvider.GetPartFileHandle(request.InfoHash);
+            var fileHandle = await fileHandleProvider.GetPartFileHandle(request.InfoHash);
             var buffer = ArrayPool<byte>.Shared.Rent(20);
             meta.GetPieceHash(request.PieceIndex).CopyTo(buffer);
 

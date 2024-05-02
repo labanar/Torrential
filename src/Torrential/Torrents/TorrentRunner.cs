@@ -5,7 +5,14 @@ using Torrential.Trackers;
 
 namespace Torrential.Torrents
 {
-    public class TorrentRunner(ILogger<TorrentRunner> logger, TorrentMetadataCache metaCache, IEnumerable<ITrackerClient> trackerClients, IPeerService peerService, PeerManager peerMgr, BitfieldManager bitfieldMgr, IFileSegmentSaveService segmentSaveService, PieceSelector pieceSelector)
+    public class TorrentRunner(ILogger<TorrentRunner> logger,
+                               TorrentMetadataCache metaCache,
+                               IEnumerable<ITrackerClient> trackerClients,
+                               IPeerService peerService,
+                               PeerManager peerMgr,
+                               BitfieldManager bitfieldMgr,
+                               IFileSegmentSaveService segmentSaveService,
+                               PieceSelector pieceSelector)
     {
         public async Task Run(InfoHash infoHash, CancellationToken cancellationToken)
         {
@@ -38,18 +45,23 @@ namespace Torrential.Torrents
             var processor = peer.Process(meta, bitfieldMgr, segmentSaveService, cancellationToken);
 
             //await peer.SendBitfield(new Bitfield2(meta.NumberOfPieces));
-            while (peer.State.Bitfield == null && !cancellationToken.IsCancellationRequested)
+            logger.LogInformation("Waiting for bitfield from peer");
+            while (peer.State.PeerBitfield == null && !cancellationToken.IsCancellationRequested)
                 await Task.Delay(100);
 
+            logger.LogInformation("Sending interested to peer");    
             await peer.SendIntereted();
+
+            logger.LogInformation("Waiting for unchoke from peer");
             while (peer.State.AmChoked && !cancellationToken.IsCancellationRequested)
                 await Task.Delay(100);
 
 
+            logger.LogInformation("Starting piece selection");
             while (!peer.State.AmChoked && !cancellationToken.IsCancellationRequested)
             {
                 //Start asking for pieces, wait for us to get a piece back then ask for the next piece
-                var idx = await pieceSelector.SuggestNextPieceAsync(meta.InfoHash, peer.State.Bitfield);
+                var idx = await pieceSelector.SuggestNextPieceAsync(meta.InfoHash, peer.State.PeerBitfield);
                 if (idx == null)
                 {
                     await Task.Delay(50);

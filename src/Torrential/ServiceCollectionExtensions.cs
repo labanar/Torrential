@@ -1,30 +1,45 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Torrential.Commands;
 using Torrential.Files;
 using Torrential.Peers;
+using Torrential.Pipelines;
 using Torrential.Torrents;
 using Torrential.Trackers;
 using Torrential.Trackers.Http;
 using Torrential.Trackers.Udp;
 
-namespace Torrential
+namespace Torrential;
+
+public static class ServiceCollectionExtensions
 {
-    public static class ServiceCollectionExtensions
+    public static void AddTorrential(this IServiceCollection services)
     {
-        public static void AddTorrential(this IServiceCollection services)
-        {
-            services.AddSingleton<IPeerService, PeerService>();
-            services.AddHttpClient<HttpTrackerClient>();
-            services.AddSingleton<ITrackerClient>(sp => sp.GetRequiredService<HttpTrackerClient>());
-            services.AddSingleton<ITrackerClient, UdpTrackerClient>();
-            services.AddSingleton<IFileHandleProvider, FileHandleProvider>();
-            services.AddSingleton<IFileSegmentSaveService, FileSegmentSaveService>();
-            services.AddSingleton<PieceSelector>();
-            services.AddSingleton<PeerManager>();
-            services.AddSingleton<BitfieldManager>();
-            services.AddSingleton<TorrentMetadataCache>();
-            services.AddSingleton<TorrentRunner>();
-            services.AddSingleton<TorrentManager>();
-            services.AddSingleton<PieceReservationService>();
-        }
+        services.AddDbContext<TorrentialDb>(config => config.UseSqlite("Data Source=torrential.db"));
+        services.AddSingleton<IPeerService, PeerService>();
+        services.AddHttpClient<HttpTrackerClient>();
+        services.AddSingleton<ITrackerClient>(sp => sp.GetRequiredService<HttpTrackerClient>());
+        services.AddSingleton<ITrackerClient, UdpTrackerClient>();
+
+        services.AddSingleton<IFileHandleProvider, FileHandleProvider>();
+        services.AddSingleton<IFileSegmentSaveService, FileSegmentSaveService>();
+        services.AddSingleton<TorrentRunner>();
+        services.AddSingleton<TorrentTaskManager>();
+
+        services.AddSingleton<PieceReservationService>();
+        services.AddSingleton<BitfieldManager>();
+        services.AddSingleton<TorrentMetadataCache>();
+        services.AddSingleton<PieceSelector>();
+        services.AddSingleton<PeerManager>();
+
+        //TODO - add service extension that scans the provided assemblies for implementations of ICommandHandler<,>
+        services.AddCommandHandler<TorrentAddCommand, TorrentAddResponse, TorrentAddCommandHandler>();
+        services.AddCommandHandler<TorrentStartCommand, TorrentStartResponse, TorrentStartCommandHandler>();
+        services.AddCommandHandler<TorrentStopCommand, TorrentStopResponse, TorrentStopCommandHandler>();
+        services.AddCommandHandler<TorrentRemoveCommand, TorrentRemoveResponse, TorrentRemoveCommandHandler>();
+        services.AddCommandHandler<FileSettingsUpdateCommand, FileSettingsUpdateResponse, SettingsUpdateCommandHandler>();
+
+
+        services.AddSingleton<IPostDownloadAction, FileCopyPostDownloadAction>();
     }
 }

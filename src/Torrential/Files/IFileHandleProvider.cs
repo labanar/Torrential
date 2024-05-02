@@ -1,11 +1,11 @@
 ﻿using Microsoft.Win32.SafeHandles;
+using Torrential.Torrents;
 
 namespace Torrential.Files
 {
     public interface IFileHandleProvider
     {
-        public SafeFileHandle GetPartFileHandle(InfoHash infoHash);
-
-        public string GetPartFilePath(InfoHash infoHash);
+        public ValueTask<SafeFileHandle> GetPartFileHandle(InfoHash infoHash);
+        public ValueTask<SafeFileHandle> GetCompletedFileHandle(InfoHash infoHash, TorrentMetadataFile fileName);
     }
 }

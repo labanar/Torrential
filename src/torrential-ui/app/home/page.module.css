@@ -1,0 +1,46 @@
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.torrentList {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.torrent {
+  background-color: #fff;
+  display: flex;
+  flex-direction: row;
+  padding: 0.4em;
+}
+
+.torrentIcon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.torrentInfo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.torrent:nth-child(even) {
+  background-color: #eee;
+}
+
+.progress {
+  padding-top: 0.2em;
+}
+
+.title {
+  font-weight: 500;
+}
+
+.progressDetails {
+  padding-top: 0.6em;
+}

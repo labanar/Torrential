@@ -1,19 +1,35 @@
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Serilog;
 using Serilog.Core;
 using Serilog.Sinks.Grafana.Loki;
 using Torrential;
+using Torrential.Commands;
 using Torrential.Extensions.SignalR;
 using Torrential.Files;
 using Torrential.Torrents;
+using Torrential.Web.Api.Models;
+using Torrential.Web.Api.Requests;
+using Torrential.Web.Api.Responses;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddMemoryCache();
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(BuildLogger(builder.Configuration));
 builder.Services.AddTorrential();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowAnyOrigin());
+});
+
 builder.Services.AddMassTransit(x =>
 {
     x.AddConsumers(typeof(TorrentHubMessageDispatcher).Assembly, typeof(PieceValidator).Assembly);
@@ -26,29 +42,16 @@ builder.Services.AddMassTransit(x =>
 var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
+app.UseCors();
 app.MapHub<TorrentHub>("/torrents/hub");
 
-//app
-//    .MapGet("/torrents/events", async (HttpContext context) =>
-//    {
-//        context.Response.Headers.Append("Content-Type", "text/event-stream");
-//        context.Response.Headers.Append("Cache-Control", "no-cache");
-//        context.Response.Headers.Append("Connection", "keep-alive");
-//        await foreach (var item in TorrentEventDispatcher.EventReader.ReadAllAsync(context.RequestAborted))
-//        {
-//            await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes("data: "));
-//            await JsonSerializer.SerializeAsync(context.Response.Body, item);
-//            await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes("\n\n"));
-//            await context.Response.Body.FlushAsync();
-//        }
-//    });
 
 app.MapPost(
     "/torrents/add",
-    async (IFormFile file, TorrentManager manager) =>
+    async (IFormFile file, ICommandHandler<TorrentAddCommand, TorrentAddResponse> handler) =>
     {
         var meta = TorrentMetadataParser.FromStream(file.OpenReadStream());
-        return await manager.Add(meta);
+        return await handler.Execute(new() { Metadata = meta, DownloadPath = "", CompletedPath = "" });
     })
     .DisableAntiforgery();
 
@@ -56,8 +59,15 @@ app.MapGet(
     "/torrents",
     () =>
     {
-        return Results.Ok();
-    });
+        //Stitch in all the appropriate data
+
+        //How can  we meter the peer connection (total upload, total download bytes)
+        //We need to make sure this is only tracking piece download and piece upload lengths (we cannot simply track the bytes going over the peer connection)
+        return Results.Ok("Hello world");
+    })
+    .Produces<IDataResponse<TorrentSummaryVm[]>>(200)
+    .Produces<IErrorResponse>(400)
+    .Produces<IErrorResponse>(500);
 
 app.MapGet(
     "/torrents/{infoHash}",
@@ -69,18 +79,66 @@ app.MapGet(
 
 app.MapPost(
     "torrents/{infoHash}/start",
-    async (InfoHash infoHash, TorrentManager torrentManager) =>
-       await torrentManager.Start(infoHash));
+    async (InfoHash infoHash, ICommandHandler<TorrentStartCommand, TorrentStartResponse> handler) =>
+        await handler.Execute(new() { InfoHash = infoHash }));
 
-app.MapPost("torrents/{infoHash}/stop",
-    async (InfoHash infoHash, TorrentManager torrentManager) =>
-        await torrentManager.Stop(infoHash));
+app.MapPost(
+    "torrents/{infoHash}/stop",
+    async (InfoHash infoHash, ICommandHandler<TorrentStopCommand, TorrentStopResponse> handler) =>
+        await handler.Execute(new() { InfoHash = infoHash }));
 
-app.MapPatch("torrents/{infoHash}/delete",
-    async (InfoHash infoHash, TorrentManager torrentManager) =>
-       await torrentManager.Remove(infoHash));
+app.MapPost(
+    "torrents/{infoHash}/delete",
+    async (InfoHash infoHash, ICommandHandler<TorrentRemoveCommand, TorrentRemoveResponse> handler) =>
+        await handler.Execute(new() { InfoHash = infoHash }));
 
-app.Run();
+app.MapPost("settings",
+       async (FileSettingsUpdateCommand command, ICommandHandler<FileSettingsUpdateCommand, FileSettingsUpdateResponse> handler) =>
+              await handler.Execute(command));
+
+using var scope = app.Services.CreateScope();
+var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
+db.Database.Migrate();
+
+
+//Load settings + create defaults
+using var scope2 = app.Services.CreateScope();
+var db2 = scope2.ServiceProvider.GetRequiredService<TorrentialDb>();
+var settings = await db2.Settings.FindAsync(TorrentialSettings.DefaultId);
+if (settings == null)
+{
+    var appPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+    await db2.Settings.AddAsync(new()
+    {
+        FileSettings = new FileSettings
+        {
+            DownloadPath = Path.Combine(appPath, "torrential\\downloads"),
+            CompletedPath = Path.Combine(appPath, "torrential\\completed")
+        }
+    });
+    await db2.SaveChangesAsync();
+}
+
+//Load settings into memory cache
+
+using var scope3 = app.Services.CreateScope();
+var db3 = scope3.ServiceProvider.GetRequiredService<TorrentialDb>();
+var cache = scope3.ServiceProvider.GetRequiredService<IMemoryCache>();
+var settings2 = await db3.Settings.FindAsync(TorrentialSettings.DefaultId);
+cache.Set("settings.file", settings2.FileSettings);
+
+
+//Load torrents
+using var scope4 = app.Services.CreateScope();
+var db4 = scope4.ServiceProvider.GetRequiredService<TorrentialDb>();
+var mgr = scope4.ServiceProvider.GetRequiredService<TorrentTaskManager>();
+await foreach(var torrent in db3.Torrents.AsNoTracking().AsAsyncEnumerable())
+{
+   
+}
+
+await app.RunAsync();
+
 
 static Logger BuildLogger(IConfiguration configuration)
 {
