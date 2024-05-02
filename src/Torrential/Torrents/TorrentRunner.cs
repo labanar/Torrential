@@ -57,8 +57,14 @@ namespace Torrential.Torrents
                 await Task.Delay(100);
 
 
+            if(!bitfieldMgr.TryGetBitfield(meta.InfoHash, out var myBitfield))
+            {
+                logger.LogError("Failed to retrieve my bitfield");
+                return;
+            }
+
             logger.LogInformation("Starting piece selection");
-            while (!peer.State.AmChoked && !cancellationToken.IsCancellationRequested)
+            while (!peer.State.AmChoked && !cancellationToken.IsCancellationRequested && !myBitfield.HasAll())
             {
                 //Start asking for pieces, wait for us to get a piece back then ask for the next piece
                 var idx = await pieceSelector.SuggestNextPieceAsync(meta.InfoHash, peer.State.PeerBitfield);
@@ -78,6 +84,8 @@ namespace Torrential.Torrents
                     remainder -= requestSize;
                 }
             }
+
+            logger.LogInformation("Finished requesting pieces from peer");
 
             await processor;
         }
