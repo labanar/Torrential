@@ -8,9 +8,5 @@ namespace Torrential.Files
     {
         public ValueTask<SafeFileHandle> GetPartFileHandle(InfoHash infoHash);
         public ValueTask<SafeFileHandle> GetCompletedFileHandle(InfoHash infoHash, TorrentMetadataFile fileName);
-
-        public ValueTask SaveMetadata(TorrentMetadata metaData);
-        public IAsyncEnumerable<TorrentMetadata> GetAllMetadataFiles();
-        
     }
 }

@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITrackerClient, UdpTrackerClient>();
 
         services.AddSingleton<IFileHandleProvider, FileHandleProvider>();
+        services.AddSingleton<IMetadataFileService, MetadataFileService>();
         services.AddSingleton<IFileSegmentSaveService, FileSegmentSaveService>();
         services.AddSingleton<TorrentRunner>();
         services.AddSingleton<TorrentTaskManager>();

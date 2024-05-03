@@ -132,8 +132,8 @@ cache.Set("settings.file", settings2.FileSettings);
 using var scope4 = app.Services.CreateScope();
 var db4 = scope4.ServiceProvider.GetRequiredService<TorrentialDb>();
 var mgr = scope4.ServiceProvider.GetRequiredService<TorrentTaskManager>();
-var fileHandleProvider = scope4.ServiceProvider.GetRequiredService<IFileHandleProvider>();
-await foreach(var torrentMeta in fileHandleProvider.GetAllMetadataFiles())
+var metaFileService = scope4.ServiceProvider.GetRequiredService<IMetadataFileService>();
+await foreach(var torrentMeta in metaFileService.GetAllMetadataFiles())
 {
     await mgr.Add(torrentMeta);
 }
