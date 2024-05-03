@@ -1,9 +1,10 @@
 ﻿using MassTransit;
 using System.Collections.Concurrent;
+using Torrential.Peers;
 
 namespace Torrential.Torrents
 {
-    public class TorrentTaskManager(TorrentMetadataCache metaCache, TorrentRunner runner, IBus bus)
+    public class TorrentTaskManager(TorrentMetadataCache metaCache, PeerSwarm swarms, IBus bus)
     {
         private static ConcurrentDictionary<InfoHash, string> Torrents = [];
         private static ConcurrentDictionary<InfoHash, Task> TorrentTasks = [];
@@ -68,7 +69,7 @@ namespace Torrential.Torrents
                 };
             }
 
-            if (TorrentTasks.ContainsKey(infoHash))
+            if (TorrentTasks.TryGetValue(infoHash, out var torrentTask) && !torrentTask.IsCompleted)
             {
                 return new()
                 {
@@ -80,7 +81,7 @@ namespace Torrential.Torrents
 
             var cts = new CancellationTokenSource();
             TorrentTaskCancellationTokenSources[infoHash] = cts;
-            TorrentTasks[infoHash] = runner.Run(infoHash, cts.Token);
+            TorrentTasks[infoHash] = swarms.MaintainSwarm(infoHash, 50, cts.Token);
             await bus.Publish(new TorrentStartedEvent { InfoHash = infoHash });
             return new()
             {
