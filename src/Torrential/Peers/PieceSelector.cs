@@ -9,54 +9,41 @@ namespace Torrential.Peers
         //Put bitfields on reservation
         private ConcurrentDictionary<InfoHash, SemaphoreSlim> _semaphores = [];
 
-
-        public int? SuggestNextPiece(InfoHash infohash, Bitfield peerBitfield)
+        public async Task<PieceSuggestionResult> SuggestNextPieceAsync(InfoHash infohash, Bitfield peerBitfield)
         {
             if (!bitfieldManager.TryGetBitfield(infohash, out var myBitfield))
-                return null;
+                return PieceSuggestionResult.NoMorePieces;
 
-
-            //Put a reservation on a piece
-
-            return myBitfield.SuggestPieceToDownload(peerBitfield);
-        }
-
-
-        public async Task<int?> SuggestNextPieceAsync(InfoHash infohash, Bitfield peerBitfield)
-        {
-            if (!bitfieldManager.TryGetBitfield(infohash, out var myBitfield))
-                return null;
-
-
-            //Put a reservation on a piece
             var suggestedPiece = myBitfield.SuggestPieceToDownload(peerBitfield);
-            if (!suggestedPiece.HasValue) return null;
+            if (!suggestedPiece.Index.HasValue)
+                return suggestedPiece;
 
-            var reserved = await pieceReservationService.TryReservePiece(infohash, suggestedPiece.Value);
+
+            var suggestedIndex = suggestedPiece.Index.Value;
+
+
+            //As we approach 100% completion, we can be more aggressive in our piece selection
+            //meaning we can reduce the reservation length
+            //This is a simple linear function that reduces the reservation length as we approach 100%
+            var reservationLengthSeconds = 10;
+            if(myBitfield.CompletionRatio > 0.80)
+                reservationLengthSeconds = (int)(10 - (9 * myBitfield.CompletionRatio));
+
+            var reserved = await pieceReservationService.TryReservePiece(infohash, suggestedIndex, reservationLengthSeconds);
             if (!reserved)
             {
-                logger.LogWarning("Piece already reserved - {Index}", suggestedPiece.Value);
-                return null;
+                logger.LogWarning("Piece already reserved - {Index}", suggestedIndex);
+                return new PieceSuggestionResult(null, suggestedPiece.MorePiecesAvailable);
             };
 
-            return suggestedPiece.Value;
-
-            //Make a reservation
-
-            //If successfull
-            //- Return the piece as a suggestion
-
-            //Otherwise, return null
+            return suggestedPiece;
         }
     }
 
-
-
-    //Automatically have this remove the high flag from the piece bitfield
     public class PieceReservationService(TorrentMetadataCache metaCache)
     {
         private ConcurrentDictionary<InfoHash, Bitfield> _bitfields = new ConcurrentDictionary<InfoHash, Bitfield>();
-        public async Task<bool> TryReservePiece(InfoHash infoHash, int pieceIndex)
+        public async Task<bool> TryReservePiece(InfoHash infoHash, int pieceIndex, float reservationLengthSeconds = 10)
         {
             if (!metaCache.TryGet(infoHash, out var meta))
                 return false;
@@ -67,13 +54,11 @@ namespace Torrential.Peers
             });
 
             if (bitfield.HasPiece(pieceIndex)) return false;
-
             bitfield.MarkHave(pieceIndex);
 
-            //Make the reservation task here
             _ = Task.Run(async () =>
             {
-                await Task.Delay(TimeSpan.FromSeconds(10));
+                await Task.Delay(TimeSpan.FromSeconds(reservationLengthSeconds));
                 await bitfield.UnmarkHaveAsync(pieceIndex, CancellationToken.None);
             });
 

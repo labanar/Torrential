@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,6 +11,22 @@ namespace Torrential.Peers
         private readonly SemaphoreSlim[] _semaphores;
         private readonly int _sizeInBytes;
         private readonly byte[] _bitfield;
+
+        public float CompletionRatio
+        {
+            get
+            {
+                var totalPieces = (float)_numOfPieces;
+                var piecesHave = 0;
+
+                for (var i = 0; i < _sizeInBytes; i++)
+                {
+                    piecesHave += BitOperations.PopCount(_bitfield[i]);
+                }
+
+                return piecesHave / totalPieces;
+            }
+        }
 
         public Bitfield(int numOfPieces)
         {
@@ -139,17 +156,26 @@ namespace Torrential.Peers
             }
         }
 
-        public int? SuggestPieceToDownload(Bitfield peerBitfield)
+        public PieceSuggestionResult SuggestPieceToDownload(Bitfield peerBitfield)
         {
+            if (HasAll())
+                return PieceSuggestionResult.NoMorePieces;
+
             var random = Random.Shared.Next(0, _numOfPieces);
 
-            while(HasPiece(random) && !HasAll())
+            var hasAll = HasAll();
+            while(HasPiece(random) && !hasAll)
+            {
                 random = Random.Shared.Next(0, _numOfPieces);
+                hasAll = HasAll();
+            }
 
-            if (HasAll())
-                return null;
+            return new PieceSuggestionResult(random, !hasAll);
+        }
+    }
 
-            return random;
-        }   
+    public readonly record struct PieceSuggestionResult(int? Index, bool MorePiecesAvailable)
+    {
+        public static PieceSuggestionResult NoMorePieces => new PieceSuggestionResult(null, false);
     }
 }

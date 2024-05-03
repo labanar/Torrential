@@ -26,7 +26,7 @@ namespace Torrential.Tests
 
             Assert.False(myBitfield.HasAll());
             var suggestedPiece = myBitfield.SuggestPieceToDownload(peerBitfield);
-            Assert.NotNull(suggestedPiece);
+            Assert.NotNull(suggestedPiece.Index);
 
             myBitfield.MarkHave(2512);
             Assert.False(myBitfield.HasAll());
@@ -39,9 +39,10 @@ namespace Torrential.Tests
 
             myBitfield.MarkHave(2515);
             Assert.True(myBitfield.HasAll());
+            Assert.Equal(1.0, myBitfield.CompletionRatio, 0);
 
             //We should no longer be suggesting pieces if we have the all
-            Assert.Null(myBitfield.SuggestPieceToDownload(peerBitfield));
+            Assert.Null(myBitfield.SuggestPieceToDownload(peerBitfield).Index);
         }
     }
 }

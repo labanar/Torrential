@@ -51,6 +51,7 @@ public sealed class PeerWireClient : IDisposable
     });
 
     private CancellationTokenSource _processCts;
+    private TorrentMetadata _meta;
     private BitfieldManager _bitfields;
     private InfoHash _infoHash;
     private IFileSegmentSaveService _fileSegmentSaveService;
@@ -69,6 +70,7 @@ public sealed class PeerWireClient : IDisposable
 
     public async Task Process(TorrentMetadata meta, BitfieldManager bitfields, IFileSegmentSaveService fileSegmentSaveService, CancellationToken cancellationToken)
     {
+        _meta = meta;
         _bitfields = bitfields;
         _infoHash = meta.InfoHash;
         _fileSegmentSaveService = fileSegmentSaveService;
@@ -288,7 +290,8 @@ public sealed class PeerWireClient : IDisposable
     {
         Span<byte> buffer = stackalloc byte[(int)payload.Length];
         payload.CopyTo(buffer);
-        _state.PeerBitfield = new Bitfield(buffer);
+        _state.PeerBitfield = new Bitfield(_meta.NumberOfPieces);
+        _state.PeerBitfield.Fill(buffer);
         return true;
     }
     private bool HandleRequest(ReadOnlySequence<byte> payload)

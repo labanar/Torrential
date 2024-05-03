@@ -64,23 +64,25 @@ namespace Torrential.Torrents
             }
 
             logger.LogInformation("Starting piece selection");
-            while (!peer.State.AmChoked && !cancellationToken.IsCancellationRequested && !myBitfield.HasAll())
+            var hasMorePieces = true;
+            while (!peer.State.AmChoked && !cancellationToken.IsCancellationRequested && hasMorePieces)
             {
                 //Start asking for pieces, wait for us to get a piece back then ask for the next piece
-                var idx = await pieceSelector.SuggestNextPieceAsync(meta.InfoHash, peer.State.PeerBitfield);
-                if (idx == null)
+                var suggestion = await pieceSelector.SuggestNextPieceAsync(meta.InfoHash, peer.State.PeerBitfield);
+                if (!suggestion.Index.HasValue)
                 {
+                    hasMorePieces = suggestion.MorePiecesAvailable;
                     await Task.Delay(50);
                     continue;
                 }
 
-                logger.LogInformation("Requesting {Piece} from peer", idx);
+                logger.LogInformation("Requesting {Piece} from peer", suggestion);
                 var requestSize = (int)Math.Pow(2, 14);
                 var remainder = (int)meta.PieceSize;
                 while (remainder > 0 && !cancellationToken.IsCancellationRequested)
                 {
                     var offset = (int)meta.PieceSize - remainder;
-                    await peer.SendPieceRequest(idx.Value, offset, requestSize);
+                    await peer.SendPieceRequest(suggestion.Index.Value, offset, requestSize);
                     remainder -= requestSize;
                 }
             }
