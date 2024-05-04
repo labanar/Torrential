@@ -1,7 +1,4 @@
-﻿using System;
-using System.Numerics;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Numerics;
 
 namespace Torrential.Peers
 {
@@ -11,6 +8,10 @@ namespace Torrential.Peers
         private readonly SemaphoreSlim[] _semaphores;
         private readonly int _sizeInBytes;
         private readonly byte[] _bitfield;
+
+        public int NumberOfPieces => _numOfPieces;
+
+        public byte[] Bytes => _bitfield;
 
         public float CompletionRatio
         {
@@ -114,26 +115,6 @@ namespace Torrential.Peers
             _bitfield[byteIndex] |= (byte)(1 << bitIndex);
         }
 
-        public async Task MarkHaveAsync(int index, CancellationToken cancellationToken)
-        {
-            if (index < 0 || index >= _numOfPieces)
-            {
-                throw new ArgumentOutOfRangeException(nameof(index));
-            }
-
-            var byteIndex = index / 8;
-            var bitIndex = index % 8;
-
-            await _semaphores[byteIndex].WaitAsync(cancellationToken);
-            try
-            {
-                _bitfield[byteIndex] |= (byte)(1 << bitIndex);
-            }
-            finally
-            {
-                _semaphores[byteIndex].Release();
-            }
-        }
 
         public async Task UnmarkHaveAsync(int index, CancellationToken cancellationToken)
         {
@@ -164,7 +145,7 @@ namespace Torrential.Peers
             var random = Random.Shared.Next(0, _numOfPieces);
 
             var hasAll = HasAll();
-            while(HasPiece(random) && !hasAll)
+            while (HasPiece(random) && !hasAll)
             {
                 random = Random.Shared.Next(0, _numOfPieces);
                 hasAll = HasAll();

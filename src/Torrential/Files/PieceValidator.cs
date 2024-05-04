@@ -22,16 +22,27 @@ namespace Torrential.Files
         {
             var request = context.Message;
 
+            if (!metaCache.TryGet(request.InfoHash, out var meta))
+            {
+                logger.LogError("Could not find torrent metadata");
+                return;
+            }
+
             //Have we already verified this piece?
-            if (!bitfieldMgr.TryGetBitfield(request.InfoHash, out var bitfield))
+            if (!bitfieldMgr.TryGetDownloadBitfield(request.InfoHash, out var downloadBitfield))
                 return;
 
-            if (bitfield.HasPiece(request.PieceIndex))
+            if (!bitfieldMgr.TryGetVerificationBitfield(request.InfoHash, out var verificationBitfield))
+                return;
+
+            if (verificationBitfield.HasPiece(request.PieceIndex))
+            {
                 logger.LogInformation("Already verified piece {Piece} - ignoring", request.PieceIndex);
+                return;
+            }
 
+            //Let's save the piece and mark it as downloaded
 
-            if (!metaCache.TryGet(request.InfoHash, out var meta))
-                logger.LogError("Could not find torrent metadata");
 
             var fileHandle = await fileHandleProvider.GetPartFileHandle(request.InfoHash);
             var buffer = ArrayPool<byte>.Shared.Rent(20);
@@ -46,13 +57,18 @@ namespace Torrential.Files
 
             if (result)
             {
-                bitfield.MarkHave(request.PieceIndex);
+                verificationBitfield.MarkHave(request.PieceIndex);
                 await bus.Publish(new TorrentPieceVerifiedEvent { InfoHash = request.InfoHash, PieceIndex = request.PieceIndex });
-                if (bitfield.HasAll())
+                if (verificationBitfield.HasAll())
                 {
-                    logger.LogInformation("ALL PIECES ACQUIRED!");
+                    logger.LogInformation("All pieces verified");
                     await bus.Publish(new TorrentCompleteEvent { InfoHash = request.InfoHash });
                 }
+            }
+            else
+            {
+                logger.LogWarning("Piece verification failed for {Piece}, unmarking from download bitfield", request.PieceIndex);
+                await downloadBitfield.UnmarkHaveAsync(request.PieceIndex, CancellationToken.None);
             }
         }
 

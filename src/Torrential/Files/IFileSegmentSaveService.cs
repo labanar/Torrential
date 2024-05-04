@@ -1,6 +1,5 @@
 ﻿using MassTransit;
 using Microsoft.Extensions.Logging;
-using System.Buffers;
 using System.Collections.Concurrent;
 using Torrential.Peers;
 using Torrential.Torrents;
@@ -26,12 +25,15 @@ namespace Torrential.Files
                     return;
 
                 //Have we already saved this piece?
-                if (!bitfieldManager.TryGetBitfield(segment.InfoHash, out var bitfield))
-                    return;
-
-                if (bitfield.HasPiece(segment.PieceIndex))
+                if (!bitfieldManager.TryGetDownloadBitfield(segment.InfoHash, out var downloadBitfield))
                 {
-                    logger.LogInformation("Already verified {Piece} - ignoring segment data!", segment.PieceIndex);
+                    logger.LogError("Could not find download bitfield for {InfoHash}", segment.InfoHash);
+                    return;
+                }
+
+                if (downloadBitfield.HasPiece(segment.PieceIndex))
+                {
+                    logger.LogInformation("Already downloaded {Piece} - ignoring segment data!", segment.PieceIndex);
                     return;
                 }
 
@@ -58,6 +60,7 @@ namespace Torrential.Files
                 segmentField.MarkHave(segmentFieldIndex);
                 if (HasAllSegmentsForPiece(segment.InfoHash, segment.PieceIndex, numSegmentsPerPiece))
                 {
+                    downloadBitfield.MarkHave(segment.PieceIndex);
                     await bus.Publish(new PieceValidationRequest { InfoHash = segment.InfoHash, PieceIndex = segment.PieceIndex });
                     await bus.Publish(new TorrentPieceDownloadedEvent { InfoHash = segment.InfoHash, PieceIndex = segment.PieceIndex });
                 }

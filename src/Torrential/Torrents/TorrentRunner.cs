@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Torrential.Files;
 using Torrential.Peers;
-using Torrential.Trackers;
 
 namespace Torrential.Torrents
 {
@@ -11,31 +10,58 @@ namespace Torrential.Torrents
                                PieceSelector pieceSelector)
     {
 
-        public async Task InitiatePeer(TorrentMetadata meta, PeerWireClient peer, CancellationToken cancellationToken)
+        public async Task InitiatePeer(TorrentMetadata meta, PeerWireClient peer, CancellationToken stoppingToken)
         {
-            var processor = peer.Process(meta, bitfieldMgr, segmentSaveService, cancellationToken);
+            var processor = peer.Process(meta, bitfieldMgr, segmentSaveService, stoppingToken);
+
+            if (!bitfieldMgr.TryGetVerificationBitfield(meta.InfoHash, out var verificationBitfield))
+            {
+                logger.LogInformation("Failed to retrieve verification bitfield");
+                return;
+            }
+            await peer.SendBitfield(verificationBitfield);
 
             logger.LogInformation("Waiting for bitfield from peer");
-            while (peer.State.PeerBitfield == null && !cancellationToken.IsCancellationRequested)
+            while (peer.State.PeerBitfield == null && !stoppingToken.IsCancellationRequested)
                 await Task.Delay(100);
 
-            logger.LogInformation("Sending interested to peer");    
-            await peer.SendIntereted();
-
-            logger.LogInformation("Waiting for unchoke from peer");
-            while (peer.State.AmChoked && !cancellationToken.IsCancellationRequested)
-                await Task.Delay(100);
+            var leechTask = LeechFromPeer(meta, peer, stoppingToken);
+            await Task.WhenAll(processor, leechTask);
+        }
 
 
-            if(!bitfieldMgr.TryGetBitfield(meta.InfoHash, out var myBitfield))
+        private async Task LeechFromPeer(TorrentMetadata meta, PeerWireClient peer, CancellationToken stoppingToken)
+        {
+            if (!bitfieldMgr.TryGetDownloadBitfield(meta.InfoHash, out var downloadBitfield))
             {
-                logger.LogError("Failed to retrieve my bitfield");
+                logger.LogInformation("Failed to retrieve download bitfield");
                 return;
             }
 
+            if (!bitfieldMgr.TryGetVerificationBitfield(meta.InfoHash, out var verificationBitfield))
+            {
+                logger.LogInformation("Failed to retrieve verification bitfield");
+                return;
+            }
+
+            if (downloadBitfield.HasAll())
+            {
+                logger.LogInformation("Already have all pieces");
+                return;
+            }
+
+            logger.LogInformation("Sending interested to peer");
+            await peer.SendIntereted();
+
+
+            logger.LogInformation("Waiting for unchoke from peer");
+            while (peer.State.AmChoked && !stoppingToken.IsCancellationRequested)
+                await Task.Delay(100);
+
+
             logger.LogInformation("Starting piece selection");
             var hasMorePieces = true;
-            while (!peer.State.AmChoked && !cancellationToken.IsCancellationRequested && hasMorePieces)
+            while (!peer.State.AmChoked && !stoppingToken.IsCancellationRequested && hasMorePieces)
             {
                 //Start asking for pieces, wait for us to get a piece back then ask for the next piece
                 var suggestion = await pieceSelector.SuggestNextPieceAsync(meta.InfoHash, peer.State.PeerBitfield);
@@ -49,7 +75,7 @@ namespace Torrential.Torrents
                 logger.LogInformation("Requesting {Piece} from peer", suggestion);
                 var requestSize = (int)Math.Pow(2, 14);
                 var remainder = (int)meta.PieceSize;
-                while (remainder > 0 && !cancellationToken.IsCancellationRequested)
+                while (remainder > 0 && !stoppingToken.IsCancellationRequested)
                 {
                     var offset = (int)meta.PieceSize - remainder;
                     await peer.SendPieceRequest(suggestion.Index.Value, offset, requestSize);
@@ -58,8 +84,30 @@ namespace Torrential.Torrents
             }
 
             logger.LogInformation("Finished requesting pieces from peer");
+        }
 
-            await processor;
+        private async Task SeedToPeer(TorrentMetadata meta, PeerWireClient peer, CancellationToken stoppingToken)
+        {
+            if (peer.State.PeerBitfield == null)
+            {
+                logger.LogInformation("Peer has not sent bitfield yet");
+                return;
+            }
+
+            if (peer.State.PeerBitfield.HasAll())
+            {
+                logger.LogInformation("Peer has all pieces");
+                return;
+            }
+
+            //Wait for peer to be interested then unchoke them
+            while (!peer.State.PeerInterested && !stoppingToken.IsCancellationRequested)
+                await Task.Delay(100);
+
+            logger.LogInformation("Peer has shown interest, unchoking");
+            await peer.SendUnchoke();
+
+            //Wait for the peer to request a piece;
         }
     }
 }

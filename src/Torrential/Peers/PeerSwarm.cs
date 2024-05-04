@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using System.Threading;
 using Torrential.Torrents;
 using Torrential.Trackers;
 
@@ -19,23 +18,25 @@ namespace Torrential.Peers
         TorrentRunner torrentRunner,
         IPeerService peerService,
         IEnumerable<ITrackerClient> trackerClients,
-        BitfieldManager bitfieldMgr,
-        ILogger<PeerSwarm> logger, 
+        ILogger<PeerSwarm> logger,
         ILoggerFactory loggerFactory)
     {
         private ConcurrentDictionary<InfoHash, PeerSwarmConfiguration> _swarmConfigs = [];
         private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> _peerSwarms = [];
         private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> _swarmTasks = [];
 
+        public IReadOnlyDictionary<InfoHash, PeerSwarmConfiguration> SwarmConfigs => _swarmConfigs;
+        public IReadOnlyDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> PeerClients => _peerSwarms;
+        public IReadOnlyDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> SwarmTasks => _swarmTasks;
+
+
         public async Task MaintainSwarm(InfoHash infoHash, int swarmSize, CancellationToken stoppingToken)
         {
-            if(!metadataCache.TryGet(infoHash, out var metadata))
+            if (!metadataCache.TryGet(infoHash, out var metadata))
             {
-                logger.LogError("Metadata not found for {InfoHash}", infoHash);     
+                logger.LogError("Metadata not found for {InfoHash}", infoHash);
                 return;
             }
-
-            bitfieldMgr.Initialize(metadata.InfoHash, metadata.NumberOfPieces);
 
             if (_swarmConfigs.TryGetValue(infoHash, out var swarmConfig))
             {
@@ -60,11 +61,11 @@ namespace Torrential.Peers
         private async Task AnnounceAndFillSwarm(TorrentMetadata metadata, CancellationToken stoppingToken)
         {
             var peerTasks = new List<Task>();
-            await foreach(var announceResponse in Announce(metadata))
+            await foreach (var announceResponse in Announce(metadata))
             {
                 foreach (var peer in announceResponse.Peers)
                 {
-                     peerTasks.Add(TryAddPeerToSwarm(metadata, peer, stoppingToken));
+                    peerTasks.Add(TryAddPeerToSwarm(metadata, peer, stoppingToken));
                 }
             }
             await Task.WhenAll(peerTasks);
@@ -80,10 +81,10 @@ namespace Torrential.Peers
             var conn = new PeerWireConnection(peerService, new System.Net.Sockets.TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
             var result = await conn.Connect(infoHash, peerInfo, timedCts.Token);
 
-            if(result.Success && conn.PeerId != null)
+            if (result.Success && conn.PeerId != null)
             {
                 var peerConnections = _peerSwarms.GetOrAdd(infoHash, (_) => new ConcurrentDictionary<PeerId, PeerWireClient>());
-                if(peerConnections.ContainsKey(conn.PeerId.Value)) return true;
+                if (peerConnections.ContainsKey(conn.PeerId.Value)) return true;
                 var pwcLogger = loggerFactory.CreateLogger<PeerWireClient>();
                 var pwc = new PeerWireClient(conn, pwcLogger);
                 peerConnections.TryAdd(conn.PeerId.Value, pwc);
@@ -95,7 +96,7 @@ namespace Torrential.Peers
 
         public async Task<ICollection<PeerWireClient>> GetPeers(InfoHash infoHash)
         {
-            if(!_peerSwarms.TryGetValue(infoHash, out var peerConnections))
+            if (!_peerSwarms.TryGetValue(infoHash, out var peerConnections))
                 return Array.Empty<PeerWireClient>();
 
             return peerConnections.Values.ToArray();
@@ -116,13 +117,13 @@ namespace Torrential.Peers
                     NumWant = 50
                 });
 
-                if(announceResponse ==  null) continue;
+                if (announceResponse == null) continue;
                 yield return announceResponse;
             }
         }
     }
 
-    public  class PeerSwarmConfiguration
+    public class PeerSwarmConfiguration
     {
         public required InfoHash InfoHash { get; init; }
         public required int SwarmSize { get; set; }

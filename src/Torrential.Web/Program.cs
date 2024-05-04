@@ -1,4 +1,5 @@
 using MassTransit;
+using MassTransit.Initializers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Serilog;
@@ -8,9 +9,9 @@ using Torrential;
 using Torrential.Commands;
 using Torrential.Extensions.SignalR;
 using Torrential.Files;
+using Torrential.Peers;
 using Torrential.Torrents;
 using Torrential.Web.Api.Models;
-using Torrential.Web.Api.Requests;
 using Torrential.Web.Api.Responses;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -57,13 +58,43 @@ app.MapPost(
 
 app.MapGet(
     "/torrents",
-    () =>
+    async (PeerSwarm swarms,
+    TorrentialDb torrentDb,
+    BitfieldManager bitfieldManager,
+    TorrentMetadataCache metaCache) =>
     {
-        //Stitch in all the appropriate data
+        var summaries = new List<object>();
 
-        //How can  we meter the peer connection (total upload, total download bytes)
-        //We need to make sure this is only tracking piece download and piece upload lengths (we cannot simply track the bytes going over the peer connection)
-        return Results.Ok("Hello world");
+        //Stitch in all the appropriate data
+        await foreach (var torrents in torrentDb.Torrents.AsAsyncEnumerable())
+        {
+            if (!metaCache.TryGet(torrents.InfoHash, out var meta)) continue;
+
+
+
+            var peers = await swarms.GetPeers(torrents.InfoHash);
+            var peerSummaries = peers.Select(x => new
+            {
+                PeerId = x.PeerId.ToAsciiString(),
+                BytesDownloaded = x.BytesDownloaded,
+            });
+
+            if (!bitfieldManager.TryGetDownloadBitfield(torrents.InfoHash, out var downloadBitfield))
+                continue;
+
+            var summary = new
+            {
+                Name = meta.Name,
+                InfoHash = meta.InfoHash,
+                Peers = peerSummaries,
+                Progress = downloadBitfield.CompletionRatio
+            };
+
+            summaries.Add(summary);
+        }
+
+
+        return Results.Json(summaries);
     })
     .Produces<IDataResponse<TorrentSummaryVm[]>>(200)
     .Produces<IErrorResponse>(400)
@@ -133,7 +164,7 @@ using var scope4 = app.Services.CreateScope();
 var db4 = scope4.ServiceProvider.GetRequiredService<TorrentialDb>();
 var mgr = scope4.ServiceProvider.GetRequiredService<TorrentTaskManager>();
 var metaFileService = scope4.ServiceProvider.GetRequiredService<IMetadataFileService>();
-await foreach(var torrentMeta in metaFileService.GetAllMetadataFiles())
+await foreach (var torrentMeta in metaFileService.GetAllMetadataFiles())
 {
     await mgr.Add(torrentMeta);
 }

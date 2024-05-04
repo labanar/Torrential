@@ -60,11 +60,18 @@ public sealed class PeerWireClient : IDisposable
     public long BytesUploaded { get; private set; }
     public long BytesDownloaded { get; private set; }
 
+    public PeerId PeerId { get; private set; }
+
     public PeerWireClient(IPeerWireConnection connection, ILogger logger)
     {
+        if (!connection.PeerId.HasValue)
+            throw new ArgumentException("Peer Id must be set", nameof(connection));
+
+
         _connection = connection;
         _logger = logger;
         _state = new PeerWireState();
+        PeerId = connection.PeerId.Value;
     }
 
 

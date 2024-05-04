@@ -4,7 +4,7 @@ using Torrential.Peers;
 
 namespace Torrential.Torrents
 {
-    public class TorrentTaskManager(TorrentMetadataCache metaCache, PeerSwarm swarms, IBus bus)
+    public class TorrentTaskManager(TorrentMetadataCache metaCache, PeerSwarm swarms, IBus bus, BitfieldManager bitfieldManager)
     {
         private static ConcurrentDictionary<InfoHash, string> Torrents = [];
         private static ConcurrentDictionary<InfoHash, Task> TorrentTasks = [];
@@ -23,7 +23,7 @@ namespace Torrential.Torrents
             }
 
             metaCache.Add(torrentMetadata);
-
+            bitfieldManager.Initialize(torrentMetadata.InfoHash, torrentMetadata.NumberOfPieces);
 
             await bus.Publish(new TorrentAddedEvent
             {

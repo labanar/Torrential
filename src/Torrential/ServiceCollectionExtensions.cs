@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<TorrentRunner>();
         services.AddSingleton<TorrentTaskManager>();
 
+        services.AddSingleton<TorrentFileService>();
         services.AddSingleton<PieceReservationService>();
         services.AddSingleton<BitfieldManager>();
         services.AddSingleton<TorrentMetadataCache>();
@@ -41,6 +42,8 @@ public static class ServiceCollectionExtensions
         services.AddCommandHandler<TorrentRemoveCommand, TorrentRemoveResponse, TorrentRemoveCommandHandler>();
         services.AddCommandHandler<FileSettingsUpdateCommand, FileSettingsUpdateResponse, SettingsUpdateCommandHandler>();
 
+
+        services.AddHostedService<BitfieldSyncService>();
 
         services.AddSingleton<IPostDownloadAction, FileCopyPostDownloadAction>();
     }
