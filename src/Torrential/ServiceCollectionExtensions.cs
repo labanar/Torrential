@@ -33,7 +33,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<BitfieldManager>();
         services.AddSingleton<TorrentMetadataCache>();
         services.AddSingleton<PieceSelector>();
-        services.AddSingleton<PeerManager>();
 
         //TODO - add service extension that scans the provided assemblies for implementations of ICommandHandler<,>
         services.AddCommandHandler<TorrentAddCommand, TorrentAddResponse, TorrentAddCommandHandler>();

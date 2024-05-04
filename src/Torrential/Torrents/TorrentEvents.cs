@@ -60,7 +60,6 @@ namespace Torrential.Torrents
         public required int PieceIndex { get; init; }
     }
 
-
     public class PeerConnectedEvent : ITorrentEvent
     {
         public required InfoHash InfoHash { get; init; }

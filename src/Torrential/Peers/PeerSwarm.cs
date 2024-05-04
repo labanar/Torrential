@@ -1,18 +1,12 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Buffers;
 using System.Collections.Concurrent;
 using Torrential.Torrents;
 using Torrential.Trackers;
 
 namespace Torrential.Peers
 {
-    /// <summary>
-    /// Should be responsible for the following:
-    /// 
-    /// 1) Re-announcing on some cadence
-    /// 2) Keeping the swarm healthy (removing bad peers, connecting to new ones when we're under the limit)
-    /// 3) Central place for us to dispatch have messages to peers (once we downlod a piece we need to inform the peers we have it now)
-    /// 
-    /// </summary>
+
     public sealed class PeerSwarm(
         BitfieldManager bitfields,
         TorrentMetadataCache metadataCache,

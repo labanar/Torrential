@@ -1,38 +1,39 @@
 # Torrential
 
-A high-performance Torrent client built with .NET. 
+A high-performance Torrent client built with .NET.
 
 BEPs:
+
 - [ ] BEP03 - Bit Torrent Protocol
-  - [X] Decode metadata files
-  - [X] HTTP Trackers
+  - [x] Decode metadata files
+  - [x] HTTP Trackers
   - [ ] Peer Messages
     - [ ] Choke
       - [ ] Send
-      - [X] Receive
+      - [x] Receive
     - [ ] Unchoke
       - [ ] Send
-      - [X] Receive
+      - [x] Receive
     - [ ] Interested
-      - [X] Send
+      - [x] Send
       - [ ] Receive
     - [ ] Not Interested
       - [ ] Send
-      - [X] Receive
-    - [ ] Have
-      - [ ] Send
-      - [X] Receive
-    - [ ] Bitfield
-      - [X] Send
-      - [X] Receive
+      - [x] Receive
+    - [x] Have
+      - [x] Send
+      - [x] Receive
+    - [x] Bitfield
+      - [x] Send
+      - [x] Receive
     - [ ] Request
-      - [X] Send
+      - [x] Send
       - [ ] Receive
     - [ ] Piece
       - [ ] Send
-      - [X] Receive
+      - [x] Receive
     - [ ] Cancel
       - [ ] Send
-      - [ ] Receive  
+      - [ ] Receive
 - [ ] BEP06 - Fast Extensions
-- [X] BEP15 - UDP Tracker Protocol
+- [x] BEP15 - UDP Tracker Protocol
