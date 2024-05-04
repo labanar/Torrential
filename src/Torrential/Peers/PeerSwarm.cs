@@ -14,6 +14,7 @@ namespace Torrential.Peers
     /// 
     /// </summary>
     public sealed class PeerSwarm(
+        BitfieldManager bitfields,
         TorrentMetadataCache metadataCache,
         TorrentRunner torrentRunner,
         IPeerService peerService,
@@ -53,8 +54,27 @@ namespace Torrential.Peers
             var timer = new PeriodicTimer(TimeSpan.FromSeconds(60));
             while (!stoppingToken.IsCancellationRequested)
             {
+                await CleanupPeers(stoppingToken);
                 await AnnounceAndFillSwarm(metadata, stoppingToken);
                 await timer.WaitForNextTickAsync(stoppingToken);
+            }
+        }
+
+
+        private async Task CleanupPeers(CancellationToken stoppingToken)
+        {
+            foreach (var (infoHash, swarmTasks) in _swarmTasks)
+            {
+                foreach (var (peerId, swarmTask) in swarmTasks)
+                {
+                    if (swarmTask.IsCompleted || swarmTask.IsCanceled || swarmTask.IsFaulted)
+                    {
+                        logger.LogInformation("Cleaning up peer {PeerId} from swarm {InfoHash}", peerId.ToAsciiString(), infoHash.AsString());
+                        //_swarmTasks[infoHash].TryRemove(peerId, out _);
+                        //if (_peerSwarms[infoHash].TryRemove(peerId, out var pwc))
+                        //    pwc.Dispose();
+                    }
+                }
             }
         }
 

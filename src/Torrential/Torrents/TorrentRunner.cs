@@ -10,8 +10,11 @@ namespace Torrential.Torrents
                                PieceSelector pieceSelector)
     {
 
-        public async Task InitiatePeer(TorrentMetadata meta, PeerWireClient peer, CancellationToken stoppingToken)
+        public async Task InitiatePeer(TorrentMetadata meta, PeerWireClient peer, CancellationToken canellationToken)
         {
+            var ctsWrap = CancellationTokenSource.CreateLinkedTokenSource(canellationToken);
+            var stoppingToken = ctsWrap.Token;
+
             var processor = peer.Process(meta, bitfieldMgr, segmentSaveService, stoppingToken);
 
             if (!bitfieldMgr.TryGetVerificationBitfield(meta.InfoHash, out var verificationBitfield))
@@ -25,8 +28,12 @@ namespace Torrential.Torrents
             while (peer.State.PeerBitfield == null && !stoppingToken.IsCancellationRequested)
                 await Task.Delay(100);
 
+            logger.LogInformation("Received bitfield from peer");
+
             var leechTask = LeechFromPeer(meta, peer, stoppingToken);
-            await Task.WhenAll(processor, leechTask);
+            var seedTask = SeedToPeer(meta, peer, stoppingToken);
+            await Task.WhenAll(processor, leechTask, seedTask);
+            ctsWrap.Cancel();
         }
 
 
@@ -108,6 +115,15 @@ namespace Torrential.Torrents
             await peer.SendUnchoke();
 
             //Wait for the peer to request a piece;
+            await foreach (var request in peer.PeerPeieceRequests.Reader.ReadAllAsync(stoppingToken))
+            {
+                if (request == null)
+                    continue;
+
+                logger.LogInformation("Received piece {@Request} from peer", request);
+
+                var foo = "xyz";
+            }
         }
     }
 }

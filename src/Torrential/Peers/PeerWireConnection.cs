@@ -23,11 +23,14 @@ public class PeerWireConnection : IPeerWireConnection
 
     public Guid Id { get; }
 
+    private PeerInfo _peerInfo;
+
     public PeerId? PeerId { get; private set; }
     public PipeReader Reader => _peerReader;
     public PipeWriter Writer => _peerWriter;
     public InfoHash InfoHash { get; private set; } = InfoHash.None;
     public bool IsConnected { get; private set; }
+    public PeerInfo PeerInfo => _peerInfo;
 
     public PeerWireConnection(IPeerService peerService, TcpClient client, ILogger<PeerWireConnection> logger)
     {
@@ -53,6 +56,7 @@ public class PeerWireConnection : IPeerWireConnection
             return PeerConnectionResult.Failure;
         }
 
+        _peerInfo = peer;
         PeerId = handshakeResult.PeerId;
         InfoHash = infoHash;
         IsConnected = true;

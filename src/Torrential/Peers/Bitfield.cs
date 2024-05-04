@@ -63,19 +63,12 @@ namespace Torrential.Peers
 
         public bool HasAll()
         {
+            var piecesHave = 0;
+
             for (var i = 0; i < _sizeInBytes; i++)
-            {
-                var allBitsSet = (i == _sizeInBytes - 1 && _numOfPieces % 8 != 0)
-                                  ? (byte)((1 << (_numOfPieces % 8)) - 1)
-                                  : (byte)0xFF;
+                piecesHave += BitOperations.PopCount(_bitfield[i]);
 
-                if ((_bitfield[i] & allBitsSet) != allBitsSet)
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return piecesHave == _numOfPieces;
         }
 
         public bool HasNone()

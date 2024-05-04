@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Threading.Channels;
 using Torrential.Files;
 using Torrential.Torrents;
+using Torrential.Trackers;
 
 namespace Torrential.Peers;
 
@@ -26,6 +27,8 @@ public sealed class PeerWireClient : IDisposable
     private readonly PeerWireState _state;
     private readonly IPeerWireConnection _connection;
     private readonly ILogger _logger;
+
+    public PeerInfo PeerInfo => _connection.PeerInfo;
 
     private SemaphoreSlim _pieceRequestLimit = new SemaphoreSlim(10, 10);
 

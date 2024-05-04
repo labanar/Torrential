@@ -76,7 +76,11 @@ app.MapGet(
             var peerSummaries = peers.Select(x => new
             {
                 PeerId = x.PeerId.ToAsciiString(),
+                IpAddress = x.PeerInfo.Ip.ToString(),
+                Port = x.PeerInfo.Port,
                 BytesDownloaded = x.BytesDownloaded,
+                IsSeed = x.State?.PeerBitfield?.HasAll() ?? false,
+                CompletionRatio = x.State?.PeerBitfield?.CompletionRatio ?? 0
             });
 
             if (!bitfieldManager.TryGetDownloadBitfield(torrents.InfoHash, out var downloadBitfield))
@@ -86,8 +90,8 @@ app.MapGet(
             {
                 Name = meta.Name,
                 InfoHash = meta.InfoHash,
+                Progress = downloadBitfield.CompletionRatio,
                 Peers = peerSummaries,
-                Progress = downloadBitfield.CompletionRatio
             };
 
             summaries.Add(summary);
