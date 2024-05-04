@@ -39,6 +39,7 @@ builder.Services.AddMassTransit(x =>
         cfg.ConfigureEndpoints(context);
     });
 });
+builder.Services.AddHostedService<InitializationService>();
 
 var app = builder.Build();
 app.UseSwagger();
@@ -131,47 +132,48 @@ app.MapPost("settings",
        async (FileSettingsUpdateCommand command, ICommandHandler<FileSettingsUpdateCommand, FileSettingsUpdateResponse> handler) =>
               await handler.Execute(command));
 
-using var scope = app.Services.CreateScope();
-var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
-db.Database.Migrate();
+
+//using var scope = app.Services.CreateScope();
+//var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
+//db.Database.Migrate();
 
 
-//Load settings + create defaults
-using var scope2 = app.Services.CreateScope();
-var db2 = scope2.ServiceProvider.GetRequiredService<TorrentialDb>();
-var settings = await db2.Settings.FindAsync(TorrentialSettings.DefaultId);
-if (settings == null)
-{
-    var appPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-    await db2.Settings.AddAsync(new()
-    {
-        FileSettings = new FileSettings
-        {
-            DownloadPath = Path.Combine(appPath, "torrential\\downloads"),
-            CompletedPath = Path.Combine(appPath, "torrential\\completed")
-        }
-    });
-    await db2.SaveChangesAsync();
-}
+////Load settings + create defaults
+//using var scope2 = app.Services.CreateScope();
+//var db2 = scope2.ServiceProvider.GetRequiredService<TorrentialDb>();
+//var settings = await db2.Settings.FindAsync(TorrentialSettings.DefaultId);
+//if (settings == null)
+//{
+//    var appPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+//    await db2.Settings.AddAsync(new()
+//    {
+//        FileSettings = new FileSettings
+//        {
+//            DownloadPath = Path.Combine(appPath, "torrential\\downloads"),
+//            CompletedPath = Path.Combine(appPath, "torrential\\completed")
+//        }
+//    });
+//    await db2.SaveChangesAsync();
+//}
 
-//Load settings into memory cache
+////Load settings into memory cache
 
-using var scope3 = app.Services.CreateScope();
-var db3 = scope3.ServiceProvider.GetRequiredService<TorrentialDb>();
-var cache = scope3.ServiceProvider.GetRequiredService<IMemoryCache>();
-var settings2 = await db3.Settings.FindAsync(TorrentialSettings.DefaultId);
-cache.Set("settings.file", settings2.FileSettings);
+//using var scope3 = app.Services.CreateScope();
+//var db3 = scope3.ServiceProvider.GetRequiredService<TorrentialDb>();
+//var cache = scope3.ServiceProvider.GetRequiredService<IMemoryCache>();
+//var settings2 = await db3.Settings.FindAsync(TorrentialSettings.DefaultId);
+//cache.Set("settings.file", settings2.FileSettings);
 
 
-//Load torrents
-using var scope4 = app.Services.CreateScope();
-var db4 = scope4.ServiceProvider.GetRequiredService<TorrentialDb>();
-var mgr = scope4.ServiceProvider.GetRequiredService<TorrentTaskManager>();
-var metaFileService = scope4.ServiceProvider.GetRequiredService<IMetadataFileService>();
-await foreach (var torrentMeta in metaFileService.GetAllMetadataFiles())
-{
-    await mgr.Add(torrentMeta);
-}
+////Load torrents
+//using var scope4 = app.Services.CreateScope();
+//var db4 = scope4.ServiceProvider.GetRequiredService<TorrentialDb>();
+//var mgr = scope4.ServiceProvider.GetRequiredService<TorrentTaskManager>();
+//var metaFileService = scope4.ServiceProvider.GetRequiredService<IMetadataFileService>();
+//await foreach (var torrentMeta in metaFileService.GetAllMetadataFiles())
+//{
+//    await mgr.Add(torrentMeta);
+//}
 
 
 //Go through the file system and get all metadata files
@@ -196,4 +198,45 @@ static Logger BuildLogger(IConfiguration configuration)
                 });
 
     return config.CreateLogger();
+}
+
+internal class InitializationService(IServiceProvider serviceProvider, IMemoryCache cache, TorrentTaskManager taskManager, IMetadataFileService metaFileService) : BackgroundService
+{
+    protected async override Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
+        db.Database.Migrate();
+
+
+        using var scope2 = serviceProvider.CreateScope();
+        var db2 = scope2.ServiceProvider.GetRequiredService<TorrentialDb>();
+        var settings = await db2.Settings.FindAsync(TorrentialSettings.DefaultId);
+        if (settings == null)
+        {
+            var appPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            await db2.Settings.AddAsync(new()
+            {
+                FileSettings = new FileSettings
+                {
+                    DownloadPath = Path.Combine(appPath, "torrential\\downloads"),
+                    CompletedPath = Path.Combine(appPath, "torrential\\completed")
+                }
+            });
+            await db2.SaveChangesAsync();
+        }
+
+        using var scope3 = serviceProvider.CreateScope();
+        var db3 = scope3.ServiceProvider.GetRequiredService<TorrentialDb>();
+        var settings2 = await db3.Settings.FindAsync(TorrentialSettings.DefaultId);
+        cache.Set("settings.file", settings2.FileSettings);
+
+
+        using var scope4 = serviceProvider.CreateScope();
+        var db4 = scope4.ServiceProvider.GetRequiredService<TorrentialDb>();
+        await foreach (var torrentMeta in metaFileService.GetAllMetadataFiles())
+        {
+            await taskManager.Add(torrentMeta);
+        }
+    }
 }

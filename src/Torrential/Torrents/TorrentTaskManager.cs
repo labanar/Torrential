@@ -23,7 +23,7 @@ namespace Torrential.Torrents
             }
 
             metaCache.Add(torrentMetadata);
-            bitfieldManager.Initialize(torrentMetadata.InfoHash, torrentMetadata.NumberOfPieces);
+            await bitfieldManager.Initialize(torrentMetadata.InfoHash, torrentMetadata.NumberOfPieces);
 
             await bus.Publish(new TorrentAddedEvent
             {

@@ -1,10 +1,11 @@
-﻿using System.Buffers;
+﻿using MassTransit;
+using System.Buffers;
 using System.Collections.Concurrent;
 using Torrential.Files;
 
 namespace Torrential.Peers
 {
-    public class BitfieldManager(TorrentFileService fileService)
+    public class BitfieldManager(TorrentFileService fileService, IBus bus)
     {
         private ConcurrentDictionary<InfoHash, Bitfield> _downloadBitfields = new ConcurrentDictionary<InfoHash, Bitfield>();
         private ConcurrentDictionary<InfoHash, Bitfield> _verificationBitfields = new ConcurrentDictionary<InfoHash, Bitfield>();
@@ -12,7 +13,7 @@ namespace Torrential.Peers
         public ICollection<(InfoHash, Bitfield)> DownloadBitfields => _downloadBitfields.Select(Bitfield => (Bitfield.Key, Bitfield.Value)).ToArray();
         public ICollection<(InfoHash, Bitfield)> VerificationBitfields => _verificationBitfields.Select(Bitfield => (Bitfield.Key, Bitfield.Value)).ToArray();
 
-        public void Initialize(InfoHash infoHash, int numberOfPieces)
+        public async Task Initialize(InfoHash infoHash, int numberOfPieces)
         {
             var downloadBitfield = new Bitfield(numberOfPieces);
             var verificationBitfield = new Bitfield(numberOfPieces);
@@ -23,6 +24,12 @@ namespace Torrential.Peers
             _downloadBitfields[infoHash] = downloadBitfield;
             _verificationBitfields[infoHash] = verificationBitfield;
 
+            //Determine which pieces are downloaded but not verified
+            for (var i = 0; i < numberOfPieces; i++)
+            {
+                if (downloadBitfield.HasPiece(i) && !verificationBitfield.HasPiece(i))
+                    await bus.Publish(new PieceValidationRequest { InfoHash = infoHash, PieceIndex = i });
+            }
         }
 
         public bool TryGetDownloadBitfield(InfoHash infoHash, out Bitfield bitfield)

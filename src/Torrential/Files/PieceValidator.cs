@@ -41,8 +41,6 @@ namespace Torrential.Files
                 return;
             }
 
-            //Let's save the piece and mark it as downloaded
-
 
             var fileHandle = await fileHandleProvider.GetPartFileHandle(request.InfoHash);
             var buffer = ArrayPool<byte>.Shared.Rent(20);
