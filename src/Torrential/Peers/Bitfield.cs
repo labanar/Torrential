@@ -21,9 +21,7 @@ namespace Torrential.Peers
                 var piecesHave = 0;
 
                 for (var i = 0; i < _sizeInBytes; i++)
-                {
                     piecesHave += BitOperations.PopCount(_bitfield[i]);
-                }
 
                 return piecesHave / totalPieces;
             }
@@ -96,25 +94,45 @@ namespace Torrential.Peers
             return (_bitfield[byteIndex] & (1 << bitIndex)) != 0;
         }
 
+
+        /// <summary>
+        /// WARNING: This method is not thread-safe, and should only be called in a single-threaded context.
+        /// </summary>
+        /// <param name="index"></param>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
         public void MarkHave(int index)
         {
             if (index < 0 || index >= _numOfPieces)
-            {
                 throw new ArgumentOutOfRangeException(nameof(index));
-            }
 
             var byteIndex = index / 8;
             var bitIndex = index % 8;
             _bitfield[byteIndex] |= (byte)(1 << bitIndex);
         }
 
+        public async Task MarkHaveAsync(int index, CancellationToken cancellationToken)
+        {
+            if (index < 0 || index >= _numOfPieces)
+                throw new ArgumentOutOfRangeException(nameof(index));
+
+            var byteIndex = index / 8;
+            var bitIndex = index % 8;
+            await _semaphores[byteIndex].WaitAsync(cancellationToken);
+            try
+            {
+                _bitfield[byteIndex] |= (byte)(1 << bitIndex);
+            }
+            finally
+            {
+                _semaphores[byteIndex].Release();
+            }
+        }
+
 
         public async Task UnmarkHaveAsync(int index, CancellationToken cancellationToken)
         {
             if (index < 0 || index >= _numOfPieces)
-            {
                 throw new ArgumentOutOfRangeException(nameof(index));
-            }
 
             var byteIndex = index / 8;
             var bitIndex = index % 8;

@@ -57,7 +57,7 @@ namespace Torrential.Files
 
             if (result)
             {
-                verificationBitfield.MarkHave(request.PieceIndex);
+                await verificationBitfield.MarkHaveAsync(request.PieceIndex, CancellationToken.None);
                 await bus.Publish(new TorrentPieceVerifiedEvent { InfoHash = request.InfoHash, PieceIndex = request.PieceIndex });
                 if (verificationBitfield.HasAll())
                 {

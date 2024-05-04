@@ -17,7 +17,7 @@ namespace Torrential.Peers
             });
 
             if (bitfield.HasPiece(pieceIndex)) return false;
-            bitfield.MarkHave(pieceIndex);
+            await bitfield.MarkHaveAsync(pieceIndex, CancellationToken.None);
 
             _ = Task.Run(async () =>
             {

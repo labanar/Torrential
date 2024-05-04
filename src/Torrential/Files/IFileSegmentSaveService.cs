@@ -57,10 +57,10 @@ namespace Torrential.Files
                 var segmentFieldIndex = segment.PieceIndex * numSegmentsPerPiece;
                 var offsetIdx = segment.Offset / SEGMENT_LENGTH;
                 segmentFieldIndex += offsetIdx;
-                segmentField.MarkHave(segmentFieldIndex);
+                await segmentField.MarkHaveAsync(segmentFieldIndex, CancellationToken.None);
                 if (HasAllSegmentsForPiece(segment.InfoHash, segment.PieceIndex, numSegmentsPerPiece))
                 {
-                    downloadBitfield.MarkHave(segment.PieceIndex);
+                    await downloadBitfield.MarkHaveAsync(segment.PieceIndex, CancellationToken.None);
                     await bus.Publish(new PieceValidationRequest { InfoHash = segment.InfoHash, PieceIndex = segment.PieceIndex });
                     await bus.Publish(new TorrentPieceDownloadedEvent { InfoHash = segment.InfoHash, PieceIndex = segment.PieceIndex });
                 }
