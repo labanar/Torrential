@@ -50,6 +50,13 @@ public sealed class PeerWireClient : IDisposable
         SingleWriter = true
     });
 
+    public readonly Channel<PieceRequestMessage> PeerPeieceRequests = Channel.CreateBounded<PieceRequestMessage>(new BoundedChannelOptions(5)
+    {
+        SingleReader = false,
+        SingleWriter = true,
+        FullMode = BoundedChannelFullMode.Wait
+    });
+
     private CancellationTokenSource _processCts;
     private TorrentMetadata _meta;
     private BitfieldManager _bitfields;
@@ -256,6 +263,9 @@ public sealed class PeerWireClient : IDisposable
             case PeerWireMessageType.Have:
                 HandleHave(payload);
                 return true;
+                //case PeerWireMessageType.Request:
+                //    HandleRequest(payload);
+                //    return true;
         }
 
         //Return false here when we cannot process the message. It tells the main loop to disconnect and stop comms with this peer
@@ -310,6 +320,9 @@ public sealed class PeerWireClient : IDisposable
             return false;
         if (!sequenceReader.TryReadBigEndian(out int length))
             return false;
+
+
+        PeerPeieceRequests.Writer.TryWrite(new(index, begin, length));
 
         return true;
     }
@@ -422,12 +435,12 @@ public sealed class PeerWireClient : IDisposable
 
     private void WriteBitfield(Bitfield bitfield)
     {
-        //var pak = new PreparedPacket(bitfield..Length + 5);
-        //var buffer = pak.AsSpan();
-        //buffer.TryWriteBigEndian(bitfield.Value.Length);
-        //buffer[4] = PeerWireMessageType.Bitfield;
-        //bitfield.Value.CopyTo(buffer[5..]);
-        //OUTBOUND_MESSAGES.Writer.TryWrite(pak);
+        var pak = new PreparedPacket(bitfield.Bytes.Length + 5);
+        var buffer = pak.AsSpan();
+        buffer.TryWriteBigEndian(bitfield.Bytes.Length + 1);
+        buffer[4] = PeerWireMessageType.Bitfield;
+        bitfield.Bytes.CopyTo(buffer[5..]);
+        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
     }
     private void WriteKeepAlive()
     {
@@ -493,6 +506,8 @@ public sealed class PeerWireClient : IDisposable
         _connection.Dispose();
     }
 }
+
+public readonly record struct PieceRequestMessage(int PieceIndex, int Begin, int Length);
 
 public sealed class PreparedPacket : IDisposable
 {
