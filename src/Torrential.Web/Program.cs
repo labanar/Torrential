@@ -64,30 +64,25 @@ app.MapGet(
     BitfieldManager bitfieldManager,
     TorrentMetadataCache metaCache) =>
     {
-        var summaries = new List<object>();
-
-        //Stitch in all the appropriate data
+        var summaries = new List<TorrentSummaryVm>();
         await foreach (var torrents in torrentDb.Torrents.AsAsyncEnumerable())
         {
             if (!metaCache.TryGet(torrents.InfoHash, out var meta)) continue;
-
-
-
             var peers = await swarms.GetPeers(torrents.InfoHash);
-            var peerSummaries = peers.Select(x => new
+            var peerSummaries = peers.Select(x => new PeerSummaryVm
             {
                 PeerId = x.PeerId.ToAsciiString(),
                 IpAddress = x.PeerInfo.Ip.ToString(),
                 Port = x.PeerInfo.Port,
                 BytesDownloaded = x.BytesDownloaded,
                 IsSeed = x.State?.PeerBitfield?.HasAll() ?? false,
-                CompletionRatio = x.State?.PeerBitfield?.CompletionRatio ?? 0
+                Progress = x.State?.PeerBitfield?.CompletionRatio ?? 0
             });
 
             if (!bitfieldManager.TryGetDownloadBitfield(torrents.InfoHash, out var downloadBitfield))
                 continue;
 
-            var summary = new
+            var summary = new TorrentSummaryVm
             {
                 Name = meta.Name,
                 InfoHash = meta.InfoHash,
@@ -97,8 +92,6 @@ app.MapGet(
 
             summaries.Add(summary);
         }
-
-
         return Results.Json(summaries);
     })
     .Produces<IDataResponse<TorrentSummaryVm[]>>(200)
@@ -107,11 +100,40 @@ app.MapGet(
 
 app.MapGet(
     "/torrents/{infoHash}",
-    (InfoHash infoHash, TorrentMetadataCache cache) =>
+    async (InfoHash infoHash, TorrentMetadataCache cache, PeerSwarm swarms, BitfieldManager bitfieldManager) =>
     {
-        cache.TryGet(infoHash, out var meta);
-        return meta;
-    });
+        if (!cache.TryGet(infoHash, out var meta))
+            return Results.NotFound();
+
+        if (!bitfieldManager.TryGetVerificationBitfield(infoHash, out var verificationBitfield))
+            return Results.NotFound();
+
+        var peers = await swarms.GetPeers(infoHash);
+        var peerSummaries = peers.Select(x => new PeerSummaryVm
+        {
+            PeerId = x.PeerId.ToAsciiString(),
+            IpAddress = x.PeerInfo.Ip.ToString(),
+            Port = x.PeerInfo.Port,
+            BytesDownloaded = x.BytesDownloaded,
+            IsSeed = x.State?.PeerBitfield?.HasAll() ?? false,
+            Progress = x.State?.PeerBitfield?.CompletionRatio ?? 0
+        });
+
+
+        var summary = new TorrentSummaryVm
+        {
+            Name = meta.Name,
+            InfoHash = meta.InfoHash,
+            Progress = verificationBitfield.CompletionRatio,
+            Peers = peerSummaries,
+        };
+
+        return Results.Json(summary);
+    })
+    .Produces<IDataResponse<TorrentSummaryVm>>(200)
+    .Produces<IErrorResponse>(404)
+    .Produces<IErrorResponse>(400)
+    .Produces<IErrorResponse>(500);
 
 app.MapPost(
     "torrents/{infoHash}/start",
@@ -133,50 +155,6 @@ app.MapPost("settings",
               await handler.Execute(command));
 
 
-//using var scope = app.Services.CreateScope();
-//var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
-//db.Database.Migrate();
-
-
-////Load settings + create defaults
-//using var scope2 = app.Services.CreateScope();
-//var db2 = scope2.ServiceProvider.GetRequiredService<TorrentialDb>();
-//var settings = await db2.Settings.FindAsync(TorrentialSettings.DefaultId);
-//if (settings == null)
-//{
-//    var appPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-//    await db2.Settings.AddAsync(new()
-//    {
-//        FileSettings = new FileSettings
-//        {
-//            DownloadPath = Path.Combine(appPath, "torrential\\downloads"),
-//            CompletedPath = Path.Combine(appPath, "torrential\\completed")
-//        }
-//    });
-//    await db2.SaveChangesAsync();
-//}
-
-////Load settings into memory cache
-
-//using var scope3 = app.Services.CreateScope();
-//var db3 = scope3.ServiceProvider.GetRequiredService<TorrentialDb>();
-//var cache = scope3.ServiceProvider.GetRequiredService<IMemoryCache>();
-//var settings2 = await db3.Settings.FindAsync(TorrentialSettings.DefaultId);
-//cache.Set("settings.file", settings2.FileSettings);
-
-
-////Load torrents
-//using var scope4 = app.Services.CreateScope();
-//var db4 = scope4.ServiceProvider.GetRequiredService<TorrentialDb>();
-//var mgr = scope4.ServiceProvider.GetRequiredService<TorrentTaskManager>();
-//var metaFileService = scope4.ServiceProvider.GetRequiredService<IMetadataFileService>();
-//await foreach (var torrentMeta in metaFileService.GetAllMetadataFiles())
-//{
-//    await mgr.Add(torrentMeta);
-//}
-
-
-//Go through the file system and get all metadata files
 
 await app.RunAsync();
 
@@ -204,39 +182,45 @@ internal class InitializationService(IServiceProvider serviceProvider, IMemoryCa
 {
     protected async override Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await MigrateDatabase();
+        await LoadSettings();
+        await LoadTorrents();
+    }
+
+    private async Task MigrateDatabase()
+    {
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
-        db.Database.Migrate();
+        await db.Database.MigrateAsync();
+    }
 
-
-        using var scope2 = serviceProvider.CreateScope();
-        var db2 = scope2.ServiceProvider.GetRequiredService<TorrentialDb>();
-        var settings = await db2.Settings.FindAsync(TorrentialSettings.DefaultId);
+    private async Task LoadSettings()
+    {
+        using var scope = serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
+        var settings = await db.Settings.FindAsync(TorrentialSettings.DefaultId);
         if (settings == null)
         {
             var appPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            await db2.Settings.AddAsync(new()
+            settings = new()
             {
                 FileSettings = new FileSettings
                 {
                     DownloadPath = Path.Combine(appPath, "torrential\\downloads"),
                     CompletedPath = Path.Combine(appPath, "torrential\\completed")
                 }
-            });
-            await db2.SaveChangesAsync();
+            };
+            await db.Settings.AddAsync(settings);
+            await db.SaveChangesAsync();
         }
 
-        using var scope3 = serviceProvider.CreateScope();
-        var db3 = scope3.ServiceProvider.GetRequiredService<TorrentialDb>();
-        var settings2 = await db3.Settings.FindAsync(TorrentialSettings.DefaultId);
-        cache.Set("settings.file", settings2.FileSettings);
+        cache.Set("settings.file", settings.FileSettings);
+    }
 
-
-        using var scope4 = serviceProvider.CreateScope();
-        var db4 = scope4.ServiceProvider.GetRequiredService<TorrentialDb>();
+    private async Task LoadTorrents()
+    {
+        using var scope = serviceProvider.CreateScope();
         await foreach (var torrentMeta in metaFileService.GetAllMetadataFiles())
-        {
             await taskManager.Add(torrentMeta);
-        }
     }
 }

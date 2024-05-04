@@ -1,14 +1,20 @@
-﻿namespace Torrential.Web.Api.Models
+﻿namespace Torrential.Web.Api.Models;
+
+public class TorrentSummaryVm
 {
-    public class TorrentSummaryVm
-    {
-        public required string Name { get; set; }
-        public required float Percentage { get; set; }
+    public required string InfoHash { get; init; }
+    public required string Name { get; set; }
+    public required float Progress { get; set; }
+    public IEnumerable<PeerSummaryVm> Peers { get; init; } = Array.Empty<PeerSummaryVm>();
+}
 
-        public required int ConnectedSeeds { get; set; }
-        public required int ConnectedPeers { get; set; }
 
-        public required long BytesDownloaded { get; set; }
-        public required long BytesTotal { get; set; }
-    }
+public class PeerSummaryVm
+{
+    public required string PeerId { get; init; }
+    public required string IpAddress { get; init; }
+    public required int Port { get; init; }
+    public required long BytesDownloaded { get; init; }
+    public required bool IsSeed { get; init; }
+    public required float Progress { get; init; }
 }
