@@ -106,6 +106,19 @@ namespace Torrential.Peers
         //TODO - Figure this out once at startup and then maintain a list of valid trackers
         private async IAsyncEnumerable<AnnounceResponse> Announce(TorrentMetadata meta)
         {
+            //Get my verified bitfield
+            if (!bitfields.TryGetVerificationBitfield(meta.InfoHash, out var bitfield))
+            {
+                logger.LogError("Failed to get verified bitfield for {InfoHash}", meta.InfoHash);
+                yield break;
+            }
+
+            //Determine bytes remaining to download
+            var totalBytes = meta.PieceSize * meta.NumberOfPieces;
+            var downloadedBytesF = bitfield.CompletionRatio * totalBytes;
+            var downloadedBytes = (long)downloadedBytesF;
+            var remainingBytes = totalBytes - downloadedBytes;
+
             foreach (var tracker in trackerClients)
             {
                 if (!tracker.IsValidAnnounceForClient(meta.AnnounceList.First())) continue;
@@ -114,7 +127,10 @@ namespace Torrential.Peers
                     InfoHash = meta.InfoHash,
                     PeerId = peerService.Self.Id,
                     Url = meta.AnnounceList.First(),
-                    NumWant = 50
+                    NumWant = 50,
+                    BytesUploaded = 0,
+                    BytesDownloaded = downloadedBytes,
+                    BytesRemaining = remainingBytes
                 });
 
                 if (announceResponse == null) continue;
