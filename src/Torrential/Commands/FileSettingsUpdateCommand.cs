@@ -1,6 +1,4 @@
-﻿using MassTransit;
-using Torrential.Messages.Settings;
-using Torrential.Settings;
+﻿using Torrential.Settings;
 
 namespace Torrential.Commands
 {
@@ -16,7 +14,7 @@ namespace Torrential.Commands
 
     }
 
-    public class SettingsUpdateCommandHandler(SettingsManager settingsManager, IBus bus)
+    public class SettingsUpdateCommandHandler(SettingsManager settingsManager)
         : ICommandHandler<FileSettingsUpdateCommand, FileSettingsUpdateResponse>
     {
         public async Task<FileSettingsUpdateResponse> Execute(FileSettingsUpdateCommand command)
@@ -27,7 +25,6 @@ namespace Torrential.Commands
                 CompletedPath = command.CompletedPath
             });
 
-            await bus.Publish(new FileSettingsUpdatedMessage { CompletedPath = command.CompletedPath, IncompletePath = command.DownloadPath });
             return new();
         }
     }
