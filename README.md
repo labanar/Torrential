@@ -7,18 +7,19 @@ BEPs:
 - [ ] BEP03 - Bit Torrent Protocol
   - [x] Decode metadata files
   - [x] HTTP Trackers
+  - [x] TCP Listener
   - [ ] Peer Messages
-    - [ ] Choke
-      - [ ] Send
-      - [x] Receive
-    - [ ] Unchoke
-      - [ ] Send
-      - [x] Receive
-    - [ ] Interested
+    - [x] Choke
       - [x] Send
-      - [ ] Receive
-    - [ ] Not Interested
-      - [ ] Send
+      - [x] Receive
+    - [x] Unchoke
+      - [x] Send
+      - [x] Receive
+    - [x] Interested
+      - [x] Send
+      - [x] Receive
+    - [x] Not Interested
+      - [x] Send
       - [x] Receive
     - [x] Have
       - [x] Send
@@ -26,9 +27,9 @@ BEPs:
     - [x] Bitfield
       - [x] Send
       - [x] Receive
-    - [ ] Request
+    - [x] Request
       - [x] Send
-      - [ ] Receive
+      - [x] Receive
     - [ ] Piece
       - [ ] Send
       - [x] Receive
