@@ -1,6 +1,5 @@
 using MassTransit;
 using MassTransit.Initializers;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Serilog;
@@ -42,15 +41,6 @@ builder.Services.AddMassTransit(x =>
 });
 builder.Services.AddHostedService<InitializationService>();
 builder.Services.AddConnections();
-//builder.WebHost.ConfigureKestrel(options =>
-//{
-//    options.ListenAnyIP(53123, listenOptions =>
-//    {
-//        listenOptions.UseConnectionHandler<TcpConnectionHandler>();
-//    });
-
-//    options.ListenLocalhost(5142);
-//});
 
 var app = builder.Build();
 app.UseSwagger();
@@ -187,46 +177,6 @@ static Logger BuildLogger(IConfiguration configuration)
         });
 
     return config.CreateLogger();
-}
-
-internal class TcpConnectionHandler : ConnectionHandler
-{
-    private readonly ILogger<TcpConnectionHandler> _logger;
-    private readonly HandshakeService _handshakeService;
-    private readonly PeerSwarm _swarm;
-
-    public TcpConnectionHandler(HandshakeService handshakeService, ILogger<TcpConnectionHandler> logger, PeerSwarm swarm)
-    {
-        _logger = logger;
-        _handshakeService = handshakeService;
-        _swarm = swarm;
-    }
-
-    public override async Task OnConnectedAsync(ConnectionContext connection)
-    {
-        var conn = new PeerWireDuplexPipeConnection(connection, _handshakeService, _logger);
-        var result = await conn.ConnectInbound(CancellationToken.None);
-        if (!result.Success)
-        {
-            _logger.LogWarning("Connection failed");
-            return;
-        }
-
-        await _swarm.AddToSwarm(conn);
-    }
-
-    private static bool IsIPv4MappedToIPv6(byte[] bytes)
-    {
-        for (int i = 0; i < 10; i++)
-        {
-            if (bytes[i] != 0) return false;
-        }
-        if (bytes[10] != 0xff || bytes[11] != 0xff)
-        {
-            return false;
-        }
-        return true;
-    }
 }
 
 internal class InitializationService(IServiceProvider serviceProvider, IMemoryCache cache, TorrentTaskManager taskManager, IMetadataFileService metaFileService, TcpPeerListener tcpPeerListener) : BackgroundService
