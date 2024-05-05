@@ -57,6 +57,7 @@ namespace Torrential.Tests
             var peerService = new PeerService();
             var metaCache = new TorrentMetadataCache();
             metaCache.TryAdd(meta);
+            var handshakeService = new HandshakeService(peerService, metaCache, loggerFactory.CreateLogger<HandshakeService>());
 
             var resp = await sut.Announce(new AnnounceRequest
             {
@@ -72,7 +73,7 @@ namespace Torrential.Tests
 
             //TODO - lift timeout to config
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var conn = new PeerWireConnection(metaCache, peerService, new System.Net.Sockets.TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
+            var conn = new PeerWireConnection(handshakeService, new System.Net.Sockets.TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
             var result = await conn.ConnectOutbound(meta.InfoHash, resp.Peers.First(), cts.Token);
             Assert.True(result.Success);
         }

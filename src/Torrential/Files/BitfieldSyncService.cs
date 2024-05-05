@@ -25,7 +25,7 @@ namespace Torrential.Files
         {
             foreach (var (infoHash, bitfield) in bitfields.DownloadBitfields)
             {
-                var path = fileService.GetDownloadBitFieldPath(infoHash);
+                var path = await fileService.GetDownloadBitFieldPath(infoHash);
                 using var fs = File.OpenWrite(path);
                 var writer = PipeWriter.Create(fs);
                 DumpBitfieldToWriter(writer, bitfield);
@@ -38,7 +38,7 @@ namespace Torrential.Files
         {
             foreach (var (infoHash, bitfield) in bitfields.VerificationBitfields)
             {
-                var path = fileService.GetVerificationBitFieldPath(infoHash);
+                var path = await fileService.GetVerificationBitFieldPath(infoHash);
                 using var fs = File.OpenWrite(path);
                 var writer = PipeWriter.Create(fs);
                 DumpBitfieldToWriter(writer, bitfield);

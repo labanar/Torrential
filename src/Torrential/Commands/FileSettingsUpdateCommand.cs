@@ -1,12 +1,13 @@
 ﻿using MassTransit;
 using Torrential.Messages.Settings;
+using Torrential.Settings;
 
 namespace Torrential.Commands
 {
     public class FileSettingsUpdateCommand : ICommand<FileSettingsUpdateResponse>
     {
-        public string DownloadPath { get; init; }
-        public string CompletedPath { get; init; }
+        public required string DownloadPath { get; init; }
+        public required string CompletedPath { get; init; }
 
     }
 
@@ -15,32 +16,17 @@ namespace Torrential.Commands
 
     }
 
-    public class SettingsUpdateCommandHandler(TorrentialDb db, IBus bus)
+    public class SettingsUpdateCommandHandler(SettingsManager settingsManager, IBus bus)
         : ICommandHandler<FileSettingsUpdateCommand, FileSettingsUpdateResponse>
     {
         public async Task<FileSettingsUpdateResponse> Execute(FileSettingsUpdateCommand command)
         {
-            var settings = await db.Settings.FindAsync(TorrentialSettings.DefaultId);
-            if (settings != null)
+            await settingsManager.SaveFileSettings(new()
             {
-                settings.FileSettings = new FileSettings
-                {
-                    DownloadPath = command.DownloadPath,
-                    CompletedPath = command.CompletedPath
-                };
-            }
-            else
-            {
-                await db.Settings.AddAsync(new()
-                {
-                    FileSettings = new FileSettings
-                    {
-                        DownloadPath = command.DownloadPath,
-                        CompletedPath = command.CompletedPath
-                    }
-                });
-            }
-            await db.SaveChangesAsync();
+                DownloadPath = command.DownloadPath,
+                CompletedPath = command.CompletedPath
+            });
+
             await bus.Publish(new FileSettingsUpdatedMessage { CompletedPath = command.CompletedPath, IncompletePath = command.DownloadPath });
             return new();
         }

@@ -4,6 +4,7 @@ using Torrential.Commands;
 using Torrential.Files;
 using Torrential.Peers;
 using Torrential.Pipelines;
+using Torrential.Settings;
 using Torrential.Torrents;
 using Torrential.Trackers;
 using Torrential.Trackers.Http;
@@ -35,6 +36,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<PieceSelector>();
         services.AddSingleton<TcpPeerListener>();
         services.AddSingleton<HandshakeService>();
+        services.AddSingleton<SettingsManager>();
 
         //TODO - add service extension that scans the provided assemblies for implementations of ICommandHandler<,>
         services.AddCommandHandler<TorrentAddCommand, TorrentAddResponse, TorrentAddCommandHandler>();

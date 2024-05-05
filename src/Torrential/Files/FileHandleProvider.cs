@@ -1,11 +1,11 @@
-﻿using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Win32.SafeHandles;
+﻿using Microsoft.Win32.SafeHandles;
 using System.Collections.Concurrent;
+using Torrential.Settings;
 using Torrential.Torrents;
 
 namespace Torrential.Files;
 
-internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileService fileService, IMemoryCache cache)
+internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileService fileService, SettingsManager settingsManager)
     : IFileHandleProvider
 {
     public ConcurrentDictionary<InfoHash, SafeFileHandle> _partFiles = new ConcurrentDictionary<InfoHash, SafeFileHandle>();
@@ -31,7 +31,7 @@ internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileSer
             var pieceSize = (int)meta.PieceSize;
             var numberOfPieces = meta.NumberOfPieces;
             var torrentName = Path.GetFileNameWithoutExtension(FileUtilities.GetPathSafeFileName(meta.Name));
-            var filePath = fileService.GetPartFilePath(hash);
+            var filePath = await fileService.GetPartFilePath(hash);
             FileUtilities.TouchFile(filePath, pieceSize * numberOfPieces);
             return _partFiles.GetOrAdd(hash, (torrentId) => File.OpenHandle(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous));
         }
@@ -43,8 +43,7 @@ internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileSer
 
     public async ValueTask<SafeFileHandle> GetCompletedFileHandle(InfoHash infoHash, TorrentMetadataFile file)
     {
-        if (!cache.TryGetValue<FileSettings>("settings.file", out var settings))
-            throw new InvalidOperationException("Settings not found");
+        var settings = await settingsManager.GetFileSettings();
 
         if (!metaCache.TryGet(infoHash, out var meta))
             throw new ArgumentException("Torrent metadata not found in cache");

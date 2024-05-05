@@ -186,7 +186,6 @@ internal class InitializationService(IServiceProvider serviceProvider, IMemoryCa
     protected async override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await MigrateDatabase();
-        await LoadSettings();
         await LoadTorrents();
         Task.Run(() => tcpPeerListener.Start(CancellationToken.None));
     }
@@ -198,28 +197,28 @@ internal class InitializationService(IServiceProvider serviceProvider, IMemoryCa
         await db.Database.MigrateAsync();
     }
 
-    private async Task LoadSettings()
-    {
-        using var scope = serviceProvider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
-        var settings = await db.Settings.FindAsync(TorrentialSettings.DefaultId);
-        if (settings == null)
-        {
-            var appPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            settings = new()
-            {
-                FileSettings = new FileSettings
-                {
-                    DownloadPath = Path.Combine(appPath, "torrential\\downloads"),
-                    CompletedPath = Path.Combine(appPath, "torrential\\completed")
-                }
-            };
-            await db.Settings.AddAsync(settings);
-            await db.SaveChangesAsync();
-        }
+    //private async Task LoadSettings()
+    //{
+    //    using var scope = serviceProvider.CreateScope();
+    //    var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
+    //    var settings = await db.Settings.FindAsync(TorrentialSettings.DefaultId);
+    //    if (settings == null)
+    //    {
+    //        var appPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+    //        settings = new()
+    //        {
+    //            FileSettings = new PersistedFileSettings
+    //            {
+    //                DownloadPath = Path.Combine(appPath, "torrential\\downloads"),
+    //                CompletedPath = Path.Combine(appPath, "torrential\\completed")
+    //            }
+    //        };
+    //        await db.Settings.AddAsync(settings);
+    //        await db.SaveChangesAsync();
+    //    }
 
-        cache.Set("settings.file", settings.FileSettings);
-    }
+    //    cache.Set("settings.file", settings.FileSettings);
+    //}
 
     private async Task LoadTorrents()
     {

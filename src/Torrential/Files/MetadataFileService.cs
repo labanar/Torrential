@@ -1,17 +1,16 @@
-﻿using Microsoft.Extensions.Caching.Memory;
-using System.Text.Json;
+﻿using System.Text.Json;
+using Torrential.Settings;
 using Torrential.Torrents;
 
 namespace Torrential.Files
 {
 
-    public class MetadataFileService(IMemoryCache cache)
+    public class MetadataFileService(SettingsManager settingsManager)
         : IMetadataFileService
     {
         public async ValueTask SaveMetadata(TorrentMetadata metaData)
         {
-            if (!cache.TryGetValue<FileSettings>("settings.file", out var settings) || settings == null)
-                throw new InvalidOperationException("Settings not found");
+            var settings = await settingsManager.GetFileSettings();
 
             var torrentName = Path.GetFileNameWithoutExtension(FileUtilities.GetPathSafeFileName(metaData.Name));
             var filePath = Path.Combine(settings.DownloadPath, torrentName, $"{metaData.InfoHash.AsString()}.metadata");
@@ -24,8 +23,7 @@ namespace Torrential.Files
 
         public async IAsyncEnumerable<TorrentMetadata> GetAllMetadataFiles()
         {
-            if (!cache.TryGetValue<FileSettings>("settings.file", out var settings) || settings == null)
-                throw new InvalidOperationException("Settings not found");
+            var settings = await settingsManager.GetFileSettings();
 
             var inProgressMetas = Directory.GetFiles(settings.DownloadPath, "*.metadata", SearchOption.AllDirectories);
             var completedMetas = Directory.GetFiles(settings.CompletedPath, "*.metadata", SearchOption.AllDirectories);

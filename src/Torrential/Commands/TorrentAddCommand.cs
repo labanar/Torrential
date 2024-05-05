@@ -1,4 +1,5 @@
 ﻿using Torrential.Files;
+using Torrential.Settings;
 using Torrential.Torrents;
 
 namespace Torrential.Commands
@@ -15,17 +16,19 @@ namespace Torrential.Commands
         public InfoHash InfoHash { get; init; }
     }
 
-    public class TorrentAddCommandHandler(TorrentialDb db, TorrentTaskManager mgr, IMetadataFileService metaFileService)
+    public class TorrentAddCommandHandler(TorrentialDb db, TorrentTaskManager mgr, IMetadataFileService metaFileService, SettingsManager settingsManager)
         : ICommandHandler<TorrentAddCommand, TorrentAddResponse>
     {
         public async Task<TorrentAddResponse> Execute(TorrentAddCommand command)
         {
+            var fileSettings = await settingsManager.GetFileSettings();
+
             await db.AddAsync(new TorrentConfiguration
             {
                 InfoHash = command.Metadata.InfoHash,
                 DateAdded = DateTimeOffset.UtcNow,
-                CompletedPath = command.CompletedPath,
-                DownloadPath = command.DownloadPath,
+                CompletedPath = string.IsNullOrEmpty(command.CompletedPath) ? fileSettings.CompletedPath : command.CompletedPath,
+                DownloadPath = string.IsNullOrEmpty(command.DownloadPath) ? fileSettings.DownloadPath : command.DownloadPath,
                 Status = TorrentStatus.Idle
             });
 

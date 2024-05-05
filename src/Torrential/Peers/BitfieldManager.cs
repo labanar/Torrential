@@ -18,8 +18,8 @@ namespace Torrential.Peers
             var downloadBitfield = new Bitfield(numberOfPieces);
             var verificationBitfield = new Bitfield(numberOfPieces);
 
-            LoadDownloadBitfieldData(infoHash, downloadBitfield);
-            LoadVerificationBitfieldData(infoHash, verificationBitfield);
+            await LoadDownloadBitfieldData(infoHash, downloadBitfield);
+            await LoadVerificationBitfieldData(infoHash, verificationBitfield);
 
             _downloadBitfields[infoHash] = downloadBitfield;
             _verificationBitfields[infoHash] = verificationBitfield;
@@ -43,30 +43,30 @@ namespace Torrential.Peers
         }
 
 
-        private void LoadDownloadBitfieldData(InfoHash infoHash, Bitfield bitField)
+        private async ValueTask LoadDownloadBitfieldData(InfoHash infoHash, Bitfield bitField)
         {
-            var path = fileService.GetDownloadBitFieldPath(infoHash);
+            var path = await fileService.GetDownloadBitFieldPath(infoHash);
             if (!File.Exists(path))
                 return;
 
             using var fs = File.OpenRead(path);
             fs.Seek(4, SeekOrigin.Begin);
 
-            Span<byte> buffer = stackalloc byte[bitField.Bytes.Length];
+            var buffer = new byte[bitField.Bytes.Length];
             fs.ReadExactly(buffer);
             bitField.Fill(buffer);
         }
 
-        private void LoadVerificationBitfieldData(InfoHash infoHash, Bitfield bitField)
+        private async ValueTask LoadVerificationBitfieldData(InfoHash infoHash, Bitfield bitField)
         {
-            var path = fileService.GetVerificationBitFieldPath(infoHash);
+            var path = await fileService.GetVerificationBitFieldPath(infoHash);
             if (!File.Exists(path))
                 return;
 
             using var fs = File.OpenRead(path);
             fs.Seek(4, SeekOrigin.Begin);
 
-            Span<byte> buffer = stackalloc byte[bitField.Bytes.Length];
+            var buffer = new byte[bitField.Bytes.Length];
             fs.ReadExactly(buffer);
             bitField.Fill(buffer);
         }

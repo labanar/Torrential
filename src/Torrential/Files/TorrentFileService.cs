@@ -1,10 +1,10 @@
-﻿using Microsoft.Extensions.Caching.Memory;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
+using Torrential.Settings;
 using Torrential.Torrents;
 
 namespace Torrential.Files;
 
-public sealed class TorrentFileService(TorrentMetadataCache metaCache, IMemoryCache cache)
+public sealed class TorrentFileService(TorrentMetadataCache metaCache, SettingsManager settingsManager)
 {
     private ConcurrentDictionary<InfoHash, string> _downloadPaths = [];
     private ConcurrentDictionary<InfoHash, string> _partPaths = [];
@@ -12,39 +12,39 @@ public sealed class TorrentFileService(TorrentMetadataCache metaCache, IMemoryCa
     private ConcurrentDictionary<InfoHash, string> _downloadBitFieldPath = [];
     private ConcurrentDictionary<InfoHash, string> _verificationBitFieldPath = [];
 
-    public string GetMetadataFilePath(InfoHash infoHash)
+    public async Task<string> GetMetadataFilePath(InfoHash infoHash)
     {
         if (!_downloadPaths.ContainsKey(infoHash))
-            BuildPathCache(infoHash);
+            await BuildPathCache(infoHash);
 
         return _metadataPaths[infoHash];
     }
 
-    public string GetDownloadBitFieldPath(InfoHash infoHash)
+    public async Task<string> GetDownloadBitFieldPath(InfoHash infoHash)
     {
         if (!_downloadPaths.ContainsKey(infoHash))
-            BuildPathCache(infoHash);
+            await BuildPathCache(infoHash);
 
         return _downloadBitFieldPath[infoHash];
     }
 
-    public string GetVerificationBitFieldPath(InfoHash infoHash)
+    public async Task<string> GetVerificationBitFieldPath(InfoHash infoHash)
     {
         if (!_downloadPaths.ContainsKey(infoHash))
-            BuildPathCache(infoHash);
+            await BuildPathCache(infoHash);
 
         return _verificationBitFieldPath[infoHash];
     }
 
-    public string GetPartFilePath(InfoHash infoHash)
+    public async Task<string> GetPartFilePath(InfoHash infoHash)
     {
         if (!_downloadPaths.ContainsKey(infoHash))
-            BuildPathCache(infoHash);
+            await BuildPathCache(infoHash);
 
         return _partPaths[infoHash];
     }
 
-    private string BuildPathCache(InfoHash infoHash)
+    private async Task<string> BuildPathCache(InfoHash infoHash)
     {
         if (_downloadPaths.TryGetValue(infoHash, out var path))
             return path;
@@ -52,10 +52,7 @@ public sealed class TorrentFileService(TorrentMetadataCache metaCache, IMemoryCa
         if (!metaCache.TryGet(infoHash, out var metaData))
             throw new InvalidOperationException("Torrent metadata not found");
 
-
-        if (!cache.TryGetValue<FileSettings>("settings.file", out var settings))
-            throw new InvalidOperationException("Settings not found");
-
+        var settings = await settingsManager.GetFileSettings();
 
         var torrentName = Path.GetFileNameWithoutExtension(FileUtilities.GetPathSafeFileName(metaData.Name));
         path = Path.Combine(settings.DownloadPath, torrentName);
