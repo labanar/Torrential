@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Net.Sockets;
 using Torrential.Torrents;
 using Torrential.Trackers;
 
@@ -9,6 +10,7 @@ namespace Torrential.Peers
 
     public sealed class PeerSwarm(
         BitfieldManager bitfields,
+        HandshakeService handshakeService,
         TorrentMetadataCache metadataCache,
         TorrentRunner torrentRunner,
         IPeerService peerService,
@@ -54,7 +56,7 @@ namespace Torrential.Peers
             }
         }
 
-        public async Task AddToSwarm(PeerWireConnection connection)
+        public async Task AddToSwarm(IPeerWireConnection connection)
         {
             if (!metadataCache.TryGet(connection.InfoHash, out var metadata))
             {
@@ -100,7 +102,7 @@ namespace Torrential.Peers
                 foreach (var peer in announceResponse.Peers)
                 {
                     //TODO - enable this afterwards
-                    //peerTasks.Add(TryAddPeerToSwarm(metadata, peer, stoppingToken));
+                    peerTasks.Add(TryAddPeerToSwarm(metadata, peer, stoppingToken));
                 }
             }
             await Task.WhenAll(peerTasks);
@@ -113,11 +115,8 @@ namespace Torrential.Peers
             var timedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             timedCts.CancelAfter(5_000);
 
-
-
-            var conn = new PeerWireConnection(metadataCache, peerService, new System.Net.Sockets.TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
+            var conn = new PeerWireConnection(handshakeService, new TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
             var result = await conn.ConnectOutbound(infoHash, peerInfo, timedCts.Token);
-
 
             if (result.Success && conn.PeerId != null)
             {

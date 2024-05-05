@@ -69,7 +69,6 @@ public sealed class PeerWireClient : IDisposable
 
     public long BytesUploaded { get; private set; }
     public long BytesDownloaded { get; private set; }
-
     public PeerId PeerId { get; private set; }
 
     public PeerWireClient(IPeerWireConnection connection, ILogger logger)
@@ -127,7 +126,7 @@ public sealed class PeerWireClient : IDisposable
                     await _connection.Writer.FlushAsync(cancellationToken);
                 }
             }
-            catch (ObjectDisposedException ode)
+            catch (Exception ode)
             {
                 _logger.LogError(ode, "Error writing to peer");
                 return;
@@ -171,6 +170,7 @@ public sealed class PeerWireClient : IDisposable
                 // Stop reading if there's no more data coming.
                 if (result.IsCompleted)
                 {
+                    _logger.LogWarning("No further data from peer");
                     break;
                 }
             }
@@ -202,6 +202,8 @@ public sealed class PeerWireClient : IDisposable
             }
         }
 
+
+        _logger.LogInformation("Peer read loop ended, disposing connection and exiting");
         await _connection.Reader.CompleteAsync();
         _processCts.Cancel();
         _connection.Dispose();
@@ -257,7 +259,6 @@ public sealed class PeerWireClient : IDisposable
         if (messageId == 0 && messageSize == 0)
             return true;
 
-        _logger.LogInformation("Peer sent message {MessageId}", messageId);
         switch (messageId)
         {
             case PeerWireMessageType.Choke:

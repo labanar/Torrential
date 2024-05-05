@@ -34,6 +34,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<TorrentMetadataCache>();
         services.AddSingleton<PieceSelector>();
         services.AddSingleton<TcpPeerListener>();
+        services.AddSingleton<HandshakeService>();
 
         //TODO - add service extension that scans the provided assemblies for implementations of ICommandHandler<,>
         services.AddCommandHandler<TorrentAddCommand, TorrentAddResponse, TorrentAddCommandHandler>();
