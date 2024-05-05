@@ -12,7 +12,8 @@ public interface IPeerWireConnection : IDisposable
     bool IsConnected { get; }
     PipeReader Reader { get; }
     PipeWriter Writer { get; }
-    Task<PeerConnectionResult> Connect(InfoHash infoHash, PeerInfo peer, CancellationToken cancellationToken);
+    Task<PeerConnectionResult> ConnectOutbound(InfoHash infoHash, PeerInfo peer, CancellationToken cancellationToken);
+    Task<PeerConnectionResult> ConnectInbound(CancellationToken cancellationToken);
 }
 
 public readonly struct PeerConnectionResult

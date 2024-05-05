@@ -55,6 +55,8 @@ namespace Torrential.Tests
             var logger = loggerFactory.CreateLogger<HttpTrackerClient>();
             var sut = new HttpTrackerClient(client, logger);
             var peerService = new PeerService();
+            var metaCache = new TorrentMetadataCache();
+            metaCache.TryAdd(meta);
 
             var resp = await sut.Announce(new AnnounceRequest
             {
@@ -62,15 +64,16 @@ namespace Torrential.Tests
                 PeerId = peerService.Self.Id,
                 Url = meta.AnnounceList.First(),
                 NumWant = 50,
+                Port = 53123
             });
 
             Assert.NotEqual(0, resp.Interval);
             Assert.NotEmpty(resp.Peers);
 
             //TODO - lift timeout to config
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            var conn = new PeerWireConnection(peerService, new System.Net.Sockets.TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
-            var result = await conn.Connect(meta.InfoHash, resp.Peers.First(), cts.Token);
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var conn = new PeerWireConnection(metaCache, peerService, new System.Net.Sockets.TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
+            var result = await conn.ConnectOutbound(meta.InfoHash, resp.Peers.First(), cts.Token);
             Assert.True(result.Success);
         }
     }

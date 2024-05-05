@@ -119,10 +119,18 @@ public sealed class PeerWireClient : IDisposable
     {
         await foreach (var pak in OUTBOUND_MESSAGES.Reader.ReadAllAsync(cancellationToken))
         {
-            using (pak)
+            try
             {
-                _connection.Writer.Write(pak.AsSpan());
-                await _connection.Writer.FlushAsync(cancellationToken);
+                using (pak)
+                {
+                    _connection.Writer.Write(pak.AsSpan());
+                    await _connection.Writer.FlushAsync(cancellationToken);
+                }
+            }
+            catch (ObjectDisposedException ode)
+            {
+                _logger.LogError(ode, "Error writing to peer");
+                return;
             }
         }
     }
@@ -180,6 +188,12 @@ public sealed class PeerWireClient : IDisposable
             catch (SocketException)
             {
                 _connection.Dispose();
+                return;
+            }
+            catch (ObjectDisposedException)
+            {
+                await _connection.Reader.CompleteAsync();
+                _processCts.Cancel();
                 return;
             }
             catch
@@ -243,6 +257,7 @@ public sealed class PeerWireClient : IDisposable
         if (messageId == 0 && messageSize == 0)
             return true;
 
+        _logger.LogInformation("Peer sent message {MessageId}", messageId);
         switch (messageId)
         {
             case PeerWireMessageType.Choke:
@@ -266,9 +281,9 @@ public sealed class PeerWireClient : IDisposable
             case PeerWireMessageType.Have:
                 HandleHave(payload);
                 return true;
-                //case PeerWireMessageType.Request:
-                //    HandleRequest(payload);
-                //    return true;
+            case PeerWireMessageType.Request:
+                HandleRequest(payload);
+                return true;
         }
 
         //Return false here when we cannot process the message. It tells the main loop to disconnect and stop comms with this peer

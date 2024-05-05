@@ -54,6 +54,26 @@ namespace Torrential.Peers
             }
         }
 
+        public async Task AddToSwarm(PeerWireConnection connection)
+        {
+            if (!metadataCache.TryGet(connection.InfoHash, out var metadata))
+            {
+                logger.LogError("Metadata not found for {InfoHash}", connection.InfoHash);
+                return;
+            }
+
+            var peerConnections = _peerSwarms.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, PeerWireClient>());
+
+
+            if (peerConnections.ContainsKey(connection.PeerId.Value)) return;
+            var pwcLogger = loggerFactory.CreateLogger<PeerWireClient>();
+            var pwc = new PeerWireClient(connection, pwcLogger);
+            peerConnections.TryAdd(connection.PeerId.Value, pwc);
+
+            var peerSwarmTasks = _swarmTasks.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, Task>());
+            peerSwarmTasks.TryAdd(connection.PeerId.Value, torrentRunner.InitiatePeer(metadata, pwc, CancellationToken.None));
+        }
+
 
         private async Task CleanupPeers(CancellationToken stoppingToken)
         {
@@ -79,7 +99,8 @@ namespace Torrential.Peers
             {
                 foreach (var peer in announceResponse.Peers)
                 {
-                    peerTasks.Add(TryAddPeerToSwarm(metadata, peer, stoppingToken));
+                    //TODO - enable this afterwards
+                    //peerTasks.Add(TryAddPeerToSwarm(metadata, peer, stoppingToken));
                 }
             }
             await Task.WhenAll(peerTasks);
@@ -92,8 +113,11 @@ namespace Torrential.Peers
             var timedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             timedCts.CancelAfter(5_000);
 
-            var conn = new PeerWireConnection(peerService, new System.Net.Sockets.TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
-            var result = await conn.Connect(infoHash, peerInfo, timedCts.Token);
+
+
+            var conn = new PeerWireConnection(metadataCache, peerService, new System.Net.Sockets.TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
+            var result = await conn.ConnectOutbound(infoHash, peerInfo, timedCts.Token);
+
 
             if (result.Success && conn.PeerId != null)
             {
@@ -144,7 +168,8 @@ namespace Torrential.Peers
                     NumWant = 50,
                     BytesUploaded = 0,
                     BytesDownloaded = downloadedBytes,
-                    BytesRemaining = remainingBytes
+                    BytesRemaining = remainingBytes,
+                    Port = 53123 //TODO - lift this to settings
                 });
 
                 if (announceResponse == null) continue;

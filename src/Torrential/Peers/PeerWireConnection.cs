@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Net;
 using System.Net.Sockets;
+using Torrential.Torrents;
 using Torrential.Trackers;
 using Torrential.Utilities;
 
@@ -20,6 +21,7 @@ public class PeerWireConnection : IPeerWireConnection
     private readonly TcpClient _client;
     private readonly IPeerService _peerService;
     private readonly ILogger<PeerWireConnection> _logger;
+    private readonly TorrentMetadataCache _metaCache;
 
     public Guid Id { get; }
 
@@ -32,15 +34,16 @@ public class PeerWireConnection : IPeerWireConnection
     public bool IsConnected { get; private set; }
     public PeerInfo PeerInfo => _peerInfo;
 
-    public PeerWireConnection(IPeerService peerService, TcpClient client, ILogger<PeerWireConnection> logger)
+    public PeerWireConnection(TorrentMetadataCache metaCache, IPeerService peerService, TcpClient client, ILogger<PeerWireConnection> logger)
     {
         Id = Guid.NewGuid();
+        _metaCache = metaCache;
         _client = client;
         _peerService = peerService;
         _logger = logger;
     }
 
-    public async Task<PeerConnectionResult> Connect(InfoHash infoHash, PeerInfo peer, CancellationToken cancellationToken)
+    public async Task<PeerConnectionResult> ConnectOutbound(InfoHash infoHash, PeerInfo peer, CancellationToken cancellationToken)
     {
         if (!await TryEstablishConnection(peer, cancellationToken))
         {
@@ -49,7 +52,7 @@ public class PeerWireConnection : IPeerWireConnection
         }
         _peerReader = PipeReader.Create(_client.GetStream());
         _peerWriter = PipeWriter.Create(_client.GetStream());
-        var handshakeResult = await Handshake(infoHash, cancellationToken);
+        var handshakeResult = await HandshakeOutbound(infoHash, cancellationToken);
         if (!handshakeResult.Success)
         {
             _client.Dispose();
@@ -62,6 +65,36 @@ public class PeerWireConnection : IPeerWireConnection
         IsConnected = true;
         return PeerConnectionResult.FromHandshake(handshakeResult);
     }
+
+    public async Task<PeerConnectionResult> ConnectInbound(CancellationToken token)
+    {
+        _peerReader = PipeReader.Create(_client.GetStream());
+        _peerWriter = PipeWriter.Create(_client.GetStream());
+
+        var peerHandshake = await WaitForHandshake(token);
+        if (!peerHandshake.Success)
+        {
+            _client.Dispose();
+            return PeerConnectionResult.Failure;
+        }
+
+        if (!_metaCache.TryGet(peerHandshake.InfoHash, out var torrentMeta))
+        {
+            _client.Dispose();
+            return PeerConnectionResult.Failure;
+        }
+
+        _peerInfo = new PeerInfo
+        {
+            Ip = ((IPEndPoint)_client.Client.RemoteEndPoint).Address,
+            Port = ((IPEndPoint)_client.Client.RemoteEndPoint).Port
+        };
+        PeerId = peerHandshake.PeerId;
+        InfoHash = peerHandshake.InfoHash;
+        IsConnected = true;
+        return PeerConnectionResult.FromHandshake(peerHandshake);
+    }
+
     private async Task<bool> TryEstablishConnection(PeerInfo peer, CancellationToken cancellationToken)
     {
         var endpoint = new IPEndPoint(peer.Ip, peer.Port);
@@ -96,13 +129,39 @@ public class PeerWireConnection : IPeerWireConnection
         return false;
     }
 
-    private async Task<HandshakeResponse> Handshake(InfoHash infoHash, CancellationToken cancellationToken)
+
+    private async Task<HandshakeResponse> HandshakeInbound(CancellationToken cancellationToken)
     {
-        await SendHandshake(_peerWriter, infoHash);
-        return await WaitForHandshake(infoHash, cancellationToken);
+        var peerHandshake = await WaitForHandshake(cancellationToken);
+        if (!peerHandshake.Success)
+        {
+            _logger.LogWarning("Handshake failed - {Error}", peerHandshake.Error);
+            return peerHandshake;
+        }
+
+        if (!_metaCache.TryGet(peerHandshake.InfoHash, out _))
+        {
+            _logger.LogWarning("Handshake failed - Torrent not found");
+            return new HandshakeResponse(HandshakeError.INVALID_HASH);
+        }
+
+        return peerHandshake;
     }
 
-    private async Task<HandshakeResponse> WaitForHandshake(InfoHash infoHash, CancellationToken cancellationToken)
+    private async Task<HandshakeResponse> HandshakeOutbound(InfoHash infoHash, CancellationToken cancellationToken)
+    {
+        await SendHandshake(_peerWriter, infoHash);
+        var handshakeResponse = await WaitForHandshake(cancellationToken);
+        if (handshakeResponse.InfoHash != infoHash)
+        {
+            _logger.LogWarning("Handshake failed - Info hash did not match");
+            return new HandshakeResponse(HandshakeError.INVALID_HASH);
+        }
+
+        return handshakeResponse;
+    }
+
+    private async Task<HandshakeResponse> WaitForHandshake(CancellationToken cancellationToken)
     {
         var sw = Stopwatch.StartNew();
         while (!cancellationToken.IsCancellationRequested)
@@ -126,7 +185,7 @@ public class PeerWireConnection : IPeerWireConnection
 
             if (TryReadHandshake(ref buffer, out var handshakeBytes))
             {
-                var resp = ParseHandshake(handshakeBytes, infoHash);
+                var resp = ParseHandshake(handshakeBytes);
                 _peerReader.AdvanceTo(buffer.Start, buffer.End);
                 return resp;
             }
@@ -171,7 +230,7 @@ public class PeerWireConnection : IPeerWireConnection
         buffer = buffer.Slice(handshakeBytes.End);
         return true;
     }
-    private HandshakeResponse ParseHandshake(ReadOnlySequence<byte> handshakeBytes, InfoHash expectedHash)
+    private HandshakeResponse ParseHandshake(ReadOnlySequence<byte> handshakeBytes)
     {
         var reader = new SequenceReader<byte>(handshakeBytes);
 
@@ -210,11 +269,6 @@ public class PeerWireConnection : IPeerWireConnection
             return new HandshakeResponse(HandshakeError.HASH_NOT_RECEIVED);
         }
 
-        if (peerInfoHash != expectedHash)
-        {
-            _logger.LogInformation("Handshake failed - Info hash did not match");
-            return new HandshakeResponse(HandshakeError.INVALID_HASH);
-        }
 
         if (!reader.TryReadPeerId(out var peerId))
         {
@@ -222,7 +276,7 @@ public class PeerWireConnection : IPeerWireConnection
             return new HandshakeResponse(HandshakeError.PEER_ID_NOT_RECEIVED);
         }
 
-        return new HandshakeResponse(peerId, peerExtensions);
+        return new HandshakeResponse(peerInfoHash, peerId, peerExtensions);
     }
 
     public void Dispose()
@@ -239,11 +293,13 @@ internal readonly struct HandshakeResponse
     public readonly HandshakeError Error = HandshakeError.NONE;
     public readonly PeerId PeerId;
     public readonly PeerExtensions Extensions;
-    public HandshakeResponse(PeerId peerId, PeerExtensions extensions)
+    public readonly InfoHash InfoHash;
+    public HandshakeResponse(InfoHash infoHash, PeerId peerId, PeerExtensions extensions)
     {
         Success = true;
         PeerId = peerId;
         Extensions = extensions;
+        InfoHash = infoHash;
     }
 
     public HandshakeResponse(HandshakeError error)

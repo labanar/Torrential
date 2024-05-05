@@ -19,6 +19,7 @@ public class UdpTrackerTests
             PeerId = peerService.Self.Id,
             Url = meta.AnnounceList.First(),
             NumWant = 50,
+            Port = 53123
         });
 
         Assert.NotEqual(0, resp.Interval);

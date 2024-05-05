@@ -22,6 +22,8 @@ namespace Torrential.Torrents
                 logger.LogInformation("Failed to retrieve verification bitfield");
                 return;
             }
+
+            logger.LogInformation("Sending bitfield to peer");
             await peer.SendBitfield(verificationBitfield);
 
             logger.LogInformation("Waiting for bitfield from peer");
@@ -54,6 +56,7 @@ namespace Torrential.Torrents
             if (downloadBitfield.HasAll())
             {
                 logger.LogInformation("Already have all pieces");
+                await peer.SendNotInterested();
                 return;
             }
 
@@ -107,12 +110,14 @@ namespace Torrential.Torrents
                 return;
             }
 
+
             //Wait for peer to be interested then unchoke them
             while (!peer.State.PeerInterested && !stoppingToken.IsCancellationRequested)
                 await Task.Delay(100);
 
             logger.LogInformation("Peer has shown interest, unchoking");
             await peer.SendUnchoke();
+
 
             //Wait for the peer to request a piece;
             await foreach (var request in peer.PeerPeieceRequests.Reader.ReadAllAsync(stoppingToken))

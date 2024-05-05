@@ -110,7 +110,9 @@ public class HttpTrackerClient : ITrackerClient
         var peer_id = HttpUtility.UrlEncode(request.PeerId.ToAsciiString());
 
 
-        using var response = await _client.GetAsync($"{request.Url}?info_hash={info_hash}&peer_id={peer_id}&numwant={request.NumWant}&no_peer_id=1&compact=1&downloaded={request.BytesDownloaded}&uploaded={request.BytesUploaded}&left={request.BytesRemaining}");
+        using var response = await _client.GetAsync($"{request.Url}?info_hash={info_hash}&port={request.Port}&peer_id={peer_id}&numwant={request.NumWant}&no_peer_id=1&compact=1&downloaded={request.BytesDownloaded}&uploaded={request.BytesUploaded}&left={request.BytesRemaining}");
+
+        var rawContent = await response.Content.ReadAsStringAsync();
         var parser = new BencodeParser();
         var responseDictionary = parser.Parse<BDictionary>(await response.Content.ReadAsStreamAsync());
 

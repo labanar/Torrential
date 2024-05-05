@@ -5,7 +5,9 @@ namespace Torrential.Trackers.Udp;
 
 //Implements BEP15
 //https://www.bittorrent.org/beps/bep_0015.html
-public class UdpTrackerClient : ITrackerClient
+public class UdpTrackerClient()
+
+    : ITrackerClient
 {
     public bool IsValidAnnounceForClient(string announceUrl)
     {
