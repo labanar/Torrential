@@ -413,6 +413,20 @@ public sealed class PeerWireClient : IDisposable
         await _pieceRequestLimit.WaitAsync(_processCts.Token);
         await SendMessageAsync(PeerWireMessageType.Request, pieceIndex, begin, length);
     }
+
+    public void SendPiece(int pieceIndex, int begin, ReadOnlySpan<byte> payload)
+    {
+        var pak = new PreparedPacket(13 + payload.Length);
+        Span<byte> buffer = pak.AsSpan();
+        buffer.TryWriteBigEndian(9 + payload.Length);
+        buffer[4] = PeerWireMessageType.Piece;
+        buffer[5..].TryWriteBigEndian(pieceIndex);
+        buffer[9..].TryWriteBigEndian(begin);
+        payload.CopyTo(buffer.Slice(13));
+        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
+        BytesUploaded += payload.Length;
+    }
+
     public async Task SendCancel(int pieceIndex, int begin, int length) => await SendMessageAsync(PeerWireMessageType.Cancel, pieceIndex, begin, length);
     private async Task SendMessageAsync(byte messageId)
     {

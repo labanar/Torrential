@@ -15,6 +15,7 @@ public class PeerSummaryVm
     public required string IpAddress { get; init; }
     public required int Port { get; init; }
     public required long BytesDownloaded { get; init; }
+    public required long BytesUploaded { get; init; }
     public required bool IsSeed { get; init; }
     public required float Progress { get; init; }
 }

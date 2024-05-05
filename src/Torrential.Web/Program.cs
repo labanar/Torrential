@@ -76,6 +76,7 @@ app.MapGet(
                 IpAddress = x.PeerInfo.Ip.ToString(),
                 Port = x.PeerInfo.Port,
                 BytesDownloaded = x.BytesDownloaded,
+                BytesUploaded = x.BytesUploaded,
                 IsSeed = x.State?.PeerBitfield?.HasAll() ?? false,
                 Progress = x.State?.PeerBitfield?.CompletionRatio ?? 0
             });
@@ -116,6 +117,7 @@ app.MapGet(
             IpAddress = x.PeerInfo.Ip.ToString(),
             Port = x.PeerInfo.Port,
             BytesDownloaded = x.BytesDownloaded,
+            BytesUploaded = x.BytesUploaded,
             IsSeed = x.State?.PeerBitfield?.HasAll() ?? false,
             Progress = x.State?.PeerBitfield?.CompletionRatio ?? 0
         });

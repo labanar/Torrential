@@ -30,8 +30,8 @@ BEPs:
     - [x] Request
       - [x] Send
       - [x] Receive
-    - [ ] Piece
-      - [ ] Send
+    - [x] Piece
+      - [x] Send
       - [x] Receive
     - [ ] Cancel
       - [ ] Send

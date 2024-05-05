@@ -66,7 +66,6 @@ namespace Torrential.Peers
 
             var peerConnections = _peerSwarms.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, PeerWireClient>());
 
-
             if (peerConnections.ContainsKey(connection.PeerId.Value)) return;
             var pwcLogger = loggerFactory.CreateLogger<PeerWireClient>();
             var pwc = new PeerWireClient(connection, pwcLogger);

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Buffers;
 using Torrential.Files;
 using Torrential.Peers;
 
@@ -6,6 +7,7 @@ namespace Torrential.Torrents
 {
     public class TorrentRunner(ILogger<TorrentRunner> logger,
                                BitfieldManager bitfieldMgr,
+                               IFileHandleProvider fileHandleProvider,
                                IFileSegmentSaveService segmentSaveService,
                                PieceSelector pieceSelector)
     {
@@ -127,7 +129,21 @@ namespace Torrential.Torrents
 
                 logger.LogInformation("Received piece {@Request} from peer", request);
 
-                var foo = "xyz";
+
+                //TODO - add pieces to the superseed list as we go
+                var buffer = ArrayPool<byte>.Shared.Rent(request.Length);
+                try
+                {
+                    var fileHandle = await fileHandleProvider.GetPartFileHandle(meta.InfoHash);
+                    long fileOffset = (request.PieceIndex * meta.PieceSize) + request.Begin;
+                    RandomAccess.Read(fileHandle, buffer, fileOffset);
+                    peer.SendPiece(request.PieceIndex, request.Begin, buffer.AsSpan().Slice(0, request.Length));
+                    logger.LogInformation("Sent piece {@Request} to peer", request);
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(buffer);
+                }
             }
         }
     }
