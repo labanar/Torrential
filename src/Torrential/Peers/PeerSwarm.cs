@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using MassTransit;
+using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
@@ -16,6 +17,7 @@ namespace Torrential.Peers
         IPeerService peerService,
         IEnumerable<ITrackerClient> trackerClients,
         ILogger<PeerSwarm> logger,
+        IBus bus,
         ILoggerFactory loggerFactory)
     {
         private ConcurrentDictionary<InfoHash, PeerSwarmConfiguration> _swarmConfigs = [];
@@ -73,6 +75,13 @@ namespace Torrential.Peers
 
             var peerSwarmTasks = _swarmTasks.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, Task>());
             peerSwarmTasks.TryAdd(connection.PeerId.Value, torrentRunner.InitiatePeer(metadata, pwc, CancellationToken.None));
+            await bus.Publish(new PeerConnectedEvent
+            {
+                InfoHash = metadata.InfoHash,
+                Ip = connection.PeerInfo.Ip.ToString(),
+                Port = connection.PeerInfo.Port,
+                PeerId = connection.PeerId.Value
+            });
         }
 
 
@@ -100,8 +109,7 @@ namespace Torrential.Peers
             {
                 foreach (var peer in announceResponse.Peers)
                 {
-                    //TODO - enable this afterwards
-                    peerTasks.Add(TryAddPeerToSwarm(metadata, peer, stoppingToken));
+                    //peerTasks.Add(TryAddPeerToSwarm(metadata, peer, stoppingToken));
                 }
             }
             await Task.WhenAll(peerTasks);
@@ -125,6 +133,13 @@ namespace Torrential.Peers
                 var pwc = new PeerWireClient(conn, pwcLogger);
                 peerConnections.TryAdd(conn.PeerId.Value, pwc);
                 _swarmTasks[infoHash].TryAdd(conn.PeerId.Value, torrentRunner.InitiatePeer(metaData, pwc, stoppingToken));
+                await bus.Publish(new PeerConnectedEvent
+                {
+                    InfoHash = infoHash,
+                    Ip = peerInfo.Ip.ToString(),
+                    Port = peerInfo.Port,
+                    PeerId = conn.PeerId.Value
+                });
             }
 
             return result.Success;
