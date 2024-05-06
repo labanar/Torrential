@@ -1,7 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Torrential.Web.Api.Models;
 
-namespace Torrential.Web.Api.Responses
+namespace Torrential.Web.Api.Responses.Torrents
 {
     public class TorrentGetResponse : IDataResponse<TorrentSummaryVm>, IErrorResponse
     {

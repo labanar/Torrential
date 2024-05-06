@@ -1,4 +1,4 @@
-﻿namespace Torrential.Web.Api.Requests
+﻿namespace Torrential.Web.Api.Requests.Torrents
 {
     public record TorrentGetRequest(InfoHash Hash);
 }
