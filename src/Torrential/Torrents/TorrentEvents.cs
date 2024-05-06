@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using Torrential.Peers;
 
 namespace Torrential.Torrents
 {
@@ -63,7 +64,19 @@ namespace Torrential.Torrents
     public class PeerConnectedEvent : ITorrentEvent
     {
         public required InfoHash InfoHash { get; init; }
+        public required string PeerId { get; init; }
+        public required string Ip { get; init; }
+        public required int Port { get; init; }
     }
+
+    public class PeerBitfieldReceivedEvent : ITorrentEvent
+    {
+        public required InfoHash InfoHash { get; init; }
+        public required string PeerId { get; init; }
+        public required Bitfield Bitfield { get; init; }
+    }
+
+
 
     public class PeerDisconnectedEvent : ITorrentEvent
     {

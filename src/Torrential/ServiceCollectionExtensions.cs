@@ -34,16 +34,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<BitfieldManager>();
         services.AddSingleton<TorrentMetadataCache>();
         services.AddSingleton<PieceSelector>();
-        services.AddSingleton<TcpPeerListener>();
         services.AddSingleton<HandshakeService>();
         services.AddSingleton<SettingsManager>();
+        services.AddSingleton<TcpPeerListener>();
 
         //TODO - add service extension that scans the provided assemblies for implementations of ICommandHandler<,>
         services.AddCommandHandler<TorrentAddCommand, TorrentAddResponse, TorrentAddCommandHandler>();
         services.AddCommandHandler<TorrentStartCommand, TorrentStartResponse, TorrentStartCommandHandler>();
         services.AddCommandHandler<TorrentStopCommand, TorrentStopResponse, TorrentStopCommandHandler>();
         services.AddCommandHandler<TorrentRemoveCommand, TorrentRemoveResponse, TorrentRemoveCommandHandler>();
-        services.AddCommandHandler<FileSettingsUpdateCommand, FileSettingsUpdateResponse, SettingsUpdateCommandHandler>();
 
 
         services.AddHostedService<BitfieldSyncService>();

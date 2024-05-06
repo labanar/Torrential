@@ -16,6 +16,7 @@ using Torrential.Web.Api.Models;
 using Torrential.Web.Api.Requests.Settings;
 using Torrential.Web.Api.Responses;
 using Torrential.Web.Api.Responses.Settings;
+using Torrential.Web.Api.Responses.Torrents;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMemoryCache();
@@ -29,9 +30,10 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
         policy
+            .AllowCredentials()
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowAnyOrigin());
+            .WithOrigins("http://localhost:3000"));
 });
 
 builder.Services.AddMassTransit(x =>
@@ -95,26 +97,24 @@ app.MapGet(
                 Name = meta.Name,
                 InfoHash = meta.InfoHash,
                 Progress = downloadBitfield.CompletionRatio,
+                TotalSizeBytes = meta.PieceSize * meta.NumberOfPieces,
                 Peers = peerSummaries,
             };
 
             summaries.Add(summary);
         }
-        return Results.Json(summaries);
-    })
-    .Produces<IDataResponse<TorrentSummaryVm[]>>(200)
-    .Produces<IErrorResponse>(400)
-    .Produces<IErrorResponse>(500);
+        return new TorrentListResponse(summaries.ToArray());
+    });
 
 app.MapGet(
     "/torrents/{infoHash}",
     async (InfoHash infoHash, TorrentMetadataCache cache, PeerSwarm swarms, BitfieldManager bitfieldManager) =>
     {
         if (!cache.TryGet(infoHash, out var meta))
-            return Results.NotFound();
+            return TorrentGetResponse.ErrorResponse(ErrorCode.Unknown);
 
         if (!bitfieldManager.TryGetVerificationBitfield(infoHash, out var verificationBitfield))
-            return Results.NotFound();
+            return TorrentGetResponse.ErrorResponse(ErrorCode.Unknown);
 
         var peers = await swarms.GetPeers(infoHash);
         var peerSummaries = peers.Select(x => new PeerSummaryVm
@@ -134,15 +134,13 @@ app.MapGet(
             Name = meta.Name,
             InfoHash = meta.InfoHash,
             Progress = verificationBitfield.CompletionRatio,
+            TotalSizeBytes = meta.PieceSize * meta.NumberOfPieces,
             Peers = peerSummaries,
         };
 
-        return Results.Json(summary);
-    })
-    .Produces<IDataResponse<TorrentSummaryVm>>(200)
-    .Produces<IErrorResponse>(404)
-    .Produces<IErrorResponse>(400)
-    .Produces<IErrorResponse>(500);
+
+        return new TorrentGetResponse(summary);
+    });
 
 app.MapPost(
     "torrents/{infoHash}/start",
@@ -233,7 +231,7 @@ internal class InitializationService(IServiceProvider serviceProvider, IMemoryCa
     {
         await MigrateDatabase();
         await LoadTorrents();
-        Task.Run(() => tcpPeerListener.Start(CancellationToken.None));
+        _ = Task.Run(() => tcpPeerListener.Start(CancellationToken.None));
     }
 
     private async Task MigrateDatabase()
@@ -242,29 +240,6 @@ internal class InitializationService(IServiceProvider serviceProvider, IMemoryCa
         var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
         await db.Database.MigrateAsync();
     }
-
-    //private async Task LoadSettings()
-    //{
-    //    using var scope = serviceProvider.CreateScope();
-    //    var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
-    //    var settings = await db.Settings.FindAsync(TorrentialSettings.DefaultId);
-    //    if (settings == null)
-    //    {
-    //        var appPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-    //        settings = new()
-    //        {
-    //            FileSettings = new PersistedFileSettings
-    //            {
-    //                DownloadPath = Path.Combine(appPath, "torrential\\downloads"),
-    //                CompletedPath = Path.Combine(appPath, "torrential\\completed")
-    //            }
-    //        };
-    //        await db.Settings.AddAsync(settings);
-    //        await db.SaveChangesAsync();
-    //    }
-
-    //    cache.Set("settings.file", settings.FileSettings);
-    //}
 
     private async Task LoadTorrents()
     {

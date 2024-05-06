@@ -7,6 +7,8 @@ public readonly record struct PeerId(long P1, long P2, int P3)
     private static readonly ushort TorrentialImplementation = CreateImplementationShort('T', 'O');
     public static PeerId None => new(long.MaxValue, long.MaxValue, int.MaxValue);
 
+    public static implicit operator string(PeerId value) => value.ToAsciiString();
+
     public static PeerId From(ReadOnlySpan<byte> span)
     {
         Span<byte> buffer = stackalloc byte[span.Length];
@@ -54,15 +56,15 @@ public readonly record struct PeerId(long P1, long P2, int P3)
         buffer.TryWriteBigEndian(P1);
         return buffer switch
         {
-            [(byte)'-', var cli1, var cli2, var v1, var v2, var v3, var v4, (byte)'-', _]
-                when
-                    IsChar(cli1)
-                    && IsChar(cli2)
-                    && IsValidVersionByte(v1)
-                    && IsValidVersionByte(v2)
-                    && IsValidVersionByte(v3)
-                    && IsValidVersionByte(v4)
-              => true,
+        [(byte)'-', var cli1, var cli2, var v1, var v2, var v3, var v4, (byte)'-', _]
+            when
+                IsChar(cli1)
+                && IsChar(cli2)
+                && IsValidVersionByte(v1)
+                && IsValidVersionByte(v2)
+                && IsValidVersionByte(v3)
+                && IsValidVersionByte(v4)
+          => true,
             _ => false
         };
     }

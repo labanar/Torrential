@@ -2,7 +2,6 @@
 
 import { Button, Input, Progress, Text, Tooltip } from "@chakra-ui/react";
 import styles from "./page.module.css";
-import { title } from "process";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCircleDown,
@@ -11,11 +10,28 @@ import {
   faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
 import prettyBytes from "pretty-bytes";
-import { useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FileUpload, FileUploadElement } from "@/components/FileUpload";
+import { HubConnection } from "@microsoft/signalr";
+import { createSignalRConnection } from "@/utils/signalr";
+import { useAppDispatch } from "../hooks";
+import { TorrentsState, setTorrents } from "@/features/torrentsSlice";
+import { PeerSummary, TorrentSummary } from "@/types";
+import { PeerApiModel, TorrentApiModel } from "@/api/types";
+import { PeersState, addPeer, setPeers } from "@/features/peersSlice";
+import { useSelector } from "react-redux";
+import { torrentsWithPeersSelector } from "../selectors";
 
 export default function Home() {
   const uploaderRef = useRef<FileUploadElement | null>(null);
+  const dispatch = useAppDispatch();
+  const torrents = useSelector(torrentsWithPeersSelector)
+
+  useEffect(() => {
+    console.log("HERE WE GO")
+    console.log(torrents)
+  }, [torrents]);
+
 
   const onUpload = async (file: File) => {
     const formData = new FormData();
@@ -40,34 +56,111 @@ export default function Home() {
     }
   };
 
+  const fetchTorrents = async () => {
+    try {
+      const response = await fetch(`http://localhost:5142/torrents`);
+
+      if (!response.ok) {
+        console.log("Error fetching torrents");
+        return;
+      }
+
+      const result = await response.json();
+      if (result.data) {
+        const { data } = result;
+        
+        const mappedTorrents = data.reduce((pv : TorrentsState, cv: TorrentApiModel) => {
+          const summary : TorrentSummary = {
+            name: cv.name,
+            infoHash: cv.infoHash,
+            progress: cv.progress,
+            sizeInBytes: cv.totalSizeInBytes
+          }
+
+          pv[cv.infoHash] = summary;
+          return pv;
+        }, {});
+
+        
+
+
+        const peersList = data.reduce((pv: PeersState, cv: TorrentApiModel) => {
+          
+          const torrentPeers : PeerSummary[] = cv.peers.reduce((tpv : PeerSummary[], p: PeerApiModel) => {
+            let summary : PeerSummary = {
+              infoHash: cv.infoHash,
+              ip: p.ipAddress,
+              port: p.port,
+              peerId: p.peerId,
+              isSeed: p.isSeed
+            }
+
+            tpv.push(summary)
+            return tpv;
+          }, []);
+
+          dispatch(setPeers({infoHash: cv.infoHash, peers: torrentPeers}))
+
+          return pv;
+        }, [])
+       
+        console.log(mappedTorrents)
+        dispatch(setTorrents(mappedTorrents));
+      }
+    } catch (error) {}
+  };
+
+  useEffect(() => {
+    console.log("hello");
+    fetchTorrents();
+  }, []);
+
+  // useEffect(() => {
+  //   const hubUrl = "http://localhost:5142/torrents/hub";
+  //   let hubConnection: HubConnection;
+
+  //   const connectToHub = async () => {
+  //     hubConnection = await createSignalRConnection(hubUrl);
+
+  //     hubConnection.on("PeerConnected", (event) => {
+  //       console.log(`Message from ${JSON.stringify(event)}`);
+  //     });
+  //   };
+
+  //   connectToHub();
+
+  //   return () => {
+  //     hubConnection
+  //       ?.stop()
+  //       .then(() => console.log("Disconnected from SignalR."));
+  //   };
+  // }, []);
+
   return (
     <>
       <div className={styles.root}>
         <div className={styles.torrentList}>
-          <TorrentRow
-            progress={0.2}
-            infoHash={"A"}
-            seeders={27}
-            leechers={3}
-            totalBytes={2e9}
-            title="Dune.Part.One.2021.Hybrid.2160p.UHD.BluRay.REMUX.DV.HDR10Plus.HEVC.TrueHD.7.1.Atmos-WiLDCAT.mkv"
-          />
-          <TorrentRow
-            infoHash={"B"}
-            title="ubuntu-21.10-desktop-amd64.iso"
-            totalBytes={2e9}
-            progress={0.9}
-            seeders={100}
-            leechers={40}
-          />
-          <TorrentRow
-            infoHash={"C"}
-            progress={0.3}
-            totalBytes={2.4e9}
-            seeders={20}
-            leechers={5}
-            title="Dune.Part.One.2021.Hybrid.2160p.UHD.BluRay.REMUX.DV.HDR10Plus.HEVC.TrueHD.7.1.Atmos-WiLDCAT.mkv"
-          />
+          {torrents.map((t) => (
+            <TorrentRow
+              key={t.infoHash}
+              progress={t.progress ?? 0}
+              infoHash={t.infoHash ?? ""}
+              seeders={
+                t.peers?.reduce((pv, cv) => {
+                  if (cv.isSeed) return pv + 1;
+                  return pv;
+                }, 0) ?? 0
+              }
+              leechers={
+                t.peers?.reduce((pv, cv) => {
+                  if (!cv.isSeed) return pv + 1;
+                  return pv;
+                }, 0) ?? 0
+              }
+              totalBytes={t.sizeInBytes ?? 0}
+              title={t.name ?? "???"}
+            />
+          ))}
         </div>
         <div className="actions">
           <FileUpload
@@ -127,7 +220,7 @@ function TorrentRow({
         <Text className={styles.progress} fontSize={"xs"}>
           {`${prettyBytes(totalBytes * progress)} of ${prettyBytes(
             totalBytes
-          )} (${progress}%)`}
+          )} (${progress * 100}%)`}
         </Text>
         <Progress value={progress * 100} colorScheme="green" height={"1em"} />
         <Text className={styles.progressDetails} fontSize={"xs"}>
