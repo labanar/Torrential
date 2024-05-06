@@ -1,5 +1,4 @@
 ﻿using System.Text.Json.Serialization;
-using Torrential.Peers;
 
 namespace Torrential.Torrents
 {
@@ -14,6 +13,7 @@ namespace Torrential.Torrents
     [JsonDerivedType(typeof(PeerDisconnectedEvent), "peer_disconnected")]
     [JsonDerivedType(typeof(TorrentFileCopyStartedEvent), "file_copy_started")]
     [JsonDerivedType(typeof(TorrentFileCopyCompletedEvent), "file_copy_completed")]
+    [JsonDerivedType(typeof(PeerBitfieldReceivedEvent), "peer_bitfield_received")]
     public interface ITorrentEvent
     {
         InfoHash InfoHash { get; }
@@ -73,10 +73,8 @@ namespace Torrential.Torrents
     {
         public required InfoHash InfoHash { get; init; }
         public required string PeerId { get; init; }
-        public required Bitfield Bitfield { get; init; }
+        public required bool HasAllPieces { get; init; }
     }
-
-
 
     public class PeerDisconnectedEvent : ITorrentEvent
     {

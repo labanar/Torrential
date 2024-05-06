@@ -1,7 +1,7 @@
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import store from '../app/store';
-import { addPeer } from '../features/peersSlice';
-import { PeerConnectedEvent } from '@/api/events';
+import { addPeer, updatePeer } from '../features/peersSlice';
+import { PeerBitfieldReceivedEvent, PeerConnectedEvent } from '@/api/events';
 import { PeerSummary } from '@/types';
 
 export class SignalRService {
@@ -25,6 +25,10 @@ export class SignalRService {
             }
             store.dispatch(addPeer(summary));
         });
+
+        this.connection.on('PeerBitfieldReceived', (event: PeerBitfieldReceivedEvent) => {
+            store.dispatch(updatePeer({infoHash: event.infoHash, peerId: event.peerId, update: {isSeed: event.hasAllPieces}}))
+        })
 
         // Add more event handlers as necessary
     }

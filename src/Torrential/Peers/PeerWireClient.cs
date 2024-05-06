@@ -90,7 +90,6 @@ public sealed class PeerWireClient : IDisposable
         _bitfields = bitfields;
         _infoHash = meta.InfoHash;
         _fileSegmentSaveService = fileSegmentSaveService;
-        _state.PeerBitfield = new Bitfield(meta.NumberOfPieces);
         _processCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var readerTask = ProcessReads(_processCts.Token);
         var writeTask = ProcessWrites(_processCts.Token);
@@ -259,36 +258,51 @@ public sealed class PeerWireClient : IDisposable
         if (messageId == 0 && messageSize == 0)
             return true;
 
+        bool handled;
         switch (messageId)
         {
             case PeerWireMessageType.Choke:
                 HandleChoke();
-                return true;
+                handled = true;
+                break;
             case PeerWireMessageType.Unchoke:
                 HandleUnchoke();
-                return true;
+                handled = true;
+                break;
             case PeerWireMessageType.Interested:
                 HandleInterested();
-                return true;
+                handled = true;
+                break;
             case PeerWireMessageType.NotInterested:
                 HandleNotInterested();
-                return true;
+                handled = true;
+                break;
             case PeerWireMessageType.Piece:
                 HandlePiece(payload);
-                return true;
+                handled = true;
+                break;
             case PeerWireMessageType.Bitfield:
                 HandleBitfield(payload);
-                return true;
+                handled = true;
+                break;
             case PeerWireMessageType.Have:
                 HandleHave(payload);
-                return true;
+                handled = true;
+                break;
             case PeerWireMessageType.Request:
                 HandleRequest(payload);
-                return true;
+                handled = true;
+                break;
+            default:
+                //Return false here when we cannot process the message. It tells the main loop to disconnect and stop comms with this peer
+                //For now we'll return true, but we should change this to false once we've implemented all the message handlers
+                handled = true;
+                break;
         }
 
-        //Return false here when we cannot process the message. It tells the main loop to disconnect and stop comms with this peer
-        return true;
+        //If we recieve any event that is not the Bitfield, then we can assume that the peer has an empty bitfield
+        _state.PeerBitfield ??= new Bitfield(_meta.NumberOfPieces);
+        return handled;
     }
 
     private bool HandleChoke()
@@ -326,8 +340,9 @@ public sealed class PeerWireClient : IDisposable
     {
         Span<byte> buffer = stackalloc byte[(int)payload.Length];
         payload.CopyTo(buffer);
-        _state.PeerBitfield = new Bitfield(_meta.NumberOfPieces);
-        _state.PeerBitfield.Fill(buffer);
+        var bitfield = new Bitfield(_meta.NumberOfPieces);
+        bitfield.Fill(buffer);
+        _state.PeerBitfield = bitfield;
         return true;
     }
     private bool HandleRequest(ReadOnlySequence<byte> payload)

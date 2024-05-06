@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using MassTransit;
+using Microsoft.Extensions.Logging;
 using System.Buffers;
 using Torrential.Files;
 using Torrential.Peers;
@@ -9,6 +10,7 @@ namespace Torrential.Torrents
                                BitfieldManager bitfieldMgr,
                                IFileHandleProvider fileHandleProvider,
                                IFileSegmentSaveService segmentSaveService,
+                               IBus bus,
                                PieceSelector pieceSelector)
     {
 
@@ -31,6 +33,19 @@ namespace Torrential.Torrents
             logger.LogInformation("Waiting for bitfield from peer");
             while (peer.State.PeerBitfield == null && !stoppingToken.IsCancellationRequested)
                 await Task.Delay(100);
+
+            if (peer.State.PeerBitfield == null)
+            {
+                logger.LogInformation("Peer did not send bitfield");
+                return;
+            }
+
+            await bus.Publish(new PeerBitfieldReceivedEvent
+            {
+                HasAllPieces = peer.State.PeerBitfield.HasAll(),
+                InfoHash = meta.InfoHash,
+                PeerId = peer.PeerId
+            });
 
             logger.LogInformation("Received bitfield from peer");
 
@@ -124,11 +139,7 @@ namespace Torrential.Torrents
             //Wait for the peer to request a piece;
             await foreach (var request in peer.PeerPeieceRequests.Reader.ReadAllAsync(stoppingToken))
             {
-                if (request == null)
-                    continue;
-
                 logger.LogInformation("Received piece {@Request} from peer", request);
-
 
                 //TODO - add pieces to the superseed list as we go
                 var buffer = ArrayPool<byte>.Shared.Rent(request.Length);

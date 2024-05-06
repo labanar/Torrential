@@ -13,7 +13,8 @@ namespace Torrential.Extensions.SignalR
         IConsumer<TorrentPieceDownloadedEvent>,
         IConsumer<TorrentPieceVerifiedEvent>,
         IConsumer<PeerConnectedEvent>,
-        IConsumer<PeerDisconnectedEvent>
+        IConsumer<PeerDisconnectedEvent>,
+        IConsumer<PeerBitfieldReceivedEvent>
     {
         public async Task Consume(ConsumeContext<TorrentAddedEvent> context) =>
             await hubContext.Clients.All.TorrentAdded(context.Message);
@@ -41,5 +42,9 @@ namespace Torrential.Extensions.SignalR
 
         public async Task Consume(ConsumeContext<PeerDisconnectedEvent> context) =>
             await hubContext.Clients.All.PeerDisconnected(context.Message);
+
+        public async Task Consume(ConsumeContext<PeerBitfieldReceivedEvent> context) =>
+            await hubContext.Clients.All.PeerBitfieldReceived(context.Message);
+
     }
 }
