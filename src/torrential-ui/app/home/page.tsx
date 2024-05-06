@@ -27,12 +27,6 @@ export default function Home() {
   const dispatch = useAppDispatch();
   const torrents = useSelector(torrentsWithPeersSelector)
 
-  useEffect(() => {
-    console.log("HERE WE GO")
-    console.log(torrents)
-  }, [torrents]);
-
-
   const onUpload = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -80,15 +74,12 @@ export default function Home() {
           pv[cv.infoHash] = summary;
           return pv;
         }, {});
+        dispatch(setTorrents(mappedTorrents));
 
-        
-
-
-        const peersList = data.reduce((pv: PeersState, cv: TorrentApiModel) => {
-          
-          const torrentPeers : PeerSummary[] = cv.peers.reduce((tpv : PeerSummary[], p: PeerApiModel) => {
+        data.forEach(torrent => {
+          const torrentPeers : PeerSummary[] = torrent.peers.reduce((tpv : PeerSummary[], p: PeerApiModel) => {
             let summary : PeerSummary = {
-              infoHash: cv.infoHash,
+              infoHash: torrent.infoHash,
               ip: p.ipAddress,
               port: p.port,
               peerId: p.peerId,
@@ -99,42 +90,17 @@ export default function Home() {
             return tpv;
           }, []);
 
-          dispatch(setPeers({infoHash: cv.infoHash, peers: torrentPeers}))
-
-          return pv;
-        }, [])
-       
-        console.log(mappedTorrents)
-        dispatch(setTorrents(mappedTorrents));
+          dispatch(setPeers({infoHash: torrent.infoHash, peers: torrentPeers}))
+        }); 
       }
-    } catch (error) {}
+    } catch (error) {
+      console.log("error fetching torrents");
+    }
   };
 
   useEffect(() => {
-    console.log("hello");
     fetchTorrents();
   }, []);
-
-  // useEffect(() => {
-  //   const hubUrl = "http://localhost:5142/torrents/hub";
-  //   let hubConnection: HubConnection;
-
-  //   const connectToHub = async () => {
-  //     hubConnection = await createSignalRConnection(hubUrl);
-
-  //     hubConnection.on("PeerConnected", (event) => {
-  //       console.log(`Message from ${JSON.stringify(event)}`);
-  //     });
-  //   };
-
-  //   connectToHub();
-
-  //   return () => {
-  //     hubConnection
-  //       ?.stop()
-  //       .then(() => console.log("Disconnected from SignalR."));
-  //   };
-  // }, []);
 
   return (
     <>

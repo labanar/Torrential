@@ -12,8 +12,8 @@ const peersSlice = createSlice({
   initialState,
   reducers: {
     addPeer(state, action: PayloadAction<PeerSummary>) {
-      const { infoHash, peerId, ip, port } = action.payload;
-      const peer = { infoHash, peerId, ip, port };
+      const { infoHash, peerId, ip, port , isSeed} = action.payload;
+      const peer = { infoHash, peerId, ip, port , isSeed};
       state[infoHash] = state[infoHash] ? [...state[infoHash], peer] : [peer];
     },
     removePeer(
@@ -27,8 +27,15 @@ const peersSlice = createSlice({
       const { infoHash, peers } = action.payload;
       state[infoHash] = peers;  // Replaces the peers list for a specific infoHash
     },
+    updatePeer(state, action: PayloadAction<{ infoHash: string; peerId: string; update: Partial<PeerSummary> }>) {
+      const { infoHash, peerId, update } = action.payload;
+      const peerIndex = state[infoHash].findIndex(p => p.peerId === peerId);
+      if (peerIndex !== -1) {
+        state[infoHash][peerIndex] = { ...state[infoHash][peerIndex], ...update };
+      }
+    }
   },
 });
 
-export const { addPeer, removePeer, setPeers } = peersSlice.actions;
+export const { addPeer, removePeer, setPeers, updatePeer} = peersSlice.actions;
 export default peersSlice.reducer;
