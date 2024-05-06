@@ -10,9 +10,12 @@ using Torrential.Commands;
 using Torrential.Extensions.SignalR;
 using Torrential.Files;
 using Torrential.Peers;
+using Torrential.Settings;
 using Torrential.Torrents;
 using Torrential.Web.Api.Models;
+using Torrential.Web.Api.Requests.Settings;
 using Torrential.Web.Api.Responses;
+using Torrential.Web.Api.Responses.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMemoryCache();
@@ -39,8 +42,11 @@ builder.Services.AddMassTransit(x =>
         cfg.ConfigureEndpoints(context);
     });
 });
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+});
 builder.Services.AddHostedService<InitializationService>();
-builder.Services.AddConnections();
 
 var app = builder.Build();
 app.UseSwagger();
@@ -153,10 +159,50 @@ app.MapPost(
     async (InfoHash infoHash, ICommandHandler<TorrentRemoveCommand, TorrentRemoveResponse> handler) =>
         await handler.Execute(new() { InfoHash = infoHash }));
 
-app.MapPost("settings",
-       async (FileSettingsUpdateCommand command, ICommandHandler<FileSettingsUpdateCommand, FileSettingsUpdateResponse> handler) =>
-              await handler.Execute(command));
 
+app.MapGet("settings/file", async (SettingsManager mgr) =>
+{
+    var settings = await mgr.GetFileSettings();
+    return new FileSettingsGetResponse(settings);
+});
+app.MapPost("settings/file", async (FileSettingsUpdateRequest request, SettingsManager mgr) =>
+{
+    await mgr.SaveFileSettings(new() { CompletedPath = request.CompletedPath, DownloadPath = request.DownloadPath });
+    return ActionResponse.SuccessResponse;
+});
+
+app.MapGet("settings/tcp", async (SettingsManager mgr) =>
+{
+    var settings = await mgr.GetTcpListenerSettings();
+    return new TcpListenerSettingsGetResponse(settings);
+});
+app.MapPost("settings/tcp", async (TcpListenerSettingsUpdateRequest request, SettingsManager mgr) =>
+{
+    await mgr.SaveTcpListenerSettings(new() { Port = request.Port, Enabled = request.Enabled });
+    return ActionResponse.SuccessResponse;
+});
+
+app.MapGet("settings/torrent/default", async (SettingsManager mgr) =>
+{
+    var settings = await mgr.GetDefaultTorrentSettings();
+    return new DefaultTorrentSettingsGetResponse(settings);
+});
+app.MapPost("settings/torrent/default", async (DefaultTorrentSettingsUpdateRequest request, SettingsManager mgr) =>
+{
+    await mgr.SaveDefaultTorrentSettings(new() { MaxConnections = request.MaxConnections });
+    return ActionResponse.SuccessResponse;
+});
+
+app.MapGet("settings/torrent/global", async (SettingsManager mgr) =>
+{
+    var settings = await mgr.GetGlobalTorrentSettings();
+    return new GlobalTorrentSettingsGetResponse(settings);
+});
+app.MapPost("settings/torrent/global", async (GlobalTorrentSettingsUpdateRequest request, SettingsManager mgr) =>
+{
+    await mgr.SaveGlobalTorrentSettings(new() { MaxConnections = request.MaxConnections });
+    return ActionResponse.SuccessResponse;
+});
 
 
 await app.RunAsync();

@@ -3,6 +3,5 @@
     public enum ErrorCode
     {
         Unknown = 9999,
-
     }
 }
