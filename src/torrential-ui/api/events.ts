@@ -1,22 +1,26 @@
-export interface PeerConnectedEvent
-{
+export interface PeerConnectedEvent {
     infoHash: string;
     peerId: string;
     ip: string;
     port: number;
 }
 
-export interface PeerBitfieldReceivedEvent
-{
+export interface PeerBitfieldReceivedEvent {
     hasAllPieces: boolean;
     peerId: string;
     infoHash: string;
 }
 
-
-export interface PieceVerifiedEvent
-{
+export interface PieceVerifiedEvent {
     infoHash: string;
     pieceIndex: number;
     progress: number;
+}
+
+export interface TorrentStartedEvent {
+    infoHash: string;
+}
+
+export interface TorrentStoppedEvent {
+    infoHash: string
 }

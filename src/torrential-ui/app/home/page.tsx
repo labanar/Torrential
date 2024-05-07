@@ -6,7 +6,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCircleDown,
   faDownLong,
+  faPause,
   faSeedling,
+  faUpLong,
   faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
 import prettyBytes from "pretty-bytes";
@@ -68,7 +70,8 @@ export default function Home() {
             name: cv.name,
             infoHash: cv.infoHash,
             progress: cv.progress,
-            sizeInBytes: cv.totalSizeBytes
+            sizeInBytes: cv.totalSizeBytes,
+            status: cv.status
           }
 
           pv[cv.infoHash] = summary;
@@ -108,6 +111,7 @@ export default function Home() {
         <div className={styles.torrentList}>
           {torrents.map((t) => (
             <TorrentRow
+              status={t.status}
               key={t.infoHash}
               progress={t.progress ?? 0}
               infoHash={t.infoHash ?? ""}
@@ -156,6 +160,7 @@ interface TorrentRowProps {
   totalBytes: number;
   seeders: number;
   leechers: number;
+  status: string;
 }
 
 function TorrentRow({
@@ -165,11 +170,12 @@ function TorrentRow({
   totalBytes,
   seeders,
   leechers,
+  status
 }: TorrentRowProps) {
   return (
     <div className={styles.torrent}>
       <div className={styles.torrentIcon}>
-        <FontAwesomeIcon
+        {status === "Running" && progress < 1 && (<FontAwesomeIcon
           icon={faDownLong}
           size={"xl"}
           style={{
@@ -177,7 +183,25 @@ function TorrentRow({
             paddingLeft: "0.4em",
             color: "darkgreen",
           }}
-        />
+        />)}
+         {status === "Running" && progress >= 1 && (<FontAwesomeIcon
+          icon={faUpLong}
+          size={"xl"}
+          style={{
+            paddingRight: "0.8em",
+            paddingLeft: "0.4em",
+            color: "darkgreen",
+          }}
+        />)}
+        {status === "Stopped" && (<FontAwesomeIcon
+          icon={faPause}
+          size={"xl"}
+          style={{
+            paddingRight: "0.8em",
+            paddingLeft: "0.4em",
+            color: "orange",
+          }}
+        />)}
       </div>
       <div className={styles.torrentInfo} key={infoHash}>
         <Text className={styles.title} fontSize={"md"} noOfLines={1}>

@@ -71,13 +71,14 @@ app.MapGet(
     async (PeerSwarm swarms,
     TorrentialDb torrentDb,
     BitfieldManager bitfieldManager,
+    TorrentStatusCache statusCache,
     TorrentMetadataCache metaCache) =>
     {
         var summaries = new List<TorrentSummaryVm>();
-        await foreach (var torrents in torrentDb.Torrents.AsAsyncEnumerable())
+        await foreach (var torrent in torrentDb.Torrents.AsAsyncEnumerable())
         {
-            if (!metaCache.TryGet(torrents.InfoHash, out var meta)) continue;
-            var peers = await swarms.GetPeers(torrents.InfoHash);
+            if (!metaCache.TryGet(torrent.InfoHash, out var meta)) continue;
+            var peers = await swarms.GetPeers(torrent.InfoHash);
             var peerSummaries = peers.Select(x => new PeerSummaryVm
             {
                 PeerId = x.PeerId.ToAsciiString(),
@@ -89,13 +90,15 @@ app.MapGet(
                 Progress = x.State?.PeerBitfield?.CompletionRatio ?? 0
             });
 
-            if (!bitfieldManager.TryGetDownloadBitfield(torrents.InfoHash, out var downloadBitfield))
+            if (!bitfieldManager.TryGetDownloadBitfield(torrent.InfoHash, out var downloadBitfield))
                 continue;
 
+            var status = await statusCache.GetStatus(torrent.InfoHash);
             var summary = new TorrentSummaryVm
             {
                 Name = meta.Name,
                 InfoHash = meta.InfoHash,
+                Status = status.ToString(),
                 Progress = downloadBitfield.CompletionRatio,
                 TotalSizeBytes = meta.PieceSize * meta.NumberOfPieces,
                 Peers = peerSummaries,
@@ -108,7 +111,7 @@ app.MapGet(
 
 app.MapGet(
     "/torrents/{infoHash}",
-    async (InfoHash infoHash, TorrentMetadataCache cache, PeerSwarm swarms, BitfieldManager bitfieldManager) =>
+    async (InfoHash infoHash, TorrentMetadataCache cache, PeerSwarm swarms, BitfieldManager bitfieldManager, TorrentStatusCache statusCache) =>
     {
         if (!cache.TryGet(infoHash, out var meta))
             return TorrentGetResponse.ErrorResponse(ErrorCode.Unknown);
@@ -128,11 +131,12 @@ app.MapGet(
             Progress = x.State?.PeerBitfield?.CompletionRatio ?? 0
         });
 
-
+        var status = await statusCache.GetStatus(infoHash);
         var summary = new TorrentSummaryVm
         {
             Name = meta.Name,
             InfoHash = meta.InfoHash,
+            Status = status.ToString(),
             Progress = verificationBitfield.CompletionRatio,
             TotalSizeBytes = meta.PieceSize * meta.NumberOfPieces,
             Peers = peerSummaries,
@@ -225,7 +229,7 @@ static Logger BuildLogger(IConfiguration configuration)
     return config.CreateLogger();
 }
 
-internal class InitializationService(IServiceProvider serviceProvider, IMemoryCache cache, TorrentTaskManager taskManager, IMetadataFileService metaFileService, TcpPeerListener tcpPeerListener, IServiceScopeFactory scopeFactory) : BackgroundService
+internal class InitializationService(IServiceProvider serviceProvider, IMemoryCache cache, TorrentTaskManager taskManager, IMetadataFileService metaFileService, TcpPeerListener tcpPeerListener, TorrentStatusCache statusCache, IServiceScopeFactory scopeFactory) : BackgroundService
 {
     protected async override Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -248,6 +252,9 @@ internal class InitializationService(IServiceProvider serviceProvider, IMemoryCa
         {
             await taskManager.Add(torrentMeta);
             var config = await GetFromDatabase(torrentMeta.InfoHash);
+            if (config?.Status != null)
+                statusCache.UpdateStatus(torrentMeta.InfoHash, config.Status);
+
             if (config?.Status == TorrentStatus.Running)
                 await taskManager.Start(torrentMeta.InfoHash);
         }
