@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
+using Torrential.Files;
 using Torrential.Settings;
 using Torrential.Torrents;
 using Torrential.Trackers;
@@ -18,15 +19,21 @@ namespace Torrential.Peers
         IBus bus,
         SettingsManager settingsManager,
         TorrentStatusCache statusCache,
+        BitfieldManager bitfieldManager,
+        IFileSegmentSaveService fileSegmentSaveService,
         ILoggerFactory loggerFactory)
     {
 
-        private ConcurrentDictionary<InfoHash, CancellationToken> _swarmCancellations = [];
+
         private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> _peerSwarms = [];
-        private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> _swarmTasks = [];
+        private ConcurrentDictionary<InfoHash, CancellationTokenSource> _torrentCts = [];
+        private ConcurrentDictionary<PeerId, CancellationTokenSource> _peerCts = [];
+        private ConcurrentDictionary<PeerId, Task> _peerMessageProcessTasks = [];
+        private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> _peerUploadDownloadTasks = [];
+
 
         public IReadOnlyDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> PeerClients => _peerSwarms;
-        public IReadOnlyDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> SwarmTasks => _swarmTasks;
+        public IReadOnlyDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> SwarmTasks => _peerUploadDownloadTasks;
 
         public async Task MaintainSwarm(InfoHash infoHash, CancellationToken stoppingToken)
         {
@@ -36,12 +43,12 @@ namespace Torrential.Peers
                 return;
             }
 
-            _swarmCancellations.TryAdd(infoHash, stoppingToken);
+            _torrentCts.TryAdd(infoHash, CancellationTokenSource.CreateLinkedTokenSource(stoppingToken));
+
             var timer = new PeriodicTimer(TimeSpan.FromSeconds(60));
             while (!stoppingToken.IsCancellationRequested)
             {
                 await CleanupPeers(stoppingToken);
-                //await AnnounceAndFillSwarm(metadata, stoppingToken);
                 await timer.WaitForNextTickAsync(stoppingToken);
             }
         }
@@ -72,7 +79,6 @@ namespace Torrential.Peers
                 return;
             }
 
-            //Check the global limit too accross all torrents
             if (_peerSwarms.Values.Sum(x => x.Count) >= globalSettings.MaxConnections)
             {
                 logger.LogInformation("Global peer limit reached");
@@ -80,14 +86,75 @@ namespace Torrential.Peers
                 return;
             }
 
-            if (peerConnections.ContainsKey(connection.PeerId.Value)) return;
-            var pwcLogger = loggerFactory.CreateLogger<PeerWireClient>();
-            var pwc = new PeerWireClient(connection, pwcLogger);
-            peerConnections.TryAdd(connection.PeerId.Value, pwc);
+            if (connection.PeerId == null)
+            {
+                logger.LogError("PeerId not set for connection {Connection}", connection);
+                connection.Dispose();
+                return;
+            }
+
+            if (peerConnections.ContainsKey(connection.PeerId.Value))
+            {
+                logger.LogError("Duplicate peer connection {PeerId}", connection.PeerId.Value);
+                connection.Dispose();
+                return;
+            };
+
+            if (!bitfieldManager.TryGetVerificationBitfield(metadata.InfoHash, out var verificationBitfield))
+            {
+                logger.LogInformation("Failed to retrieve verification bitfield");
+                connection.Dispose();
+                return;
+            }
+
+            if (!_torrentCts.TryGetValue(metadata.InfoHash, out var torrentCts))
+            {
+                logger.LogInformation("Torrent not found in swarm");
+                connection.Dispose();
+                return;
+            }
+
+            var peerClientLogger = loggerFactory.CreateLogger<PeerWireClient>();
+            var peerClient = new PeerWireClient(connection, peerClientLogger);
+            var cts = _peerCts.GetOrAdd(connection.PeerId.Value, (_) => CancellationTokenSource.CreateLinkedTokenSource(torrentCts.Token));
+            var processTask = peerClient.Process(metadata, bitfieldManager, fileSegmentSaveService, cts.Token);
+            _peerMessageProcessTasks.TryAdd(peerClient.PeerId, processTask);
 
 
-            var peerSwarmTasks = _swarmTasks.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, Task>());
-            peerSwarmTasks.TryAdd(connection.PeerId.Value, torrentRunner.InitiatePeer(metadata, pwc, CancellationToken.None));
+            logger.LogInformation("Sending our bitfield to peer");
+            await peerClient.SendBitfield(verificationBitfield);
+            logger.LogInformation("Waiting for peer to send bitfield");
+            while (peerClient.State.PeerBitfield == null && !cts.Token.IsCancellationRequested)
+                await Task.Delay(100);
+
+
+            if (peerClient.State.PeerBitfield == null)
+            {
+                logger.LogInformation("Peer did not send bitfield");
+                _peerMessageProcessTasks.TryRemove(peerClient.PeerId, out _);
+                _peerCts.TryRemove(peerClient.PeerId, out _);
+
+
+                cts.Cancel();
+                peerClient.Dispose();
+                return;
+            }
+
+            logger.LogInformation("Peer bitfield received");
+
+            if (verificationBitfield.HasAll() && peerClient.State.PeerBitfield.HasAll())
+            {
+                logger.LogInformation("Both self and peer are seeds, denying entry to swarm");
+                _peerMessageProcessTasks.TryRemove(peerClient.PeerId, out _);
+                _peerCts.TryRemove(peerClient.PeerId, out _);
+                peerClient.Dispose();
+                return;
+            }
+
+            peerConnections.TryAdd(connection.PeerId.Value, peerClient);
+
+            var peerSwarmTasks = _peerUploadDownloadTasks.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, Task>());
+            peerSwarmTasks.TryAdd(connection.PeerId.Value, torrentRunner.StartSharing(metadata, peerClient, CancellationToken.None));
             await bus.Publish(new PeerConnectedEvent
             {
                 InfoHash = metadata.InfoHash,
@@ -99,67 +166,79 @@ namespace Torrential.Peers
 
         public async Task<bool> TryAddPeerToSwarm(TorrentMetadata metaData, PeerInfo peerInfo, CancellationToken stoppingToken)
         {
-            var torrentSettings = await settingsManager.GetDefaultTorrentSettings();
-            var globalSettings = await settingsManager.GetGlobalTorrentSettings();
+            var conn = await ConnectToPeer(metaData.InfoHash, peerInfo, stoppingToken);
+            if (conn == null) return true;
+            await AddToSwarm(conn);
+            return true;
+        }
 
-            var peerConnections = _peerSwarms.GetOrAdd(metaData.InfoHash, (_) => new ConcurrentDictionary<PeerId, PeerWireClient>());
-
-            if (await statusCache.GetStatus(metaData.InfoHash) != TorrentStatus.Running)
-            {
-                logger.LogInformation("Torrent {InfoHash} is not running, not adding peer", metaData.InfoHash);
-                return false;
-            }
-
-            //Check if we're at the peer limit
-            if (peerConnections.Count >= torrentSettings.MaxConnections)
-            {
-                logger.LogInformation("Peer limit reached for {InfoHash}", metaData.InfoHash);
-                return false;
-            }
-
-            //Check the global limit too accross all torrents
-            if (_peerSwarms.Values.Sum(x => x.Count) >= globalSettings.MaxConnections)
-            {
-                logger.LogInformation("Global peer limit reached");
-                return false;
-            }
-
-            var infoHash = metaData.InfoHash;
-            var timedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-            timedCts.CancelAfter(5_000);
+        private async Task<PeerWireConnection?> ConnectToPeer(InfoHash infoHash, PeerInfo peerInfo, CancellationToken stoppingToken)
+        {
             var conn = new PeerWireConnection(handshakeService, new TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
-            var result = await conn.ConnectOutbound(infoHash, peerInfo, timedCts.Token);
-
+            var result = await conn.ConnectOutbound(infoHash, peerInfo, stoppingToken);
             if (result.Success && conn.PeerId != null)
             {
-                var peerSwarmTasks = _swarmTasks.GetOrAdd(metaData.InfoHash, (_) => new ConcurrentDictionary<PeerId, Task>());
-                if (peerConnections.ContainsKey(conn.PeerId.Value)) return true;
-                var pwcLogger = loggerFactory.CreateLogger<PeerWireClient>();
-                var pwc = new PeerWireClient(conn, pwcLogger);
-                peerConnections.TryAdd(conn.PeerId.Value, pwc);
-                peerSwarmTasks.TryAdd(conn.PeerId.Value, torrentRunner.InitiatePeer(metaData, pwc, stoppingToken));
-                await bus.Publish(new PeerConnectedEvent
-                {
-                    InfoHash = infoHash,
-                    Ip = peerInfo.Ip.ToString(),
-                    Port = peerInfo.Port,
-                    PeerId = conn.PeerId.Value
-                });
+                return conn;
             }
 
-            //We want to let the consumer know if there's more room for peers, regardless of the outcome of our peer connection
-            return true;
+            conn.Dispose();
+            return null;
         }
 
         private async Task CleanupPeers(CancellationToken stoppingToken)
         {
-            foreach (var (infoHash, swarmTasks) in _swarmTasks)
+            foreach (var (infoHash, uploadDownloadTasks) in _peerUploadDownloadTasks)
             {
-                foreach (var (peerId, swarmTask) in swarmTasks)
+                if (!bitfieldManager.TryGetVerificationBitfield(infoHash, out var bitfield))
                 {
-                    if (swarmTask.IsCompleted || swarmTask.IsCanceled || swarmTask.IsFaulted)
+                    logger.LogInformation("Failed to retrieve verification bitfield for {InfoHash}", infoHash);
+                    continue;
+                }
+
+                foreach (var (peerId, peerUploadDownloadTask) in uploadDownloadTasks)
+                {
+                    if (peerUploadDownloadTask.IsCompleted || peerUploadDownloadTask.IsCanceled || peerUploadDownloadTask.IsFaulted)
                     {
                         logger.LogInformation("Cleaning up peer {PeerId} from swarm {InfoHash}", peerId.ToAsciiString(), infoHash.AsString());
+
+                        //Get this peer's cancellation token source
+                        if (_peerCts.TryGetValue(peerId, out var cts))
+                        {
+                            logger.LogInformation("Cancelling peer {PeerId} task", peerId.ToAsciiString());
+                            cts.Cancel();
+                            _peerCts.TryRemove(peerId, out _);
+                        }
+
+                        //Remove the peer message processing task
+                        if (_peerMessageProcessTasks.TryGetValue(peerId, out var processTask))
+                        {
+                            logger.LogInformation("Removing peer message processing task");
+                            _peerMessageProcessTasks.TryRemove(peerId, out _);
+                        }
+
+                        //Remove and dispose of the client
+                        if (_peerSwarms.TryGetValue(infoHash, out var peerClients))
+                        {
+                            if (peerClients.TryRemove(peerId, out var peerClient))
+                            {
+                                logger.LogInformation("Disposing peer client");
+                                peerClient.Dispose();
+                            }
+                        }
+
+                        //Remove the upload /download task
+                        if (uploadDownloadTasks.TryRemove(peerId, out _))
+                        {
+                            logger.LogInformation("Removing peer upload/download task");
+                        }
+
+                        await bus.Publish(new PeerDisconnectedEvent
+                        {
+                            InfoHash = infoHash,
+                            PeerId = peerId
+                        });
+
+
                         //_swarmTasks[infoHash].TryRemove(peerId, out _);
                         //if (_peerSwarms[infoHash].TryRemove(peerId, out var pwc))
                         //    pwc.Dispose();

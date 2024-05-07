@@ -80,6 +80,7 @@ namespace Torrential.Torrents
     public class PeerDisconnectedEvent : ITorrentEvent
     {
         public required InfoHash InfoHash { get; init; }
+        public required string PeerId { get; init; }
     }
 
     public class TorrentFileCopyStartedEvent : ITorrentEvent

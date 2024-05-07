@@ -5,6 +5,11 @@ export interface PeerConnectedEvent {
     port: number;
 }
 
+export interface PeerDisconnectedEvent {
+    infoHash: string;
+    peerId: string;
+}
+
 export interface PeerBitfieldReceivedEvent {
     hasAllPieces: boolean;
     peerId: string;
