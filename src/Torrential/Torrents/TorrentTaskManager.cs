@@ -81,7 +81,7 @@ namespace Torrential.Torrents
 
             var cts = new CancellationTokenSource();
             TorrentTaskCancellationTokenSources[infoHash] = cts;
-            TorrentTasks[infoHash] = swarms.MaintainSwarm(infoHash, 50, cts.Token);
+            TorrentTasks[infoHash] = swarms.MaintainSwarm(infoHash, cts.Token);
             await bus.Publish(new TorrentStartedEvent { InfoHash = infoHash });
             return new()
             {
