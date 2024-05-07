@@ -14,21 +14,21 @@ namespace Torrential.Torrents
                                PieceSelector pieceSelector)
     {
 
-        public async Task InitiatePeer(TorrentMetadata meta, PeerWireClient peer, CancellationToken canellationToken)
+        public async Task StartSharing(TorrentMetadata meta, PeerWireClient peer, CancellationToken canellationToken)
         {
             var ctsWrap = CancellationTokenSource.CreateLinkedTokenSource(canellationToken);
             var stoppingToken = ctsWrap.Token;
 
-            var processor = peer.Process(meta, bitfieldMgr, segmentSaveService, stoppingToken);
+            //var processor = peer.Process(meta, bitfieldMgr, segmentSaveService, stoppingToken);
 
-            if (!bitfieldMgr.TryGetVerificationBitfield(meta.InfoHash, out var verificationBitfield))
-            {
-                logger.LogInformation("Failed to retrieve verification bitfield");
-                return;
-            }
+            //if (!bitfieldMgr.TryGetVerificationBitfield(meta.InfoHash, out var verificationBitfield))
+            //{
+            //    logger.LogInformation("Failed to retrieve verification bitfield");
+            //    return;
+            //}
 
-            logger.LogInformation("Sending bitfield to peer");
-            await peer.SendBitfield(verificationBitfield);
+            //logger.LogInformation("Sending bitfield to peer");
+            //await peer.SendBitfield(verificationBitfield);
 
             logger.LogInformation("Waiting for bitfield from peer");
             while (peer.State.PeerBitfield == null && !stoppingToken.IsCancellationRequested)
@@ -51,7 +51,7 @@ namespace Torrential.Torrents
 
             var leechTask = LeechFromPeer(meta, peer, stoppingToken);
             var seedTask = SeedToPeer(meta, peer, stoppingToken);
-            await Task.WhenAll(processor, leechTask, seedTask);
+            await Task.WhenAll(leechTask, seedTask);
             ctsWrap.Cancel();
         }
 
