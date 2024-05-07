@@ -172,6 +172,12 @@ function TorrentRow({
   leechers,
   status
 }: TorrentRowProps) {
+
+  const color = useMemo(() => {
+    if(status === "Stopped") return "orange";
+    if(status === "Running") return "green"
+  }, [status])
+
   return (
     <div className={styles.torrent}>
       <div className={styles.torrentIcon}>
@@ -181,7 +187,7 @@ function TorrentRow({
           style={{
             paddingRight: "0.8em",
             paddingLeft: "0.4em",
-            color: "darkgreen",
+            color,
           }}
         />)}
          {status === "Running" && progress >= 1 && (<FontAwesomeIcon
@@ -190,7 +196,7 @@ function TorrentRow({
           style={{
             paddingRight: "0.8em",
             paddingLeft: "0.4em",
-            color: "darkgreen",
+            color,
           }}
         />)}
         {status === "Stopped" && (<FontAwesomeIcon
@@ -199,7 +205,7 @@ function TorrentRow({
           style={{
             paddingRight: "0.8em",
             paddingLeft: "0.4em",
-            color: "orange",
+            color,
           }}
         />)}
       </div>
@@ -212,7 +218,7 @@ function TorrentRow({
             totalBytes
           )} (${(progress * 100).toFixed(1)}%)`}
         </Text>
-        <Progress value={progress * 100} colorScheme="green" height={"1em"} />
+        <Progress value={progress * 100} colorScheme={color} height={"1em"} />
         <Text className={styles.progressDetails} fontSize={"xs"}>
           <Tooltip label={`${seeders + leechers} peers`}>
             <span>
