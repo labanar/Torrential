@@ -34,6 +34,8 @@ public class PeerWireSocketConnection : IPeerWireConnection
 
     public PipeWriter Writer => _socketWriterPipe.Writer;
 
+    public DateTimeOffset ConnectionTimestamp { get; private set; } = DateTimeOffset.UtcNow;
+
 
     public PeerWireSocketConnection(Socket socket, HandshakeService handshakeService, ILogger logger)
     {
@@ -66,6 +68,7 @@ public class PeerWireSocketConnection : IPeerWireConnection
         PeerId = peerHandshake.PeerId;
         InfoHash = peerHandshake.InfoHash;
         IsConnected = true;
+        ConnectionTimestamp = DateTimeOffset.UtcNow;
         return PeerConnectionResult.FromHandshake(peerHandshake);
 
     }
@@ -86,6 +89,7 @@ public class PeerWireSocketConnection : IPeerWireConnection
         PeerId = handshakeResult.PeerId;
         InfoHash = infoHash;
         IsConnected = true;
+        ConnectionTimestamp = DateTimeOffset.UtcNow;
         return PeerConnectionResult.FromHandshake(handshakeResult);
     }
 

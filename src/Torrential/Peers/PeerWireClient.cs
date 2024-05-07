@@ -71,6 +71,8 @@ public sealed class PeerWireClient : IDisposable
     public long BytesDownloaded { get; private set; }
     public PeerId PeerId { get; private set; }
 
+    public DateTimeOffset LastMessageTimestamp { get; private set; }
+
     public PeerWireClient(IPeerWireConnection connection, ILogger logger)
     {
         if (!connection.PeerId.HasValue)
@@ -80,6 +82,7 @@ public sealed class PeerWireClient : IDisposable
         _connection = connection;
         _logger = logger;
         _state = new PeerWireState();
+        LastMessageTimestamp = connection.ConnectionTimestamp;
         PeerId = connection.PeerId.Value;
     }
 
@@ -302,6 +305,7 @@ public sealed class PeerWireClient : IDisposable
 
         //If we recieve any event that is not the Bitfield, then we can assume that the peer has an empty bitfield
         _state.PeerBitfield ??= new Bitfield(_meta.NumberOfPieces);
+        LastMessageTimestamp = DateTimeOffset.UtcNow;
         return handled;
     }
 
