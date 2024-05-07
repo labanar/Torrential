@@ -17,6 +17,7 @@ namespace Torrential.Peers
         ILogger<PeerSwarm> logger,
         IBus bus,
         SettingsManager settingsManager,
+        TorrentStatusCache statusCache,
         ILoggerFactory loggerFactory)
     {
 
@@ -57,6 +58,13 @@ namespace Torrential.Peers
             var globalSettings = await settingsManager.GetGlobalTorrentSettings();
             var peerConnections = _peerSwarms.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, PeerWireClient>());
 
+            if (await statusCache.GetStatus(connection.InfoHash) != TorrentStatus.Running)
+            {
+                logger.LogInformation("Torrent {InfoHash} is not running, not adding peer", connection.InfoHash);
+                connection.Dispose();
+                return;
+            }
+
             if (peerConnections.Count >= torrentSettings.MaxConnections)
             {
                 logger.LogInformation("Peer limit reached for {InfoHash}", metadata.InfoHash);
@@ -95,6 +103,12 @@ namespace Torrential.Peers
             var globalSettings = await settingsManager.GetGlobalTorrentSettings();
 
             var peerConnections = _peerSwarms.GetOrAdd(metaData.InfoHash, (_) => new ConcurrentDictionary<PeerId, PeerWireClient>());
+
+            if (await statusCache.GetStatus(metaData.InfoHash) != TorrentStatus.Running)
+            {
+                logger.LogInformation("Torrent {InfoHash} is not running, not adding peer", metaData.InfoHash);
+                return false;
+            }
 
             //Check if we're at the peer limit
             if (peerConnections.Count >= torrentSettings.MaxConnections)

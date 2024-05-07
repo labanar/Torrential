@@ -38,6 +38,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SettingsManager>();
         services.AddSingleton<TcpPeerListener>();
         services.AddSingleton<AnnounceServiceState>();
+        services.AddSingleton<TorrentStatusCache>();
 
 
         //TODO - add service extension that scans the provided assemblies for implementations of ICommandHandler<,>
