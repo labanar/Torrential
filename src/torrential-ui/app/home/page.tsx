@@ -68,7 +68,7 @@ export default function Home() {
             name: cv.name,
             infoHash: cv.infoHash,
             progress: cv.progress,
-            sizeInBytes: cv.totalSizeInBytes
+            sizeInBytes: cv.totalSizeBytes
           }
 
           pv[cv.infoHash] = summary;
@@ -186,7 +186,7 @@ function TorrentRow({
         <Text className={styles.progress} fontSize={"xs"}>
           {`${prettyBytes(totalBytes * progress)} of ${prettyBytes(
             totalBytes
-          )} (${progress * 100}%)`}
+          )} (${(progress * 100).toFixed(1)}%)`}
         </Text>
         <Progress value={progress * 100} colorScheme="green" height={"1em"} />
         <Text className={styles.progressDetails} fontSize={"xs"}>

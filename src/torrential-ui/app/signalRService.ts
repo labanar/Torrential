@@ -1,8 +1,9 @@
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import store from '../app/store';
 import { addPeer, updatePeer } from '../features/peersSlice';
-import { PeerBitfieldReceivedEvent, PeerConnectedEvent } from '@/api/events';
+import { PeerBitfieldReceivedEvent, PeerConnectedEvent, PieceVerifiedEvent } from '@/api/events';
 import { PeerSummary } from '@/types';
+import { updateTorrent } from '@/features/torrentsSlice';
 
 export class SignalRService {
     private connection: HubConnection;
@@ -28,6 +29,16 @@ export class SignalRService {
 
         this.connection.on('PeerBitfieldReceived', (event: PeerBitfieldReceivedEvent) => {
             store.dispatch(updatePeer({infoHash: event.infoHash, peerId: event.peerId, update: {isSeed: event.hasAllPieces}}))
+        })
+
+        this.connection.on(`PieceVerified`, (event: PieceVerifiedEvent) => {
+            const {infoHash, progress} = event;
+            const payload = {
+                infoHash,
+                update: {progress: Number(progress.toFixed(3))}
+            }
+
+            store.dispatch(updateTorrent(payload));
         })
 
         // Add more event handlers as necessary
