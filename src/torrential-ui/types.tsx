@@ -3,6 +3,7 @@ export interface TorrentSummary {
   name: string;
   sizeInBytes: number;
   progress: number;
+  status: string;
 }
 
 export interface PeerSummary {

@@ -3,7 +3,8 @@ export interface TorrentApiModel
  infoHash: string;
  name: string;
  progress: number;
- totalSizeBytes: number  
+ totalSizeBytes: number,
+ status: string,  
  peers: PeerApiModel[] 
 }
 

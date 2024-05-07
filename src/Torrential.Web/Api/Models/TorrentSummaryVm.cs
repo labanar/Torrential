@@ -5,9 +5,9 @@ public class TorrentSummaryVm
     public required string InfoHash { get; init; }
     public required string Name { get; set; }
     public required float Progress { get; set; }
-
     public required float TotalSizeBytes { get; init; }
     public IEnumerable<PeerSummaryVm> Peers { get; init; } = Array.Empty<PeerSummaryVm>();
+    public required string Status { get; init; }
 }
 
 
