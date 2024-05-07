@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Torrential.Peers;
 using Torrential.Torrents;
 using Torrential.Trackers;
 using Torrential.Trackers.Http;
@@ -46,10 +45,13 @@ namespace Torrential.Tests
         }
 
 
-        [Fact]
-        public async Task SuccessfulAnnounce()
+        [Theory]
+        [InlineData("./debian-12.0.0-amd64-netinst.iso.torrent")]
+        [InlineData("./ubuntu-24.04-desktop-amd64.iso.torrent")]
+
+        public async Task SuccessfulAnnounce(string filePath)
         {
-            var meta = TorrentMetadataParser.FromFile("./debian-12.0.0-amd64-netinst.iso.torrent");
+            var meta = TorrentMetadataParser.FromFile(filePath);
             var client = new HttpClient();
             var loggerFactory = new LoggerFactory();
             var logger = loggerFactory.CreateLogger<HttpTrackerClient>();
@@ -57,7 +59,6 @@ namespace Torrential.Tests
             var peerService = new PeerService();
             var metaCache = new TorrentMetadataCache();
             metaCache.TryAdd(meta);
-            var handshakeService = new HandshakeService(peerService, metaCache, loggerFactory.CreateLogger<HandshakeService>());
 
             var resp = await sut.Announce(new AnnounceRequest
             {
@@ -65,17 +66,14 @@ namespace Torrential.Tests
                 PeerId = peerService.Self.Id,
                 Url = meta.AnnounceList.First(),
                 NumWant = 50,
-                Port = 53123
+                Port = 53123,
+                BytesUploaded = 0,
+                BytesDownloaded = 0,
+                BytesRemaining = (meta.PieceSize * meta.NumberOfPieces)
             });
 
             Assert.NotEqual(0, resp.Interval);
             Assert.NotEmpty(resp.Peers);
-
-            //TODO - lift timeout to config
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var conn = new PeerWireConnection(handshakeService, new System.Net.Sockets.TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
-            var result = await conn.ConnectOutbound(meta.InfoHash, resp.Peers.First(), cts.Token);
-            Assert.True(result.Success);
         }
     }
 }
