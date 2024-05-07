@@ -12,3 +12,11 @@ export interface PeerBitfieldReceivedEvent
     peerId: string;
     infoHash: string;
 }
+
+
+export interface PieceVerifiedEvent
+{
+    infoHash: string;
+    pieceIndex: number;
+    progress: number;
+}

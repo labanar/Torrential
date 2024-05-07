@@ -109,7 +109,7 @@ namespace Torrential.Peers
             {
                 foreach (var peer in announceResponse.Peers)
                 {
-                    //peerTasks.Add(TryAddPeerToSwarm(metadata, peer, stoppingToken));
+                    peerTasks.Add(TryAddPeerToSwarm(metadata, peer, stoppingToken));
                 }
             }
             await Task.WhenAll(peerTasks);
