@@ -187,65 +187,132 @@ namespace Torrential.Peers
 
         private async Task CleanupPeers(CancellationToken stoppingToken)
         {
-            foreach (var (infoHash, uploadDownloadTasks) in _peerUploadDownloadTasks)
+            foreach (var (infoHash, peerClients) in _peerSwarms)
             {
-                if (!bitfieldManager.TryGetVerificationBitfield(infoHash, out var bitfield))
+                foreach (var (peerId, peerClient) in peerClients)
                 {
-                    logger.LogInformation("Failed to retrieve verification bitfield for {InfoHash}", infoHash);
-                    continue;
-                }
-
-                foreach (var (peerId, peerUploadDownloadTask) in uploadDownloadTasks)
-                {
-                    if (peerUploadDownloadTask.IsCompleted || peerUploadDownloadTask.IsCanceled || peerUploadDownloadTask.IsFaulted)
+                    //Has the peer sent us messages in the last 2 minutes?
+                    if (peerClient.LastMessageTimestamp < DateTimeOffset.UtcNow.AddMinutes(-2))
                     {
-                        logger.LogInformation("Cleaning up peer {PeerId} from swarm {InfoHash}", peerId.ToAsciiString(), infoHash.AsString());
+                        logger.LogInformation("Peer {PeerId} has not sent messages in the last 2 minutes", peerId.ToAsciiString());
+                        await CleanupPeer(infoHash, peerId);
+                    }
 
-                        //Get this peer's cancellation token source
-                        if (_peerCts.TryGetValue(peerId, out var cts))
+                    //Is the peer's upload/download task still running?
+                    if (_peerUploadDownloadTasks.TryGetValue(infoHash, out var uploadDownloadTasks))
+                    {
+                        if (uploadDownloadTasks.TryGetValue(peerId, out var task))
                         {
-                            logger.LogInformation("Cancelling peer {PeerId} task", peerId.ToAsciiString());
-                            cts.Cancel();
-                            _peerCts.TryRemove(peerId, out _);
-                        }
-
-                        //Remove the peer message processing task
-                        if (_peerMessageProcessTasks.TryGetValue(peerId, out var processTask))
-                        {
-                            logger.LogInformation("Removing peer message processing task");
-                            _peerMessageProcessTasks.TryRemove(peerId, out _);
-                        }
-
-                        //Remove and dispose of the client
-                        if (_peerSwarms.TryGetValue(infoHash, out var peerClients))
-                        {
-                            if (peerClients.TryRemove(peerId, out var peerClient))
+                            if (task.IsCompleted || task.IsCanceled || task.IsFaulted)
                             {
-                                logger.LogInformation("Disposing peer client");
-                                peerClient.Dispose();
+                                logger.LogInformation("Peer {PeerId} upload/download task is complete", peerId.ToAsciiString());
+                                await CleanupPeer(infoHash, peerId);
                             }
                         }
-
-                        //Remove the upload /download task
-                        if (uploadDownloadTasks.TryRemove(peerId, out _))
-                        {
-                            logger.LogInformation("Removing peer upload/download task");
-                        }
-
-                        await bus.Publish(new PeerDisconnectedEvent
-                        {
-                            InfoHash = infoHash,
-                            PeerId = peerId
-                        });
-
-
-                        //_swarmTasks[infoHash].TryRemove(peerId, out _);
-                        //if (_peerSwarms[infoHash].TryRemove(peerId, out var pwc))
-                        //    pwc.Dispose();
                     }
                 }
             }
         }
+
+
+        private async Task CleanupPeer(InfoHash infoHash, PeerId peerId)
+        {
+            //Get this peer's cancellation token source
+            if (_peerCts.TryGetValue(peerId, out var cts))
+            {
+                logger.LogInformation("Cancelling peer {PeerId} task", peerId.ToAsciiString());
+                cts.Cancel();
+                _peerCts.TryRemove(peerId, out _);
+            }
+
+            //Remove the peer message processing task
+            if (_peerMessageProcessTasks.TryGetValue(peerId, out var processTask))
+            {
+                logger.LogInformation("Removing peer message processing task");
+                _peerMessageProcessTasks.TryRemove(peerId, out _);
+            }
+
+            //Remove the upload/download task
+            if (_peerUploadDownloadTasks.TryGetValue(infoHash, out var uploadDownloadTasks))
+            {
+                if (uploadDownloadTasks.TryRemove(peerId, out _))
+                {
+                    logger.LogInformation("Removing peer upload/download task");
+                }
+            }
+
+            //Remove and dispose of the client
+            if (_peerSwarms.TryGetValue(infoHash, out var peerClients))
+            {
+                if (peerClients.TryRemove(peerId, out var peerClient))
+                {
+                    logger.LogInformation("Disposing peer client");
+                    peerClient.Dispose();
+                }
+            }
+
+            //Notify that the peer has been removed
+            await bus.Publish(new PeerDisconnectedEvent
+            {
+                InfoHash = infoHash,
+                PeerId = peerId
+            });
+        }
+
+
+        //private async Task CleanupPeers(CancellationToken stoppingToken)
+        //{
+        //    foreach (var (infoHash, uploadDownloadTasks) in _peerUploadDownloadTasks)
+        //    {
+        //        if (!bitfieldManager.TryGetVerificationBitfield(infoHash, out var bitfield))
+        //        {
+        //            logger.LogInformation("Failed to retrieve verification bitfield for {InfoHash}", infoHash);
+        //            continue;
+        //        }
+
+        //        foreach (var (peerId, peerUploadDownloadTask) in uploadDownloadTasks)
+        //        {
+        //            if (peerUploadDownloadTask.IsCompleted || peerUploadDownloadTask.IsCanceled || peerUploadDownloadTask.IsFaulted)
+        //            {
+        //                logger.LogInformation("Cleaning up peer {PeerId} from swarm {InfoHash}", peerId.ToAsciiString(), infoHash.AsString());
+
+        //                //Get this peer's cancellation token source
+        //                if (_peerCts.TryGetValue(peerId, out var cts))
+        //                {
+        //                    logger.LogInformation("Cancelling peer {PeerId} task", peerId.ToAsciiString());
+        //                    cts.Cancel();
+        //                    _peerCts.TryRemove(peerId, out _);
+        //                }
+
+        //                //Remove the peer message processing task
+        //                if (_peerMessageProcessTasks.TryGetValue(peerId, out var processTask))
+        //                {
+        //                    logger.LogInformation("Removing peer message processing task");
+        //                    _peerMessageProcessTasks.TryRemove(peerId, out _);
+        //                }
+
+        //                //Remove and dispose of the client
+        //                if (_peerSwarms.TryGetValue(infoHash, out var peerClients))
+        //                {
+        //                    if (peerClients.TryRemove(peerId, out var peerClient))
+        //                    {
+        //                        logger.LogInformation("Disposing peer client");
+        //                        peerClient.Dispose();
+        //                    }
+        //                }
+
+
+
+
+
+
+        //                //_swarmTasks[infoHash].TryRemove(peerId, out _);
+        //                //if (_peerSwarms[infoHash].TryRemove(peerId, out var pwc))
+        //                //    pwc.Dispose();
+        //            }
+        //        }
+        //    }
+        //}
 
         public async Task<ICollection<PeerWireClient>> GetPeers(InfoHash infoHash)
         {

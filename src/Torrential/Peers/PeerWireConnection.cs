@@ -20,6 +20,7 @@ public class PeerWireConnection : IPeerWireConnection
     public PipeWriter Writer => _peerWriter;
     public InfoHash InfoHash { get; private set; } = InfoHash.None;
     public bool IsConnected { get; private set; }
+    public DateTimeOffset ConnectionTimestamp { get; private set; } = DateTime.MinValue;
     public PeerInfo PeerInfo { get; private set; }
 
     public PeerWireConnection(HandshakeService handshakeService, TcpClient client, ILogger<PeerWireConnection> logger)
@@ -52,6 +53,7 @@ public class PeerWireConnection : IPeerWireConnection
         PeerId = handshakeResult.PeerId;
         InfoHash = infoHash;
         IsConnected = true;
+        ConnectionTimestamp = DateTimeOffset.UtcNow;
         return PeerConnectionResult.FromHandshake(handshakeResult);
     }
 
@@ -75,6 +77,7 @@ public class PeerWireConnection : IPeerWireConnection
         PeerId = peerHandshake.PeerId;
         InfoHash = peerHandshake.InfoHash;
         IsConnected = true;
+        ConnectionTimestamp = DateTimeOffset.UtcNow;
         return PeerConnectionResult.FromHandshake(peerHandshake);
     }
 
