@@ -225,7 +225,7 @@ static Logger BuildLogger(IConfiguration configuration)
     return config.CreateLogger();
 }
 
-internal class InitializationService(IServiceProvider serviceProvider, IMemoryCache cache, TorrentTaskManager taskManager, IMetadataFileService metaFileService, TcpPeerListener tcpPeerListener) : BackgroundService
+internal class InitializationService(IServiceProvider serviceProvider, IMemoryCache cache, TorrentTaskManager taskManager, IMetadataFileService metaFileService, TcpPeerListener tcpPeerListener, IServiceScopeFactory scopeFactory) : BackgroundService
 {
     protected async override Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -245,6 +245,19 @@ internal class InitializationService(IServiceProvider serviceProvider, IMemoryCa
     {
         using var scope = serviceProvider.CreateScope();
         await foreach (var torrentMeta in metaFileService.GetAllMetadataFiles())
+        {
             await taskManager.Add(torrentMeta);
+            var config = await GetFromDatabase(torrentMeta.InfoHash);
+            if (config?.Status == TorrentStatus.Running)
+                await taskManager.Start(torrentMeta.InfoHash);
+        }
+    }
+
+    private async Task<TorrentConfiguration?> GetFromDatabase(InfoHash infoHash)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
+        var torrent = await db.Torrents.AsNoTracking().FirstOrDefaultAsync(x => x.InfoHash == infoHash.AsString());
+        return torrent;
     }
 }

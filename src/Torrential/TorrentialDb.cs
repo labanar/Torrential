@@ -60,7 +60,6 @@ namespace Torrential
         Idle,
         Running,
         Stopped,
-        Verifying,
         Copying,
 
         Error = 99,
