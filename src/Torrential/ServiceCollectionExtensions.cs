@@ -37,6 +37,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<HandshakeService>();
         services.AddSingleton<SettingsManager>();
         services.AddSingleton<TcpPeerListener>();
+        services.AddSingleton<AnnounceServiceState>();
+
 
         //TODO - add service extension that scans the provided assemblies for implementations of ICommandHandler<,>
         services.AddCommandHandler<TorrentAddCommand, TorrentAddResponse, TorrentAddCommandHandler>();
@@ -46,6 +48,7 @@ public static class ServiceCollectionExtensions
 
 
         services.AddHostedService<BitfieldSyncService>();
+        services.AddHostedService<AnnounceService>();
 
         services.AddSingleton<IPostDownloadAction, FileCopyPostDownloadAction>();
     }
