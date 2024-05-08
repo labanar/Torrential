@@ -5,7 +5,7 @@ namespace Torrential.Peers
 {
     public class PieceReservationService(TorrentMetadataCache metaCache)
     {
-        private ConcurrentDictionary<InfoHash, Bitfield> _bitfields = new ConcurrentDictionary<InfoHash, Bitfield>();
+        private ConcurrentDictionary<InfoHash, AsyncBitfield> _bitfields = [];
         public async Task<bool> TryReservePiece(InfoHash infoHash, int pieceIndex, float reservationLengthSeconds = 10)
         {
             if (!metaCache.TryGet(infoHash, out var meta))
@@ -13,7 +13,7 @@ namespace Torrential.Peers
 
             var bitfield = _bitfields.GetOrAdd(infoHash, (_) =>
             {
-                return new Bitfield(meta.NumberOfPieces);
+                return new AsyncBitfield(meta.NumberOfPieces);
             });
 
             if (bitfield.HasPiece(pieceIndex)) return false;

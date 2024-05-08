@@ -15,7 +15,7 @@ namespace Torrential.Files
         : IFileSegmentSaveService
     {
         private static readonly int SEGMENT_LENGTH = (int)Math.Pow(2, 14);
-        private static ConcurrentDictionary<InfoHash, Bitfield> _segmentFields = [];
+        private static ConcurrentDictionary<InfoHash, AsyncBitfield> _segmentFields = [];
 
         public async Task SaveSegment(PooledPieceSegment segment)
         {
@@ -41,7 +41,7 @@ namespace Torrential.Files
                 var numSegmentsPerPiece = (int)(pieceSize / SEGMENT_LENGTH);
                 var segmentField = _segmentFields.GetOrAdd(segment.InfoHash, (_) =>
                 {
-                    return new Bitfield(numSegmentsPerPiece * meta.NumberOfPieces);
+                    return new AsyncBitfield(numSegmentsPerPiece * meta.NumberOfPieces);
                 });
 
 

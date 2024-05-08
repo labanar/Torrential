@@ -2,10 +2,9 @@
 
 namespace Torrential.Peers
 {
-    public sealed class Bitfield
+    public sealed class Bitfield : IBitfield
     {
         private readonly int _numOfPieces;
-        private readonly SemaphoreSlim[] _semaphores;
         private readonly int _sizeInBytes;
         private readonly byte[] _bitfield;
 
@@ -31,27 +30,15 @@ namespace Torrential.Peers
         {
             _numOfPieces = numOfPieces;
             _sizeInBytes = (numOfPieces + 7) / 8;  // Calculates the total bytes needed
-            _semaphores = new SemaphoreSlim[_sizeInBytes];
             _bitfield = new byte[_sizeInBytes];
-
-            for (var i = 0; i < _sizeInBytes; i++)
-            {
-                _semaphores[i] = new SemaphoreSlim(1, 1);
-            }
         }
 
         public Bitfield(Span<byte> data)
         {
             _sizeInBytes = data.Length;
             _numOfPieces = _sizeInBytes * 8;
-            _semaphores = new SemaphoreSlim[_sizeInBytes];
             _bitfield = new byte[_sizeInBytes];
             data.CopyTo(_bitfield);
-
-            for (var i = 0; i < _sizeInBytes; i++)
-            {
-                _semaphores[i] = new SemaphoreSlim(1, 1);
-            }
         }
 
         public void Fill(Span<byte> data)
@@ -110,45 +97,7 @@ namespace Torrential.Peers
             _bitfield[byteIndex] |= (byte)(1 << bitIndex);
         }
 
-        public async Task MarkHaveAsync(int index, CancellationToken cancellationToken)
-        {
-            if (index < 0 || index >= _numOfPieces)
-                throw new ArgumentOutOfRangeException(nameof(index));
-
-            var byteIndex = index / 8;
-            var bitIndex = index % 8;
-            await _semaphores[byteIndex].WaitAsync(cancellationToken);
-            try
-            {
-                _bitfield[byteIndex] |= (byte)(1 << bitIndex);
-            }
-            finally
-            {
-                _semaphores[byteIndex].Release();
-            }
-        }
-
-
-        public async Task UnmarkHaveAsync(int index, CancellationToken cancellationToken)
-        {
-            if (index < 0 || index >= _numOfPieces)
-                throw new ArgumentOutOfRangeException(nameof(index));
-
-            var byteIndex = index / 8;
-            var bitIndex = index % 8;
-
-            await _semaphores[byteIndex].WaitAsync(cancellationToken);
-            try
-            {
-                _bitfield[byteIndex] &= (byte)~(1 << bitIndex);
-            }
-            finally
-            {
-                _semaphores[byteIndex].Release();
-            }
-        }
-
-        public PieceSuggestionResult SuggestPieceToDownload(Bitfield peerBitfield)
+        public PieceSuggestionResult SuggestPieceToDownload(IBitfield peerBitfield)
         {
             if (HasAll())
                 return PieceSuggestionResult.NoMorePieces;

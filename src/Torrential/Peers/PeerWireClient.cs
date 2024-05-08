@@ -97,9 +97,19 @@ public sealed class PeerWireClient : IDisposable
         var readerTask = ProcessReads(_processCts.Token);
         var writeTask = ProcessWrites(_processCts.Token);
         var savingTask = ProcessSegments(_processCts.Token);
-        await readerTask;
-        await writeTask;
-        await savingTask;
+
+        try
+        {
+            await readerTask;
+            await writeTask;
+            await savingTask;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing peer connection {PeerId}", PeerId);
+        }
+
 
         OUTBOUND_MESSAGES.Writer.Complete();
         PIECE_SEGMENT_CHANNEL.Writer.Complete();
@@ -120,18 +130,10 @@ public sealed class PeerWireClient : IDisposable
     {
         await foreach (var pak in OUTBOUND_MESSAGES.Reader.ReadAllAsync(cancellationToken))
         {
-            try
+            using (pak)
             {
-                using (pak)
-                {
-                    _connection.Writer.Write(pak.AsSpan());
-                    await _connection.Writer.FlushAsync(cancellationToken);
-                }
-            }
-            catch (Exception ode)
-            {
-                _logger.LogError(ode, "Error writing to peer");
-                return;
+                _connection.Writer.Write(pak.AsSpan());
+                await _connection.Writer.FlushAsync(cancellationToken);
             }
         }
     }
@@ -160,6 +162,7 @@ public sealed class PeerWireClient : IDisposable
                     if (!Process(messageSize, messageId, ref payload))
                     {
                         _logger.LogInformation("Disconnecting from Peer: failed to process message - {MessageId} {MessageSize}", messageId, messageSize);
+                        await _connection.Reader.CompleteAsync();
                         _processCts.Cancel();
                         _connection.Dispose();
                         return;
@@ -184,33 +187,36 @@ public sealed class PeerWireClient : IDisposable
             }
             catch (IOException)
             {
+                _processCts.Cancel();
                 _connection.Dispose();
                 return;
             }
             catch (SocketException)
             {
+                _processCts.Cancel();
                 _connection.Dispose();
                 return;
             }
             catch (ObjectDisposedException)
             {
-                await _connection.Reader.CompleteAsync();
                 _processCts.Cancel();
+                _connection.Dispose();
                 return;
             }
-            catch
+            catch (Exception ex)
             {
-                throw;
+                _logger.LogError(ex, "Error reading from peer");
+                _processCts.Cancel();
+                _connection.Dispose();
+                return;
             }
         }
 
-
         _logger.LogInformation("Peer read loop ended, disposing connection and exiting");
-        await _connection.Reader.CompleteAsync();
         _processCts.Cancel();
         _connection.Dispose();
-        return;
     }
+
     private bool TryReadMessage(ref ReadOnlySequence<byte> buffer, out int messageSize, out byte messageId, out ReadOnlySequence<byte> payload)
     {
         payload = default;
@@ -256,6 +262,7 @@ public sealed class PeerWireClient : IDisposable
         buffer = buffer.Slice(payload.End);
         return true;
     }
+
     private bool Process(int messageSize, byte messageId, ref ReadOnlySequence<byte> payload)
     {
         if (messageId == 0 && messageSize == 0)
@@ -414,7 +421,7 @@ public sealed class PeerWireClient : IDisposable
         return true;
     }
 
-    public async Task SendBitfield(Bitfield bitfield)
+    public async Task SendBitfield(IBitfield bitfield)
     {
         WriteBitfield(bitfield);
     }
@@ -485,7 +492,7 @@ public sealed class PeerWireClient : IDisposable
         WritePacket(messageId, payload);
     }
 
-    private void WriteBitfield(Bitfield bitfield)
+    private void WriteBitfield(IBitfield bitfield)
     {
         var pak = new PreparedPacket(bitfield.Bytes.Length + 5);
         var buffer = pak.AsSpan();

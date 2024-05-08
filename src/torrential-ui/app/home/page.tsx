@@ -11,7 +11,6 @@ import {
   faUpLong,
   faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
-import prettyBytes from "pretty-bytes";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FileUpload, FileUploadElement } from "@/components/FileUpload";
 import { HubConnection } from "@microsoft/signalr";
