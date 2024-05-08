@@ -90,7 +90,7 @@ public sealed class AsyncBitfield : IBitfield
         }
 
         var byteIndex = index / 8;
-        var bitIndex = index % 8;
+        var bitIndex = 7 - (index % 8);
         return (_bitfield[byteIndex] & (1 << bitIndex)) != 0;
     }
 
@@ -101,7 +101,7 @@ public sealed class AsyncBitfield : IBitfield
             throw new ArgumentOutOfRangeException(nameof(index));
 
         var byteIndex = index / 8;
-        var bitIndex = index % 8;
+        var bitIndex = 7 - (index % 8);
         await _semaphores[byteIndex].WaitAsync(cancellationToken);
         try
         {
@@ -120,7 +120,7 @@ public sealed class AsyncBitfield : IBitfield
             throw new ArgumentOutOfRangeException(nameof(index));
 
         var byteIndex = index / 8;
-        var bitIndex = index % 8;
+        var bitIndex = 7 - (index % 8);
 
         await _semaphores[byteIndex].WaitAsync(cancellationToken);
         try
