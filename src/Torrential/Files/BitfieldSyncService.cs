@@ -48,7 +48,7 @@ namespace Torrential.Files
         }
 
 
-        private void DumpBitfieldToWriter(PipeWriter writer, Bitfield bitfield)
+        private void DumpBitfieldToWriter(PipeWriter writer, IBitfield bitfield)
         {
             Span<byte> numPiecesBuffer = stackalloc byte[4];
             BitConverterExtensions.TryWriteBigEndian(numPiecesBuffer, bitfield.NumberOfPieces);

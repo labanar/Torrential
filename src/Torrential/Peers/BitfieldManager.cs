@@ -7,16 +7,16 @@ namespace Torrential.Peers
 {
     public class BitfieldManager(TorrentFileService fileService, IBus bus)
     {
-        private ConcurrentDictionary<InfoHash, Bitfield> _downloadBitfields = new ConcurrentDictionary<InfoHash, Bitfield>();
-        private ConcurrentDictionary<InfoHash, Bitfield> _verificationBitfields = new ConcurrentDictionary<InfoHash, Bitfield>();
+        private ConcurrentDictionary<InfoHash, AsyncBitfield> _downloadBitfields = new ConcurrentDictionary<InfoHash, AsyncBitfield>();
+        private ConcurrentDictionary<InfoHash, AsyncBitfield> _verificationBitfields = new ConcurrentDictionary<InfoHash, AsyncBitfield>();
 
-        public ICollection<(InfoHash, Bitfield)> DownloadBitfields => _downloadBitfields.Select(Bitfield => (Bitfield.Key, Bitfield.Value)).ToArray();
-        public ICollection<(InfoHash, Bitfield)> VerificationBitfields => _verificationBitfields.Select(Bitfield => (Bitfield.Key, Bitfield.Value)).ToArray();
+        public ICollection<(InfoHash, AsyncBitfield)> DownloadBitfields => _downloadBitfields.Select(Bitfield => (Bitfield.Key, Bitfield.Value)).ToArray();
+        public ICollection<(InfoHash, AsyncBitfield)> VerificationBitfields => _verificationBitfields.Select(Bitfield => (Bitfield.Key, Bitfield.Value)).ToArray();
 
         public async Task Initialize(InfoHash infoHash, int numberOfPieces)
         {
-            var downloadBitfield = new Bitfield(numberOfPieces);
-            var verificationBitfield = new Bitfield(numberOfPieces);
+            var downloadBitfield = new AsyncBitfield(numberOfPieces);
+            var verificationBitfield = new AsyncBitfield(numberOfPieces);
 
             await LoadDownloadBitfieldData(infoHash, downloadBitfield);
             await LoadVerificationBitfieldData(infoHash, verificationBitfield);
@@ -32,18 +32,18 @@ namespace Torrential.Peers
             }
         }
 
-        public bool TryGetDownloadBitfield(InfoHash infoHash, out Bitfield bitfield)
+        public bool TryGetDownloadBitfield(InfoHash infoHash, out AsyncBitfield bitfield)
         {
             return _downloadBitfields.TryGetValue(infoHash, out bitfield);
         }
 
-        public bool TryGetVerificationBitfield(InfoHash infoHash, out Bitfield bitfield)
+        public bool TryGetVerificationBitfield(InfoHash infoHash, out AsyncBitfield bitfield)
         {
             return _verificationBitfields.TryGetValue(infoHash, out bitfield);
         }
 
 
-        private async ValueTask LoadDownloadBitfieldData(InfoHash infoHash, Bitfield bitField)
+        private async ValueTask LoadDownloadBitfieldData(InfoHash infoHash, AsyncBitfield bitField)
         {
             var path = await fileService.GetDownloadBitFieldPath(infoHash);
             if (!File.Exists(path))
@@ -57,7 +57,7 @@ namespace Torrential.Peers
             bitField.Fill(buffer);
         }
 
-        private async ValueTask LoadVerificationBitfieldData(InfoHash infoHash, Bitfield bitField)
+        private async ValueTask LoadVerificationBitfieldData(InfoHash infoHash, AsyncBitfield bitField)
         {
             var path = await fileService.GetVerificationBitFieldPath(infoHash);
             if (!File.Exists(path))

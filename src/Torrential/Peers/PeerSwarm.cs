@@ -30,10 +30,7 @@ namespace Torrential.Peers
         private ConcurrentDictionary<PeerId, CancellationTokenSource> _peerCts = [];
         private ConcurrentDictionary<PeerId, Task> _peerMessageProcessTasks = [];
         private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> _peerUploadDownloadTasks = [];
-
-
         public IReadOnlyDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> PeerClients => _peerSwarms;
-        public IReadOnlyDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> SwarmTasks => _peerUploadDownloadTasks;
 
         public async Task MaintainSwarm(InfoHash infoHash, CancellationToken stoppingToken)
         {
@@ -213,8 +210,6 @@ namespace Torrential.Peers
                 }
             }
         }
-
-
         private async Task CleanupPeer(InfoHash infoHash, PeerId peerId)
         {
             //Get this peer's cancellation token source
@@ -258,61 +253,6 @@ namespace Torrential.Peers
                 PeerId = peerId
             });
         }
-
-
-        //private async Task CleanupPeers(CancellationToken stoppingToken)
-        //{
-        //    foreach (var (infoHash, uploadDownloadTasks) in _peerUploadDownloadTasks)
-        //    {
-        //        if (!bitfieldManager.TryGetVerificationBitfield(infoHash, out var bitfield))
-        //        {
-        //            logger.LogInformation("Failed to retrieve verification bitfield for {InfoHash}", infoHash);
-        //            continue;
-        //        }
-
-        //        foreach (var (peerId, peerUploadDownloadTask) in uploadDownloadTasks)
-        //        {
-        //            if (peerUploadDownloadTask.IsCompleted || peerUploadDownloadTask.IsCanceled || peerUploadDownloadTask.IsFaulted)
-        //            {
-        //                logger.LogInformation("Cleaning up peer {PeerId} from swarm {InfoHash}", peerId.ToAsciiString(), infoHash.AsString());
-
-        //                //Get this peer's cancellation token source
-        //                if (_peerCts.TryGetValue(peerId, out var cts))
-        //                {
-        //                    logger.LogInformation("Cancelling peer {PeerId} task", peerId.ToAsciiString());
-        //                    cts.Cancel();
-        //                    _peerCts.TryRemove(peerId, out _);
-        //                }
-
-        //                //Remove the peer message processing task
-        //                if (_peerMessageProcessTasks.TryGetValue(peerId, out var processTask))
-        //                {
-        //                    logger.LogInformation("Removing peer message processing task");
-        //                    _peerMessageProcessTasks.TryRemove(peerId, out _);
-        //                }
-
-        //                //Remove and dispose of the client
-        //                if (_peerSwarms.TryGetValue(infoHash, out var peerClients))
-        //                {
-        //                    if (peerClients.TryRemove(peerId, out var peerClient))
-        //                    {
-        //                        logger.LogInformation("Disposing peer client");
-        //                        peerClient.Dispose();
-        //                    }
-        //                }
-
-
-
-
-
-
-        //                //_swarmTasks[infoHash].TryRemove(peerId, out _);
-        //                //if (_peerSwarms[infoHash].TryRemove(peerId, out var pwc))
-        //                //    pwc.Dispose();
-        //            }
-        //        }
-        //    }
-        //}
 
         public async Task<ICollection<PeerWireClient>> GetPeers(InfoHash infoHash)
         {
