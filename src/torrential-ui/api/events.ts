@@ -5,6 +5,13 @@ export interface PeerConnectedEvent {
     port: number;
 }
 
+export interface TorrentStatsEvent
+{
+    infoHash: string;
+    uploadRate: number;
+    downloadRate: number;
+}
+
 export interface PeerDisconnectedEvent {
     infoHash: string;
     peerId: string;

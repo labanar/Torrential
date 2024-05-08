@@ -19,6 +19,8 @@ namespace Torrential.Extensions.SignalR
         Task PeerDisconnected(PeerDisconnectedEvent @event);
 
         Task PeerBitfieldReceived(PeerBitfieldReceivedEvent @event);
+
+        Task TorrentStatsUpdated(TorrentStatsEvent @event);
     }
 
 
@@ -54,6 +56,9 @@ namespace Torrential.Extensions.SignalR
 
         public async Task PeerBitfieldReceived(PeerBitfieldReceivedEvent @event)
             => await Clients.All.PeerBitfieldReceived(@event);
+
+        public async Task TorrentStatsUpdated(TorrentStatsEvent @event)
+            => await Clients.All.TorrentStatsUpdated(@event);
     }
 }
 

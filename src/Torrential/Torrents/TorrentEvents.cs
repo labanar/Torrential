@@ -16,7 +16,7 @@ namespace Torrential.Torrents
     [JsonDerivedType(typeof(PeerBitfieldReceivedEvent), "peer_bitfield_received")]
     [JsonDerivedType(typeof(TorrentSegmentDownloadedEvent), "segment_downloaded")]
     [JsonDerivedType(typeof(TorrentSegmentUploadedEvent), "segment_uploaded")]
-    [JsonDerivedType(typeof(TorrentThroughputEvent), "throughput")]
+    [JsonDerivedType(typeof(TorrentStatsEvent), "throughput")]
     public interface ITorrentEvent
     {
         InfoHash InfoHash { get; }
@@ -52,11 +52,15 @@ namespace Torrential.Torrents
         public required InfoHash InfoHash { get; init; }
     }
 
-    public class TorrentThroughputEvent : ITorrentEvent
+    public class TorrentStatsEvent : ITorrentEvent
     {
         public required InfoHash InfoHash { get; init; }
-        public required double IngressRate { get; init; }
-        public required double EgressRate { get; init; }
+        public required double DownloadRate { get; init; }
+        public required double UploadRate { get; init; }
+
+        public required long TotalDownloaded { get; init; }
+
+        public required long TotalUploaded { get; init; }
     }
 
     public class TorrentSegmentDownloadedEvent : ITorrentEvent
