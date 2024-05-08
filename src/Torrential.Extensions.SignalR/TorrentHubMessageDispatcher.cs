@@ -10,11 +10,12 @@ namespace Torrential.Extensions.SignalR
         IConsumer<TorrentStoppedEvent>,
         IConsumer<TorrentCompleteEvent>,
         IConsumer<TorrentRemovedEvent>,
-        IConsumer<TorrentPieceDownloadedEvent>,
+        //IConsumer<TorrentPieceDownloadedEvent>,
         IConsumer<TorrentPieceVerifiedEvent>,
         IConsumer<PeerConnectedEvent>,
         IConsumer<PeerDisconnectedEvent>,
-        IConsumer<PeerBitfieldReceivedEvent>
+        IConsumer<PeerBitfieldReceivedEvent>,
+        IConsumer<TorrentStatsEvent>
     {
         public async Task Consume(ConsumeContext<TorrentAddedEvent> context) =>
             await hubContext.Clients.All.TorrentAdded(context.Message);
@@ -31,8 +32,8 @@ namespace Torrential.Extensions.SignalR
         public async Task Consume(ConsumeContext<TorrentRemovedEvent> context) =>
             await hubContext.Clients.All.TorrentRemoved(context.Message);
 
-        public async Task Consume(ConsumeContext<TorrentPieceDownloadedEvent> context) =>
-            await hubContext.Clients.All.PieceDownloaded(context.Message);
+        //public async Task Consume(ConsumeContext<TorrentPieceDownloadedEvent> context) =>
+        //    await hubContext.Clients.All.PieceDownloaded(context.Message);
 
         public async Task Consume(ConsumeContext<TorrentPieceVerifiedEvent> context) =>
             await hubContext.Clients.All.PieceVerified(context.Message);
@@ -45,6 +46,7 @@ namespace Torrential.Extensions.SignalR
 
         public async Task Consume(ConsumeContext<PeerBitfieldReceivedEvent> context) =>
             await hubContext.Clients.All.PeerBitfieldReceived(context.Message);
-
+        public async Task Consume(ConsumeContext<TorrentStatsEvent> context) =>
+            await hubContext.Clients.All.TorrentStatsUpdated(context.Message);
     }
 }

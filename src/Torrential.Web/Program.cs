@@ -72,6 +72,7 @@ app.MapGet(
     TorrentialDb torrentDb,
     BitfieldManager bitfieldManager,
     TorrentStatusCache statusCache,
+    TorrentStats rates,
     TorrentMetadataCache metaCache) =>
     {
         var summaries = new List<TorrentSummaryVm>();
@@ -101,6 +102,10 @@ app.MapGet(
                 Status = status.ToString(),
                 Progress = downloadBitfield.CompletionRatio,
                 TotalSizeBytes = meta.PieceSize * meta.NumberOfPieces,
+                DownloadRate = rates.GetIngressRate(torrent.InfoHash),
+                UploadRate = rates.GetEgressRate(torrent.InfoHash),
+                BytesDownloaded = rates.GetTotalDownloaded(torrent.InfoHash),
+                BytesUploaded = rates.GetTotalUploaded(torrent.InfoHash),
                 Peers = peerSummaries,
             };
 
@@ -111,7 +116,7 @@ app.MapGet(
 
 app.MapGet(
     "/torrents/{infoHash}",
-    async (InfoHash infoHash, TorrentMetadataCache cache, PeerSwarm swarms, BitfieldManager bitfieldManager, TorrentStatusCache statusCache) =>
+    async (InfoHash infoHash, TorrentMetadataCache cache, PeerSwarm swarms, BitfieldManager bitfieldManager, TorrentStatusCache statusCache, TorrentStats rates) =>
     {
         if (!cache.TryGet(infoHash, out var meta))
             return TorrentGetResponse.ErrorResponse(ErrorCode.Unknown);
@@ -139,6 +144,10 @@ app.MapGet(
             Status = status.ToString(),
             Progress = verificationBitfield.CompletionRatio,
             TotalSizeBytes = meta.PieceSize * meta.NumberOfPieces,
+            DownloadRate = rates.GetIngressRate(infoHash),
+            UploadRate = rates.GetEgressRate(infoHash),
+            BytesDownloaded = rates.GetTotalDownloaded(infoHash),
+            BytesUploaded = rates.GetTotalUploaded(infoHash),
             Peers = peerSummaries,
         };
 

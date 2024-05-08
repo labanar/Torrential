@@ -1,7 +1,7 @@
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import store from '../app/store';
 import { addPeer, removePeer, updatePeer } from '../features/peersSlice';
-import { PeerBitfieldReceivedEvent, PeerConnectedEvent, PeerDisconnectedEvent, PieceVerifiedEvent, TorrentStartedEvent, TorrentStoppedEvent } from '@/api/events';
+import { PeerBitfieldReceivedEvent, PeerConnectedEvent, PeerDisconnectedEvent, PieceVerifiedEvent, TorrentStartedEvent, TorrentStatsEvent, TorrentStoppedEvent } from '@/api/events';
 import { PeerSummary } from '@/types';
 import { updateTorrent } from '@/features/torrentsSlice';
 
@@ -67,6 +67,14 @@ export class SignalRService {
             store.dispatch(updateTorrent(payload));
         })
 
+        this.connection.on('TorrentStatsUpdated', (event: TorrentStatsEvent) => {
+            const {infoHash, uploadRate, downloadRate} = event;
+            const payload = {
+                infoHash,
+                update: {uploadRate, downloadRate}
+            }
+            store.dispatch(updateTorrent(payload));
+        });
     }
 
     public async startConnection(): Promise<void> {

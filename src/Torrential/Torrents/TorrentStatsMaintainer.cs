@@ -6,7 +6,7 @@ using Torrential.Peers;
 
 namespace Torrential.Torrents
 {
-    public class TorrentRateMaintainer(TorrentThroughputRates rates) :
+    public class TorrentStatsMaintainer(TorrentStats rates) :
         IConsumer<TorrentSegmentDownloadedEvent>,
         IConsumer<TorrentSegmentUploadedEvent>
     {
@@ -21,21 +21,20 @@ namespace Torrential.Torrents
         }
     }
 
-    public class TorrentThroughputRates
+    public class TorrentStats
     {
-        private ConcurrentDictionary<InfoHash, TorrentRateCalculator> _ingressRates = [];
-        private ConcurrentDictionary<InfoHash, TorrentRateCalculator> _egressRates = [];
-
+        private readonly ConcurrentDictionary<InfoHash, TorrentStatsCalculator> _ingressRates = [];
+        private readonly ConcurrentDictionary<InfoHash, TorrentStatsCalculator> _egressRates = [];
 
         public async Task QueueDownloadRate(InfoHash infoHash, int dataSize)
         {
-            var calculator = _ingressRates.GetOrAdd(infoHash, (_) => new TorrentRateCalculator(0.9));
+            var calculator = _ingressRates.GetOrAdd(infoHash, (_) => new TorrentStatsCalculator());
             await calculator.QueueUpdate(dataSize);
         }
 
         public async Task QueueUploadRate(InfoHash infoHash, int dataSize)
         {
-            var calculator = _egressRates.GetOrAdd(infoHash, (_) => new TorrentRateCalculator(0.9));
+            var calculator = _egressRates.GetOrAdd(infoHash, (_) => new TorrentStatsCalculator());
             await calculator.QueueUpdate(dataSize);
         }
 
@@ -54,14 +53,32 @@ namespace Torrential.Torrents
 
             return 0;
         }
+
+
+        public long GetTotalDownloaded(InfoHash infoHash)
+        {
+            if (_ingressRates.TryGetValue(infoHash, out var calculator))
+                return calculator.TotalBytesObserved;
+
+            return 0;
+        }
+
+        public long GetTotalUploaded(InfoHash infoHash)
+        {
+            if (_egressRates.TryGetValue(infoHash, out var calculator))
+                return calculator.TotalBytesObserved;
+
+            return 0;
+        }
+
     }
 
 
-    public class TorrentThroughputRatesNotifier(IBus bus, PeerSwarm peerSwarm, TorrentThroughputRates rates, ILogger<TorrentThroughputRatesNotifier> logger) : BackgroundService
+    public class TorrentThroughputRatesNotifier(IBus bus, PeerSwarm peerSwarm, TorrentStats rates, ILogger<TorrentThroughputRatesNotifier> logger) : BackgroundService
     {
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+            var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -70,9 +87,18 @@ namespace Torrential.Torrents
                 {
                     var ingressRate = rates.GetIngressRate(infoHash);
                     var egressRate = rates.GetEgressRate(infoHash);
+                    var totalDownloaded = rates.GetTotalDownloaded(infoHash);
+                    var totalUploaded = rates.GetTotalUploaded(infoHash);
 
                     logger.LogInformation("Publishing throughput rates for {InfoHash} - Ingress: {IngressRate} Egress: {EgressRate}", infoHash.AsString(), ingressRate, egressRate);
-                    await bus.Publish(new TorrentThroughputEvent { InfoHash = infoHash, IngressRate = ingressRate, EgressRate = egressRate });
+                    await bus.Publish(new TorrentStatsEvent
+                    {
+                        InfoHash = infoHash,
+                        DownloadRate = ingressRate,
+                        UploadRate = egressRate,
+                        TotalDownloaded = totalDownloaded,
+                        TotalUploaded = totalUploaded
+                    });
                 }
             }
         }

@@ -26,7 +26,7 @@ import { torrentsWithPeersSelector } from "../selectors";
 export default function Home() {
   const uploaderRef = useRef<FileUploadElement | null>(null);
   const dispatch = useAppDispatch();
-  const torrents = useSelector(torrentsWithPeersSelector)
+  const torrents = useSelector(torrentsWithPeersSelector);
 
   const onUpload = async (file: File) => {
     const formData = new FormData();
@@ -63,37 +63,49 @@ export default function Home() {
       const result = await response.json();
       if (result.data) {
         const { data } = result;
-        
-        const mappedTorrents = data.reduce((pv : TorrentsState, cv: TorrentApiModel) => {
-          const summary : TorrentSummary = {
-            name: cv.name,
-            infoHash: cv.infoHash,
-            progress: cv.progress,
-            sizeInBytes: cv.totalSizeBytes,
-            status: cv.status
-          }
 
-          pv[cv.infoHash] = summary;
-          return pv;
-        }, {});
+        const mappedTorrents = data.reduce(
+          (pv: TorrentsState, cv: TorrentApiModel) => {
+            const summary: TorrentSummary = {
+              name: cv.name,
+              infoHash: cv.infoHash,
+              progress: cv.progress,
+              uploadRate: cv.uploadRate,
+              downloadRate: cv.downloadRate,
+              sizeInBytes: cv.totalSizeBytes,
+              status: cv.status,
+              bytesUploaded: cv.bytesUploaded,
+              bytesDownloaded: cv.bytesDownloaded
+            };
+
+            pv[cv.infoHash] = summary;
+            return pv;
+          },
+          {}
+        );
         dispatch(setTorrents(mappedTorrents));
 
-        data.forEach(torrent => {
-          const torrentPeers : PeerSummary[] = torrent.peers.reduce((tpv : PeerSummary[], p: PeerApiModel) => {
-            let summary : PeerSummary = {
-              infoHash: torrent.infoHash,
-              ip: p.ipAddress,
-              port: p.port,
-              peerId: p.peerId,
-              isSeed: p.isSeed
-            }
+        data.forEach((torrent) => {
+          const torrentPeers: PeerSummary[] = torrent.peers.reduce(
+            (tpv: PeerSummary[], p: PeerApiModel) => {
+              let summary: PeerSummary = {
+                infoHash: torrent.infoHash,
+                ip: p.ipAddress,
+                port: p.port,
+                peerId: p.peerId,
+                isSeed: p.isSeed,
+              };
 
-            tpv.push(summary)
-            return tpv;
-          }, []);
+              tpv.push(summary);
+              return tpv;
+            },
+            []
+          );
 
-          dispatch(setPeers({infoHash: torrent.infoHash, peers: torrentPeers}))
-        }); 
+          dispatch(
+            setPeers({ infoHash: torrent.infoHash, peers: torrentPeers })
+          );
+        });
       }
     } catch (error) {
       console.log("error fetching torrents");
@@ -110,6 +122,8 @@ export default function Home() {
         <div className={styles.torrentList}>
           {torrents.map((t) => (
             <TorrentRow
+              uploadRate={t.uploadRate}
+              downloadRate={t.downloadRate}
               status={t.status}
               key={t.infoHash}
               progress={t.progress ?? 0}
@@ -160,6 +174,8 @@ interface TorrentRowProps {
   seeders: number;
   leechers: number;
   status: string;
+  uploadRate: number;
+  downloadRate: number;
 }
 
 function TorrentRow({
@@ -169,52 +185,59 @@ function TorrentRow({
   totalBytes,
   seeders,
   leechers,
-  status
+  status,
+  uploadRate,
+  downloadRate,
 }: TorrentRowProps) {
-
   const color = useMemo(() => {
-    if(status === "Stopped") return "orange";
-    if(status === "Running") return "green"
-  }, [status])
+    if (status === "Stopped") return "orange";
+    if (status === "Running") return "green";
+  }, [status]);
 
-  function prettyPrintBytes(bytes : number) {
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-    if (bytes === 0) return '0 Byte';
+  function prettyPrintBytes(bytes: number) {
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+    if (bytes === 0) return "0 Byte";
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    if (i === 0) return bytes + ' ' + sizes[i]; // For bytes, no decimal
-    return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
-}
+    if (i === 0) return bytes + " " + sizes[i]; // For bytes, no decimal
+    return (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i];
+  }
 
   return (
     <div className={styles.torrent}>
       <div className={styles.torrentIcon}>
-        {status === "Running" && progress < 1 && (<FontAwesomeIcon
-          icon={faDownLong}
-          size={"xl"}
-          style={{
-            paddingRight: "0.8em",
-            paddingLeft: "0.4em",
-            color,
-          }}
-        />)}
-         {status === "Running" && progress >= 1 && (<FontAwesomeIcon
-          icon={faUpLong}
-          size={"xl"}
-          style={{
-            paddingRight: "0.8em",
-            paddingLeft: "0.4em",
-            color,
-          }}
-        />)}
-        {status === "Stopped" && (<FontAwesomeIcon
-          icon={faPause}
-          size={"xl"}
-          style={{
-            paddingRight: "0.8em",
-            paddingLeft: "0.4em",
-            color,
-          }}
-        />)}
+        {status === "Running" && progress < 1 && (
+          <FontAwesomeIcon
+            icon={faDownLong}
+            size={"xl"}
+            style={{
+              paddingRight: "0.8em",
+              paddingLeft: "0.4em",
+              color,
+            }}
+          />
+        )}
+        {status === "Running" && progress >= 1 && (
+          <FontAwesomeIcon
+            icon={faUpLong}
+            size={"xl"}
+            style={{
+              paddingRight: "0.8em",
+              paddingLeft: "0.4em",
+              color,
+            }}
+          />
+        )}
+        {status === "Stopped" && (
+          <FontAwesomeIcon
+            icon={faPause}
+            size={"xl"}
+            style={{
+              paddingRight: "0.8em",
+              paddingLeft: "0.4em",
+              color,
+            }}
+          />
+        )}
       </div>
       <div className={styles.torrentInfo} key={infoHash}>
         <Text className={styles.title} fontSize={"md"} noOfLines={1}>
@@ -248,6 +271,22 @@ function TorrentRow({
               {seeders}
             </span>
           </Tooltip>
+          <span>
+            <FontAwesomeIcon
+              icon={faDownLong}
+              size={"sm"}
+              style={{ paddingLeft: "1em", paddingRight: "0.3em" }}
+            />
+            {prettyPrintBytes(downloadRate) + "/s"}
+          </span>
+          <span>
+            <FontAwesomeIcon
+              icon={faUpLong}
+              size={"sm"}
+              style={{ paddingLeft: "0.5em", paddingRight: "0.3em" }}
+            />
+            {prettyPrintBytes(uploadRate) + "/s"}
+          </span>
         </Text>
       </div>
     </div>
