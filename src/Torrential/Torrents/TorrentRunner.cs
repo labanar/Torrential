@@ -149,6 +149,9 @@ namespace Torrential.Torrents
                     long fileOffset = (request.PieceIndex * meta.PieceSize) + request.Begin;
                     RandomAccess.Read(fileHandle, buffer, fileOffset);
                     peer.SendPiece(request.PieceIndex, request.Begin, buffer.AsSpan().Slice(0, request.Length));
+
+                    await bus.Publish(new TorrentSegmentUploadedEvent { InfoHash = meta.InfoHash, SegmentLength = request.Length });
+
                     logger.LogInformation("Sent piece {@Request} to peer", request);
                 }
                 finally

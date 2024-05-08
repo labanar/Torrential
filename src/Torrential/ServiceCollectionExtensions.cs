@@ -39,6 +39,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<TcpPeerListener>();
         services.AddSingleton<AnnounceServiceState>();
         services.AddSingleton<TorrentStatusCache>();
+        services.AddSingleton<TorrentThroughputRates>();
 
 
         //TODO - add service extension that scans the provided assemblies for implementations of ICommandHandler<,>
@@ -48,6 +49,7 @@ public static class ServiceCollectionExtensions
         services.AddCommandHandler<TorrentRemoveCommand, TorrentRemoveResponse, TorrentRemoveCommandHandler>();
 
 
+        services.AddHostedService<TorrentThroughputRatesNotifier>();
         services.AddHostedService<BitfieldSyncService>();
         services.AddHostedService<AnnounceService>();
 

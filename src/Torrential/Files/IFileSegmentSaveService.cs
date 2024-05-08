@@ -49,6 +49,7 @@ namespace Torrential.Files
 
                 long fileOffset = (segment.PieceIndex * meta.PieceSize) + segment.Offset;
                 RandomAccess.Write(fileHandle, segment.Buffer, fileOffset);
+                await bus.Publish(new TorrentSegmentDownloadedEvent { InfoHash = meta.InfoHash, SegmentLength = segment.Buffer.Length });
 
                 var remainder = pieceSize % SEGMENT_LENGTH;
                 if (remainder > 0)
