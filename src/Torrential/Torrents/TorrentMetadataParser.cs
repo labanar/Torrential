@@ -85,6 +85,7 @@ public static class TorrentMetadataParser
             };
         }
 
+
         return new TorrentMetadata
         {
             Name = torrent.DisplayName,
@@ -93,7 +94,8 @@ public static class TorrentMetadataParser
             PieceSize = torrent.PieceSize,
             InfoHash = InfoHash.FromSpan(torrent.OriginalInfoHashBytes),
             UrlList = urlList,
-            PieceHashesConcatenated = torrent.Pieces
+            PieceHashesConcatenated = torrent.Pieces,
+            TotalSize = torrent.TotalSize
         };
     }
 }
