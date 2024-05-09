@@ -31,6 +31,9 @@
     <None Update="debian-12.0.0-amd64-netinst.iso.torrent">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="debian-12.5.0-arm64-netinst.iso.torrent">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="manjaro-kde-22.1.3-230529-linux61.iso.torrent">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

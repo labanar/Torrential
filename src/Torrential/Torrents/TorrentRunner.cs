@@ -19,17 +19,6 @@ namespace Torrential.Torrents
             var ctsWrap = CancellationTokenSource.CreateLinkedTokenSource(canellationToken);
             var stoppingToken = ctsWrap.Token;
 
-            //var processor = peer.Process(meta, bitfieldMgr, segmentSaveService, stoppingToken);
-
-            //if (!bitfieldMgr.TryGetVerificationBitfield(meta.InfoHash, out var verificationBitfield))
-            //{
-            //    logger.LogInformation("Failed to retrieve verification bitfield");
-            //    return;
-            //}
-
-            //logger.LogInformation("Sending bitfield to peer");
-            //await peer.SendBitfield(verificationBitfield);
-
             logger.LogInformation("Waiting for bitfield from peer");
             while (peer.State.PeerBitfield == null && !stoppingToken.IsCancellationRequested)
                 await Task.Delay(100);
@@ -99,14 +88,16 @@ namespace Torrential.Torrents
                     continue;
                 }
 
-                logger.LogInformation("Requesting {Piece} from peer", suggestion);
                 var requestSize = (int)Math.Pow(2, 14);
-                var remainder = (int)meta.PieceSize;
+                var pieceSize = (int)(suggestion.Index == meta.NumberOfPieces - 1 ? meta.FinalPieceSize : meta.PieceSize);
+                var remainder = pieceSize;
+
                 while (remainder > 0 && !stoppingToken.IsCancellationRequested)
                 {
-                    var offset = (int)meta.PieceSize - remainder;
-                    await peer.SendPieceRequest(suggestion.Index.Value, offset, requestSize);
-                    remainder -= requestSize;
+                    var offset = pieceSize - remainder;
+                    var sizeToRequest = Math.Min(requestSize, remainder);
+                    await peer.SendPieceRequest(suggestion.Index.Value, offset, sizeToRequest);
+                    remainder -= sizeToRequest;
                 }
             }
 
@@ -127,14 +118,12 @@ namespace Torrential.Torrents
                 return;
             }
 
-
             //Wait for peer to be interested then unchoke them
             while (!peer.State.PeerInterested && !stoppingToken.IsCancellationRequested)
                 await Task.Delay(100);
 
             logger.LogInformation("Peer has shown interest, unchoking");
             await peer.SendUnchoke();
-
 
             //Wait for the peer to request a piece;
             await foreach (var request in peer.PeerPeieceRequests.Reader.ReadAllAsync(stoppingToken))

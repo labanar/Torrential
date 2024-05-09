@@ -41,24 +41,22 @@ namespace Torrential.Files
                 var numSegmentsPerPiece = (int)(pieceSize / SEGMENT_LENGTH);
                 var segmentField = _segmentFields.GetOrAdd(segment.InfoHash, (_) =>
                 {
-                    return new AsyncBitfield(numSegmentsPerPiece * meta.NumberOfPieces);
+                    return new AsyncBitfield(meta.TotalNumberOfChunks);
                 });
 
-
                 var fileHandle = await fileHandleProvider.GetPartFileHandle(segment.InfoHash);
-
-                long fileOffset = (segment.PieceIndex * meta.PieceSize) + segment.Offset;
+                var fileOffset = (segment.PieceIndex * meta.PieceSize) + segment.Offset;
                 RandomAccess.Write(fileHandle, segment.Buffer, fileOffset);
 
-                var remainder = pieceSize % SEGMENT_LENGTH;
-                if (remainder > 0)
-                    numSegmentsPerPiece += 1;
+                var chunksPerFullPiece = (int)(meta.PieceSize / SEGMENT_LENGTH);
+                var chunkOffset = segment.PieceIndex * chunksPerFullPiece;
+                var pieceLength = (int)(segment.PieceIndex == meta.NumberOfPieces - 1 ? meta.FinalPieceSize : meta.PieceSize);
+                var chunksInThisPiece = (int)Math.Ceiling((decimal)pieceLength / SEGMENT_LENGTH);
+                var extra = segment.Offset / SEGMENT_LENGTH;
+                var chunkIndex = segment.PieceIndex * chunksPerFullPiece + extra;
+                await segmentField.MarkHaveAsync(chunkIndex, CancellationToken.None);
 
-                var segmentFieldIndex = segment.PieceIndex * numSegmentsPerPiece;
-                var offsetIdx = segment.Offset / SEGMENT_LENGTH;
-                segmentFieldIndex += offsetIdx;
-                await segmentField.MarkHaveAsync(segmentFieldIndex, CancellationToken.None);
-                if (HasAllSegmentsForPiece(segment.InfoHash, segment.PieceIndex, numSegmentsPerPiece))
+                if (HasAllSegmentsForPiece(segmentField, segment.PieceIndex, chunksInThisPiece, chunksPerFullPiece))
                 {
                     await downloadBitfield.MarkHaveAsync(segment.PieceIndex, CancellationToken.None);
                     await bus.Publish(new PieceValidationRequest { InfoHash = segment.InfoHash, PieceIndex = segment.PieceIndex });
@@ -67,17 +65,14 @@ namespace Torrential.Files
             }
         }
 
-        public bool HasAllSegmentsForPiece(InfoHash infoHah, int pieceIndex, int segmentsPerPiece)
+
+        public bool HasAllSegmentsForPiece(AsyncBitfield chunkField, int pieceIndex, int chunksInThisPiece, int chunksInFullPiece)
         {
-            if (!_segmentFields.TryGetValue(infoHah, out var segmentField))
-                return false;
-
-            var segmentIndex = pieceIndex * segmentsPerPiece;
-            for (int i = 0; i < segmentsPerPiece; i++)
+            var segmentIndex = pieceIndex * chunksInFullPiece;
+            for (int i = 0; i < chunksInThisPiece; i++)
             {
-                if (!segmentField.HasPiece(segmentIndex + i)) return false;
+                if (!chunkField.HasPiece(segmentIndex + i)) return false;
             }
-
             return true;
         }
     }
