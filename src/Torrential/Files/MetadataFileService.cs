@@ -25,8 +25,17 @@ namespace Torrential.Files
         {
             var settings = await settingsManager.GetFileSettings();
 
-            var inProgressMetas = Directory.GetFiles(settings.DownloadPath, "*.metadata", SearchOption.AllDirectories);
-            var completedMetas = Directory.GetFiles(settings.CompletedPath, "*.metadata", SearchOption.AllDirectories);
+            var inProgressMetas = Array.Empty<string>();
+            var completedMetas = Array.Empty<string>();
+
+            try
+            {
+                inProgressMetas = Directory.GetFiles(settings.DownloadPath, "*.metadata", SearchOption.AllDirectories);
+                completedMetas = Directory.GetFiles(settings.CompletedPath, "*.metadata", SearchOption.AllDirectories);
+            }
+            catch
+            {
+            }
 
             foreach (var file in inProgressMetas.Concat(completedMetas))
             {

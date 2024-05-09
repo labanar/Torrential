@@ -77,7 +77,7 @@ namespace Torrential.Peers
             }
 
             var byteIndex = index / 8;
-            var bitIndex = index % 8;
+            var bitIndex = 7 - (index % 8);
             return (_bitfield[byteIndex] & (1 << bitIndex)) != 0;
         }
 
@@ -93,7 +93,7 @@ namespace Torrential.Peers
                 throw new ArgumentOutOfRangeException(nameof(index));
 
             var byteIndex = index / 8;
-            var bitIndex = index % 8;
+            var bitIndex = 7 - (index % 8);
             _bitfield[byteIndex] |= (byte)(1 << bitIndex);
         }
 

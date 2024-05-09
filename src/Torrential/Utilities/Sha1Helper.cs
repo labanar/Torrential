@@ -5,8 +5,7 @@ using System.Security.Cryptography;
 namespace Torrential.Utilities;
 internal static class Sha1Helper
 {
-    public static readonly int CHUNK_SIZE = 1 << 14;
-    public static async Task<bool> VerifyHash(PipeReader reader, byte[] expectedHash, int CHUNK_SIZE)
+    public static async Task<bool> VerifyHash(PipeReader reader, byte[] expectedHash, int chunkSize)
     {
         using var hasher = SHA1.Create();
         while (true)
@@ -14,12 +13,12 @@ internal static class Sha1Helper
             var result = await reader.ReadAsync();
             var bufferSequence = result.Buffer;
 
-            while (TryReadNextChunk(ref bufferSequence, CHUNK_SIZE, out var chunk))
+            while (TryReadNextChunk(ref bufferSequence, chunkSize, out var chunk))
             {
 
-                var buffer = ArrayPool<byte>.Shared.Rent(CHUNK_SIZE);
+                var buffer = ArrayPool<byte>.Shared.Rent(chunkSize);
                 chunk.CopyTo(buffer);
-                hasher.TransformBlock(buffer, 0, CHUNK_SIZE, null, 0);
+                hasher.TransformBlock(buffer, 0, chunkSize, null, 0);
                 ArrayPool<byte>.Shared.Return(buffer);
             }
 
@@ -32,7 +31,7 @@ internal static class Sha1Helper
         }
     }
 
-    public static bool TryVerifyHash(PipeReader reader, byte[] expectedHash, int CHUNK_SIZE)
+    public static bool TryVerifyHash(PipeReader reader, byte[] expectedHash, int chunkSize)
     {
         using (var hasher = SHA1.Create())
         {
@@ -42,11 +41,11 @@ internal static class Sha1Helper
                     break;
 
                 var bufferSequence = result.Buffer;
-                while (TryReadNextChunk(ref bufferSequence, CHUNK_SIZE, out var chunk))
+                while (TryReadNextChunk(ref bufferSequence, chunkSize, out var chunk))
                 {
-                    var buffer = ArrayPool<byte>.Shared.Rent(CHUNK_SIZE);
+                    var buffer = ArrayPool<byte>.Shared.Rent(chunkSize);
                     chunk.CopyTo(buffer);
-                    hasher.TransformBlock(buffer, 0, CHUNK_SIZE, null, 0);
+                    hasher.TransformBlock(buffer, 0, chunkSize, null, 0);
                     ArrayPool<byte>.Shared.Return(buffer);
                 }
 
