@@ -1,4 +1,5 @@
 ﻿using Torrential.Peers;
+using Torrential.Torrents;
 
 namespace Torrential.Tests
 {
@@ -106,5 +107,51 @@ namespace Torrential.Tests
             Assert.Null(myBitfield.SuggestPieceToDownload(peerBitfield).Index);
         }
 
+
+        [Fact]
+        public async Task Chunk_field_with_partial_final_piece()
+        {
+            var meta = TorrentMetadataParser.FromFile("./debian-12.5.0-arm64-netinst.iso.torrent");
+            var chunkField = new AsyncBitfield(meta.TotalNumberOfChunks);
+            var segmentLength = (int)Math.Pow(2, 14);
+
+            var chunksPerFullPiece = (int)(meta.PieceSize / Math.Pow(2, 14));
+            var chunkOffset = 2105 * chunksPerFullPiece;
+
+
+            var finalPieceLength = 45056;
+
+            var chunksInThisPiece = (int)Math.Ceiling((decimal)finalPieceLength / segmentLength);
+
+
+            var offset = 0;
+            var extra = offset / segmentLength;
+            var chunkIndex = 2105 * chunksPerFullPiece + extra;
+            await chunkField.MarkHaveAsync(chunkIndex, CancellationToken.None);
+
+            offset = (int)Math.Pow(2, 14);
+            extra = offset / segmentLength;
+            chunkIndex = 2105 * chunksPerFullPiece + extra;
+            await chunkField.MarkHaveAsync(chunkIndex, CancellationToken.None);
+
+            offset = (int)Math.Pow(2, 14) * 2;
+            extra = offset / segmentLength;
+            chunkIndex = 2105 * chunksPerFullPiece + extra;
+            await chunkField.MarkHaveAsync(chunkIndex, CancellationToken.None);
+
+
+            var hasAll = HasAllSegmentsForPiece(chunkField, 2105, chunksInThisPiece, chunksPerFullPiece);
+            Assert.True(hasAll);
+        }
+
+        public bool HasAllSegmentsForPiece(AsyncBitfield chunkField, int pieceIndex, int chunksInThisPiece, int chunksInFullPiece)
+        {
+            var segmentIndex = pieceIndex * chunksInFullPiece;
+            for (int i = 0; i < chunksInThisPiece; i++)
+            {
+                if (!chunkField.HasPiece(segmentIndex + i)) return false;
+            }
+            return true;
+        }
     }
 }

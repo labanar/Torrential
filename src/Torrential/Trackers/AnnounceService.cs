@@ -32,11 +32,13 @@ namespace Torrential.Trackers
                     {
                         foreach (var peer in announceResponse.Peers)
                         {
-                            if (!await peerSwarm.TryAddPeerToSwarm(torrent, peer, stoppingToken))
+                            _ = Task.Run(async () =>
                             {
-                                logger.LogInformation("Failed to add peer to swarm");
-                                break;
-                            }
+                                if (!await peerSwarm.TryAddPeerToSwarm(torrent, peer, stoppingToken))
+                                {
+                                    logger.LogInformation("Failed to add peer to swarm");
+                                }
+                            });
                         }
                     }
                 }
