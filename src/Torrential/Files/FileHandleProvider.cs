@@ -32,7 +32,7 @@ internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileSer
             var numberOfPieces = meta.NumberOfPieces;
             var torrentName = Path.GetFileNameWithoutExtension(FileUtilities.GetPathSafeFileName(meta.Name));
             var filePath = await fileService.GetPartFilePath(hash);
-            FileUtilities.TouchFile(filePath, pieceSize * numberOfPieces);
+            FileUtilities.TouchFile(filePath, meta.TotalSize);
             return _partFiles.GetOrAdd(hash, (torrentId) => File.OpenHandle(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous));
         }
         finally
