@@ -288,7 +288,7 @@ public sealed class PeerWireClient : IDisposable
                 handled = true;
                 break;
             case PeerWireMessageType.Piece:
-                HandlePiece(payload);
+                HandlePiece(payload, messageSize - 9);
                 handled = true;
                 break;
             case PeerWireMessageType.Bitfield:
@@ -371,7 +371,7 @@ public sealed class PeerWireClient : IDisposable
 
         return true;
     }
-    private bool HandlePiece(ReadOnlySequence<byte> payload)
+    private bool HandlePiece(ReadOnlySequence<byte> payload, int chunkSize)
     {
         var reader = new SequenceReader<byte>(payload);
         if (!reader.TryReadBigEndian(out int pieceIndex))
@@ -384,9 +384,9 @@ public sealed class PeerWireClient : IDisposable
             _logger.LogError("Error reading piece offset value");
             return false;
         }
-        if (!reader.TryReadExact(PIECE_SEGMENT_REQUEST_SIZE, out var segmentSequence))
+        if (!reader.TryReadExact(chunkSize, out var segmentSequence))
         {
-            _logger.LogError("Error reading piece offset value");
+            _logger.LogError("Error reading piece chunk value");
             return false;
         }
 
