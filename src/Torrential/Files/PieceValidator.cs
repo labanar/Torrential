@@ -48,7 +48,7 @@ namespace Torrential.Files
             var pipe = new System.IO.Pipelines.Pipe();
             var fillTask = FillPipeWithPiece(fileHandle, pipe.Writer, request.PieceIndex, (int)meta.PieceSize).ConfigureAwait(true);
 
-            var pieceSize = request.PieceIndex == meta.NumberOfPieces - 1 ? meta.TotalSize % meta.PieceSize : meta.PieceSize;
+            var pieceSize = request.PieceIndex == meta.NumberOfPieces - 1 ? meta.FinalPieceSize : meta.PieceSize;
             var bufferSize = LargestPowerOf2ThatDividesX((int)pieceSize);
             var result = await Sha1Helper.VerifyHash(pipe.Reader, buffer, bufferSize);
 
