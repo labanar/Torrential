@@ -4,12 +4,17 @@ namespace Torrential.Torrents
 {
     public class TorrentStatsCalculator : IAsyncDisposable
     {
-        private readonly TimeSpan rateCalculationWindow = TimeSpan.FromSeconds(5);
+        private readonly TimeSpan rateCalculationWindow = TimeSpan.FromSeconds(10);
         private long bytesAccumulated = 0;
         private DateTime windowStartTime;
         private readonly CancellationTokenSource _cts;
         private readonly Task _processTask;
-        private readonly Channel<int> updateChannel = Channel.CreateUnbounded<int>();
+        private readonly Channel<int> updateChannel = Channel.CreateUnbounded<int>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false
+        });
+
         public long TotalBytesObserved { get; private set; }
 
         public TorrentStatsCalculator()
@@ -50,7 +55,15 @@ namespace Torrential.Torrents
         public double GetCurrentRate()
         {
             var elapsedTime = (DateTime.UtcNow - windowStartTime).TotalSeconds;
-            return elapsedTime > 0 ? (bytesAccumulated / elapsedTime) : 0;
+
+            if (elapsedTime > rateCalculationWindow.TotalSeconds)
+            {
+                bytesAccumulated = 0;
+                return 0;
+            }
+
+            var windowElapsedTime = Math.Min(elapsedTime, rateCalculationWindow.TotalSeconds);
+            return windowElapsedTime > 0 ? (bytesAccumulated / windowElapsedTime / 2) : 0;
         }
 
         public async ValueTask DisposeAsync()
@@ -60,14 +73,14 @@ namespace Torrential.Torrents
         }
     }
 
-    public readonly struct TorrentRateUpdate
+    public readonly struct TorrentDataRecieved
     {
-        public int TotalBytes { get; }
+        public int BytesReceived { get; }
         public DateTime Timestamp { get; }
 
-        public TorrentRateUpdate(int totalBytes, DateTime timestamp)
+        public TorrentDataRecieved(int bytesReceived, DateTime timestamp)
         {
-            TotalBytes = totalBytes;
+            BytesReceived = bytesReceived;
             Timestamp = timestamp;
         }
     }
