@@ -36,7 +36,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<PieceSelector>();
         services.AddSingleton<HandshakeService>();
         services.AddSingleton<SettingsManager>();
-        services.AddSingleton<TcpPeerListener>();
         services.AddSingleton<AnnounceServiceState>();
         services.AddSingleton<TorrentStatusCache>();
         services.AddSingleton<TorrentStats>();
@@ -52,6 +51,7 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<TorrentThroughputRatesNotifier>();
         services.AddHostedService<BitfieldSyncService>();
         services.AddHostedService<AnnounceService>();
+        services.AddHostedService<TcpPeerListenerBackgroundService>();
 
         services.AddSingleton<IPostDownloadAction, FileCopyPostDownloadAction>();
     }
