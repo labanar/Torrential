@@ -1,5 +1,7 @@
-﻿using Microsoft.Win32.SafeHandles;
+﻿using CommunityToolkit.HighPerformance;
+using Microsoft.Win32.SafeHandles;
 using System.Collections.Concurrent;
+using System.Text;
 using Torrential.Settings;
 using Torrential.Torrents;
 
@@ -50,9 +52,39 @@ internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileSer
 
         //Check if file exists
         var torrentName = Path.GetFileNameWithoutExtension(FileUtilities.GetPathSafeFileName(meta.Name));
-        var filePath = Path.Combine(settings.CompletedPath, torrentName, file.Filename);
+        var safeFileName = GetSafeFilePath(file.Filename);
+        var filePath = Path.Combine(settings.CompletedPath, torrentName, safeFileName);
 
         FileUtilities.TouchFile(filePath, file.FileSize);
         return File.OpenHandle(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous);
+    }
+
+    private static string GetSafeFilePath(ReadOnlySpan<char> path)
+    {
+        var pathBuilder = new StringBuilder();
+        var invalidPathChars = Path.GetInvalidPathChars();
+        var invalidFileNameChars = Path.GetInvalidFileNameChars();
+        foreach (var pathSegment in path.Tokenize(Path.DirectorySeparatorChar))
+        {
+            foreach (var c in pathSegment)
+            {
+                if (invalidPathChars.Contains(c))
+                    continue;
+
+                if (invalidFileNameChars.Contains(c))
+                    continue;
+
+                pathBuilder.Append(c);
+            }
+
+            if (pathBuilder[pathBuilder.Length - 1] == ' ')
+                pathBuilder.Remove(pathBuilder.Length - 1, 1);
+
+            pathBuilder.Append(Path.DirectorySeparatorChar);
+        }
+
+        //Remove trailing directory separator
+        pathBuilder.Remove(pathBuilder.Length - 1, 1);
+        return pathBuilder.ToString();
     }
 }
