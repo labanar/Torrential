@@ -238,13 +238,12 @@ static Logger BuildLogger(IConfiguration configuration)
     return config.CreateLogger();
 }
 
-internal class InitializationService(IServiceProvider serviceProvider, IMemoryCache cache, TorrentTaskManager taskManager, IMetadataFileService metaFileService, TcpPeerListener tcpPeerListener, TorrentStatusCache statusCache, IServiceScopeFactory scopeFactory) : BackgroundService
+internal class InitializationService(IServiceProvider serviceProvider, IMemoryCache cache, TorrentTaskManager taskManager, IMetadataFileService metaFileService, TorrentStatusCache statusCache, IServiceScopeFactory scopeFactory) : BackgroundService
 {
     protected async override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await MigrateDatabase();
         await LoadTorrents();
-        _ = Task.Run(() => tcpPeerListener.Start(CancellationToken.None));
     }
 
     private async Task MigrateDatabase()
