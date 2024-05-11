@@ -2,6 +2,8 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Sockets;
 using Torrential.Peers;
 using Torrential.Settings;
 using Torrential.Torrents;
@@ -15,6 +17,7 @@ namespace Torrential.Trackers
         IPeerService peerService,
         IEnumerable<ITrackerClient> trackerClients,
         SettingsManager settingsManager,
+        HandshakeService handshakeService,
         ILogger<AnnounceService> logger)
         : BackgroundService
     {
@@ -34,9 +37,27 @@ namespace Torrential.Trackers
                         {
                             _ = Task.Run(async () =>
                             {
-                                if (!await peerSwarm.TryAddPeerToSwarm(torrent, peer, stoppingToken))
+                                try
                                 {
-                                    logger.LogInformation("Failed to add peer to swarm");
+                                    var timeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                                    var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+                                    socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+                                    var endpoint = new IPEndPoint(peer.Ip, peer.Port);
+                                    await socket.ConnectAsync(endpoint, timeoutToken.Token);
+
+                                    var conn = new PeerWireSocketConnection(socket, handshakeService, logger);
+                                    var result = await conn.ConnectOutbound(torrent.InfoHash, peer, stoppingToken);
+
+                                    if (!result.Success)
+                                    {
+                                        conn.Dispose();
+                                        return;
+                                    }
+
+                                    await peerSwarm.AddToSwarm(conn);
+                                }
+                                catch
+                                {
                                 }
                             });
                         }

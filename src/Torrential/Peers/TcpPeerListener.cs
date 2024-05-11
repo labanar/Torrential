@@ -10,7 +10,7 @@ namespace Torrential.Peers;
 public sealed class TcpPeerListenerBackgroundService(HandshakeService handshakeService, PeerSwarm peerSwarm, SettingsManager settingsManager, ILogger<PeerWireConnection> pwcLogger, ILogger<TcpPeerListenerBackgroundService> logger)
     : BackgroundService
 {
-    private readonly Channel<TcpClient> _halfOpenConnections = Channel.CreateBounded<TcpClient>(new BoundedChannelOptions(50)
+    private readonly Channel<Socket> _halfOpenConnections = Channel.CreateBounded<Socket>(new BoundedChannelOptions(50)
     {
         SingleReader = true,
         SingleWriter = false
@@ -40,11 +40,10 @@ public sealed class TcpPeerListenerBackgroundService(HandshakeService handshakeS
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var client = await tcpListener.AcceptTcpClientAsync();
-            if (client == null) continue;
-            if (!client.Connected) continue;
-            client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-            await _halfOpenConnections.Writer.WriteAsync(client, stoppingToken);
+            var socket = await tcpListener.AcceptSocketAsync();
+            if (socket == null) continue;
+            if (!socket.Connected) continue;
+            await _halfOpenConnections.Writer.WriteAsync(socket, stoppingToken);
 
             var newPort = await WaitForEnabled(stoppingToken);
             if (newPort != port)
@@ -77,12 +76,12 @@ public sealed class TcpPeerListenerBackgroundService(HandshakeService handshakeS
 
 
 
-    private async Task ConnectToPeer(TcpClient client, CancellationToken stoppingToken)
+    private async Task ConnectToPeer(Socket socket, CancellationToken stoppingToken)
     {
         var timeOutToken = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         timeOutToken.CancelAfter(TimeSpan.FromSeconds(10));
 
-        var conn = new PeerWireConnection(handshakeService, client, pwcLogger);
+        var conn = new PeerWireSocketConnection(socket, handshakeService, pwcLogger);
         logger.LogInformation("TCP client connected to listener");
         var connectionResult = await conn.ConnectInbound(timeOutToken.Token);
 
