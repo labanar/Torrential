@@ -47,19 +47,13 @@ namespace Torrential.Torrents
 
         private async Task LeechFromPeer(TorrentMetadata meta, PeerWireClient peer, CancellationToken stoppingToken)
         {
-            if (!bitfieldMgr.TryGetDownloadBitfield(meta.InfoHash, out var downloadBitfield))
-            {
-                logger.LogInformation("Failed to retrieve download bitfield");
-                return;
-            }
-
             if (!bitfieldMgr.TryGetVerificationBitfield(meta.InfoHash, out var verificationBitfield))
             {
                 logger.LogInformation("Failed to retrieve verification bitfield");
                 return;
             }
 
-            if (downloadBitfield.HasAll())
+            if (verificationBitfield.HasAll())
             {
                 logger.LogInformation("Already have all pieces");
                 await peer.SendNotInterested();
