@@ -41,11 +41,11 @@ public static class TorrentMetadataParser
         var files = Array.Empty<TorrentMetadataFile>();
         if (torrent.Files != null)
         {
+            var startByte = 0L;
             files = new TorrentMetadataFile[torrent.Files.Count];
             for (var i = 0; i < torrent.Files.Count; i++)
             {
-                var startByte = 0L;
-                new TorrentMetadataFile
+                files[i] = new TorrentMetadataFile
                 {
                     Id = i,
                     Filename = torrent.Files[i].FullPath,
