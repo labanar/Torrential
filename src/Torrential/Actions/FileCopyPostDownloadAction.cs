@@ -7,7 +7,7 @@ using Torrential.Torrents;
 namespace Torrential.Pipelines
 {
     public class FileCopyPostDownloadAction(TorrentMetadataCache metaCache, IFileHandleProvider fileHandleProvider, IBus bus, ILogger<FileCopyPostDownloadAction> logger)
-        : IPostDownloadAction
+            : IPostDownloadAction
     {
         public string Name => "FileCopy";
         public bool ContinueOnFailure => false;
@@ -31,11 +31,13 @@ namespace Torrential.Pipelines
 
                     while (offset < fileEnd)
                     {
+                        var writeOffset = offset - fileInfo.FileStartByte;
                         var read = RandomAccess.Read(partFileHandle, buffer, offset);
-                        RandomAccess.Write(destinationHandle, buffer, offset);
+                        RandomAccess.Write(destinationHandle, buffer, offset - fileInfo.FileStartByte); // Fix: Write from buffer index 0
                         offset += read;
                     }
 
+                    //We may write additonal bytes, so we truncate the file to the correct size
                     RandomAccess.SetLength(destinationHandle, fileInfo.FileSize);
                     destinationHandle.Close();
                     await bus.Publish(new TorrentFileCopyCompletedEvent { InfoHash = infoHash, FileName = fileInfo.Filename });
