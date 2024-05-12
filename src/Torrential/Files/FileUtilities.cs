@@ -1,28 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text;
 
 namespace Torrential.Files
 {
     internal static class FileUtilities
     {
-        internal static FileInfo TouchFile(string path, long fileSize = -1)
+        internal static void TouchFile(string path, long fileSize = -1)
         {
             if (File.Exists(path))
-                return new FileInfo(path);
+                return;
 
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-
             using var fs = File.Create(path);
 
-            if (fileSize > 0)
-                fs.SetLength(fileSize);
+            if (fileSize <= 0)
+                return;
 
+            fs.SetLength(fileSize);
             fs.Close();
-
-            return new FileInfo(path);
         }
 
         internal static string GetPathSafeFileName(string fileName)

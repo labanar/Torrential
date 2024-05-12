@@ -15,6 +15,7 @@ public class PeerWireSocketConnection : IPeerWireConnection
     private readonly Task _egressFillTask;
     private readonly HandshakeService _handshakeService;
     private readonly ILogger _logger;
+    private readonly CancellationTokenSource _cts;
 
     public Guid Id { get; }
 
@@ -34,16 +35,17 @@ public class PeerWireSocketConnection : IPeerWireConnection
         _socket = socket;
         _handshakeService = handshakeService;
         _logger = logger;
+        _cts = new CancellationTokenSource();
 
 
         //Data flow from the socket to the pipe
         _ingressPipe = new Pipe();
-        _ingressFillTask = IngressFillPipeAsync(_socket, _ingressPipe.Writer);
+        _ingressFillTask = IngressFillPipeAsync(_socket, _ingressPipe.Writer, _cts.Token);
         Reader = _ingressPipe.Reader;
 
         //Data flow from the pipe to the socket
         _egressPipe = new Pipe();
-        _egressFillTask = EgressFillSocketAsync(_socket, _egressPipe.Reader);
+        _egressFillTask = EgressFillSocketAsync(_socket, _egressPipe.Reader, _cts.Token);
         Writer = _egressPipe.Writer;
     }
 
@@ -85,11 +87,11 @@ public class PeerWireSocketConnection : IPeerWireConnection
 
     //Read from the socket and write to the pipe
     //This pipe will the be read by the PeerWireClient to process the data coming from the peer
-    async Task IngressFillPipeAsync(Socket socket, PipeWriter writer)
+    async Task IngressFillPipeAsync(Socket socket, PipeWriter writer, CancellationToken stoppingToken)
     {
         const int minimumBufferSize = 16384;
 
-        while (true)
+        while (!stoppingToken.IsCancellationRequested)
         {
             // Allocate at least 512 bytes from the PipeWriter
             Memory<byte> memory = writer.GetMemory(minimumBufferSize);
@@ -123,9 +125,9 @@ public class PeerWireSocketConnection : IPeerWireConnection
     }
 
 
-    async Task EgressFillSocketAsync(Socket socket, PipeReader reader)
+    async Task EgressFillSocketAsync(Socket socket, PipeReader reader, CancellationToken stoppingToken)
     {
-        while (true)
+        while (!stoppingToken.IsCancellationRequested)
         {
 
             ReadResult result = await reader.ReadAsync();
@@ -158,6 +160,8 @@ public class PeerWireSocketConnection : IPeerWireConnection
 
     public void Dispose()
     {
+        _logger.LogInformation("Disposing connection {Id}", Id);
+        _cts.Cancel();
         _socket.Dispose();
     }
 }
