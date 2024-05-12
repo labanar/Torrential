@@ -16,10 +16,7 @@ public class PeerWireSocketConnection : IPeerWireConnection
     private readonly HandshakeService _handshakeService;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _cts;
-
     public Guid Id { get; }
-
-
 
     public PeerInfo? PeerInfo { get; private set; }
     public PeerId? PeerId { get; private set; }
@@ -39,12 +36,12 @@ public class PeerWireSocketConnection : IPeerWireConnection
 
 
         //Data flow from the socket to the pipe
-        _ingressPipe = new Pipe();
+        _ingressPipe = PipePool.Shared.Get();
         _ingressFillTask = IngressFillPipeAsync(_socket, _ingressPipe.Writer, _cts.Token);
         Reader = _ingressPipe.Reader;
 
         //Data flow from the pipe to the socket
-        _egressPipe = new Pipe();
+        _egressPipe = PipePool.Shared.Get();
         _egressFillTask = EgressFillSocketAsync(_socket, _egressPipe.Reader, _cts.Token);
         Writer = _egressPipe.Writer;
     }
@@ -89,7 +86,7 @@ public class PeerWireSocketConnection : IPeerWireConnection
     //This pipe will the be read by the PeerWireClient to process the data coming from the peer
     async Task IngressFillPipeAsync(Socket socket, PipeWriter writer, CancellationToken stoppingToken)
     {
-        const int minimumBufferSize = 16384;
+        const int minimumBufferSize = 512;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -104,18 +101,18 @@ public class PeerWireSocketConnection : IPeerWireConnection
                 }
                 // Tell the PipeWriter how much was read from the Socket
                 writer.Advance(bytesRead);
+
+                // Make the data available to the PipeReader
+                FlushResult result = await writer.FlushAsync();
+
+                if (result.IsCompleted)
+                {
+                    break;
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error reading from peer");
-                break;
-            }
-
-            // Make the data available to the PipeReader
-            FlushResult result = await writer.FlushAsync();
-
-            if (result.IsCompleted)
-            {
                 break;
             }
         }
@@ -129,27 +126,26 @@ public class PeerWireSocketConnection : IPeerWireConnection
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-
-            ReadResult result = await reader.ReadAsync();
-            var buffer = result.Buffer;
-
             try
             {
+                ReadResult result = await reader.ReadAsync();
+                var buffer = result.Buffer;
+
                 foreach (var segment in buffer)
                 {
                     await socket.SendAsync(segment, SocketFlags.None);
                 }
 
                 reader.AdvanceTo(buffer.End);
+
+                if (result.IsCompleted)
+                {
+                    break;
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error writing to peer");
-                break;
-            }
-
-            if (result.IsCompleted)
-            {
                 break;
             }
         }
@@ -158,10 +154,18 @@ public class PeerWireSocketConnection : IPeerWireConnection
     }
 
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        _logger.LogInformation("Disposing connection {Id}", Id);
         _cts.Cancel();
+
+        await _ingressFillTask;
+        await _egressFillTask;
+
+
+        PipePool.Shared.Return(_ingressPipe);
+        PipePool.Shared.Return(_egressPipe);
         _socket.Dispose();
+
+        _logger.LogInformation("Disposing connection {Id}", Id);
     }
 }

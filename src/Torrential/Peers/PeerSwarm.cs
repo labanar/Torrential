@@ -65,49 +65,49 @@ namespace Torrential.Peers
             if (await statusCache.GetStatus(connection.InfoHash) != TorrentStatus.Running)
             {
                 logger.LogInformation("Torrent {InfoHash} is not running, not adding peer", connection.InfoHash);
-                connection.Dispose();
+                await connection.DisposeAsync();
                 return;
             }
 
             if (peerConnections.Count >= torrentSettings.MaxConnections)
             {
                 logger.LogInformation("Peer limit reached for {InfoHash}", metadata.InfoHash);
-                connection.Dispose();
+                await connection.DisposeAsync();
                 return;
             }
 
             if (_peerSwarms.Values.Sum(x => x.Count) >= globalSettings.MaxConnections)
             {
                 logger.LogInformation("Global peer limit reached");
-                connection.Dispose();
+                await connection.DisposeAsync();
                 return;
             }
 
             if (connection.PeerId == null)
             {
                 logger.LogError("PeerId not set for connection {Connection}", connection);
-                connection.Dispose();
+                await connection.DisposeAsync();
                 return;
             }
 
             if (peerConnections.ContainsKey(connection.PeerId.Value))
             {
                 logger.LogError("Duplicate peer connection {PeerId}", connection.PeerId.Value);
-                connection.Dispose();
+                await connection.DisposeAsync();
                 return;
             };
 
             if (!bitfieldManager.TryGetVerificationBitfield(metadata.InfoHash, out var verificationBitfield))
             {
                 logger.LogInformation("Failed to retrieve verification bitfield");
-                connection.Dispose();
+                await connection.DisposeAsync();
                 return;
             }
 
             if (!_torrentCts.TryGetValue(metadata.InfoHash, out var torrentCts))
             {
                 logger.LogInformation("Torrent not found in swarm");
-                connection.Dispose();
+                await connection.DisposeAsync();
                 return;
             }
 
@@ -133,7 +133,7 @@ namespace Torrential.Peers
 
 
                 cts.Cancel();
-                peerClient.Dispose();
+                await peerClient.DisposeAsync();
                 return;
             }
 
@@ -144,7 +144,7 @@ namespace Torrential.Peers
                 logger.LogInformation("Both self and peer are seeds, denying entry to swarm");
                 _peerMessageProcessTasks.TryRemove(peerClient.PeerId, out _);
                 _peerCts.TryRemove(peerClient.PeerId, out _);
-                peerClient.Dispose();
+                await peerClient.DisposeAsync();
                 return;
             }
 
@@ -178,7 +178,7 @@ namespace Torrential.Peers
                 return conn;
             }
 
-            conn.Dispose();
+            await conn.DisposeAsync();
             return null;
         }
 
@@ -242,7 +242,7 @@ namespace Torrential.Peers
                 if (peerClients.TryRemove(peerId, out var peerClient))
                 {
                     logger.LogInformation("Disposing peer client");
-                    peerClient.Dispose();
+                    await peerClient.DisposeAsync();
                 }
             }
 
