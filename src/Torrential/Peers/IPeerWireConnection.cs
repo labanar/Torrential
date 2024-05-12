@@ -7,7 +7,7 @@ public interface IPeerWireConnection : IDisposable
 {
     Guid Id { get; }
 
-    PeerInfo PeerInfo { get; }
+    PeerInfo? PeerInfo { get; }
     PeerId? PeerId { get; }
     bool IsConnected { get; }
     PipeReader Reader { get; }

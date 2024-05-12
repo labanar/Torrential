@@ -18,11 +18,7 @@ public sealed class AsyncBitfield : IBitfield
         get
         {
             var totalPieces = (float)_numOfPieces;
-            var piecesHave = 0;
-
-            for (var i = 0; i < _sizeInBytes; i++)
-                piecesHave += BitOperations.PopCount(_bitfield[i]);
-
+            var piecesHave = _bitfield.Sum(b => BitOperations.PopCount(b));
             return piecesHave / totalPieces;
         }
     }
@@ -61,11 +57,7 @@ public sealed class AsyncBitfield : IBitfield
 
     public bool HasAll()
     {
-        var piecesHave = 0;
-
-        for (var i = 0; i < _sizeInBytes; i++)
-            piecesHave += BitOperations.PopCount(_bitfield[i]);
-
+        var piecesHave = _bitfield.Sum(b => BitOperations.PopCount(b));
         return piecesHave == _numOfPieces;
     }
 

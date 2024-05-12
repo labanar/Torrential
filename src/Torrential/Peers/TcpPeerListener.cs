@@ -22,7 +22,6 @@ public sealed class TcpPeerListenerBackgroundService(HandshakeService handshakeS
         SingleWriter = false
     });
 
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var acceptConnectionsTask = AcceptConnections(stoppingToken);
@@ -33,29 +32,33 @@ public sealed class TcpPeerListenerBackgroundService(HandshakeService handshakeS
 
     private async Task AcceptConnections(CancellationToken stoppingToken)
     {
-        var port = await WaitForEnabled(stoppingToken);
-        var tcpListener = new TcpListener(IPAddress.Any, port);
-        tcpListener.Start();
-        logger.LogInformation("TCP Listener Service Started");
+        TcpListener? tcpListener = null;
+        int? port = null;
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var socket = await tcpListener.AcceptSocketAsync();
-            if (socket == null) continue;
-            if (!socket.Connected) continue;
-            await _halfOpenConnections.Writer.WriteAsync(socket, stoppingToken);
-
             var newPort = await WaitForEnabled(stoppingToken);
-            if (newPort != port)
+            if (!port.HasValue || newPort != port)
             {
-                logger.LogInformation("TCP Listener port changed from {OldPort} to {NewPort}", port, newPort);
-                tcpListener.Stop();
+                tcpListener?.Stop();
+                tcpListener?.Dispose();
                 tcpListener = new TcpListener(IPAddress.Any, newPort);
                 tcpListener.Start();
+                logger.LogInformation("TCP Listener started on {Port}", port);
                 port = newPort;
             }
+
+            var socket = await tcpListener!.AcceptSocketAsync();
+            if (socket == null) continue;
+            if (!socket.Connected)
+            {
+                socket.Dispose();
+                continue;
+            }
+            await _halfOpenConnections.Writer.WriteAsync(socket, stoppingToken);
         }
     }
+
     private async Task ProcessHalfOpenConnections(CancellationToken stoppingToken)
     {
         await foreach (var client in _halfOpenConnections.Reader.ReadAllAsync(stoppingToken))
@@ -65,7 +68,6 @@ public sealed class TcpPeerListenerBackgroundService(HandshakeService handshakeS
         }
     }
 
-
     private async Task CleanupHalfOpenTasks(CancellationToken stoppingToken)
     {
         await foreach (var task in _connectionTasks.Reader.ReadAllAsync(stoppingToken))
@@ -74,28 +76,34 @@ public sealed class TcpPeerListenerBackgroundService(HandshakeService handshakeS
         }
     }
 
-
-
     private async Task ConnectToPeer(Socket socket, CancellationToken stoppingToken)
     {
-        var timeOutToken = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        timeOutToken.CancelAfter(TimeSpan.FromSeconds(10));
-
-        var conn = new PeerWireSocketConnection(socket, handshakeService, pwcLogger);
-        logger.LogInformation("TCP client connected to listener");
-        var connectionResult = await conn.ConnectInbound(timeOutToken.Token);
-
-        if (!connectionResult.Success)
+        try
         {
-            logger.LogWarning("Peer connection failed");
-            conn.Dispose();
-        }
+            var timeOutToken = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            timeOutToken.CancelAfter(TimeSpan.FromSeconds(10));
 
-        logger.LogInformation("Peer connected: {PeerId}", conn.PeerId);
-        await peerSwarm.AddToSwarm(conn);
+            var conn = new PeerWireSocketConnection(socket, handshakeService, pwcLogger);
+            logger.LogInformation("TCP client connected to listener");
+            var connectionResult = await conn.ConnectInbound(timeOutToken.Token);
+
+            if (!connectionResult.Success)
+            {
+                logger.LogWarning("Peer connection failed");
+                conn.Dispose();
+            }
+
+            logger.LogInformation("Peer connected: {PeerId}", conn.PeerId);
+            await peerSwarm.AddToSwarm(conn);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error handshaking with peer");
+            socket.Dispose();
+        }
     }
 
-    private async Task<int> WaitForEnabled(CancellationToken stoppingToken)
+    private async ValueTask<int> WaitForEnabled(CancellationToken stoppingToken)
     {
         var tcpSettings = await settingsManager.GetTcpListenerSettings();
         while (!stoppingToken.IsCancellationRequested && !tcpSettings.Enabled)
