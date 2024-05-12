@@ -25,6 +25,7 @@ public sealed class PeerWireClient : IDisposable
 {
     private const int PIECE_SEGMENT_REQUEST_SIZE = 16384;
     private readonly PeerWireState _state;
+    private readonly CancellationTokenSource _internalCts;
     private readonly IPeerWireConnection _connection;
     private readonly ILogger _logger;
 
@@ -79,6 +80,7 @@ public sealed class PeerWireClient : IDisposable
             throw new ArgumentException("Peer Id must be set", nameof(connection));
 
 
+        _internalCts = new CancellationTokenSource();
         _connection = connection;
         _logger = logger;
         _state = new PeerWireState();
@@ -93,7 +95,7 @@ public sealed class PeerWireClient : IDisposable
         _bitfields = bitfields;
         _infoHash = meta.InfoHash;
         _fileSegmentSaveService = fileSegmentSaveService;
-        _processCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _processCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _internalCts.Token);
         var readerTask = ProcessReads(_processCts.Token);
         var writeTask = ProcessWrites(_processCts.Token);
         var savingTask = ProcessSegments(_processCts.Token);
@@ -288,19 +290,19 @@ public sealed class PeerWireClient : IDisposable
                 handled = true;
                 break;
             case PeerWireMessageType.Piece:
-                HandlePiece(payload, messageSize - 9);
+                HandlePiece(ref payload, messageSize - 9);
                 handled = true;
                 break;
             case PeerWireMessageType.Bitfield:
-                HandleBitfield(payload);
+                HandleBitfield(ref payload);
                 handled = true;
                 break;
             case PeerWireMessageType.Have:
-                HandleHave(payload);
+                HandleHave(ref payload);
                 handled = true;
                 break;
             case PeerWireMessageType.Request:
-                HandleRequest(payload);
+                HandleRequest(ref payload);
                 handled = true;
                 break;
             default:
@@ -338,7 +340,7 @@ public sealed class PeerWireClient : IDisposable
         _state.PeerInterested = false;
         return true;
     }
-    private bool HandleHave(ReadOnlySequence<byte> payload)
+    private bool HandleHave(ref ReadOnlySequence<byte> payload)
     {
         var sequenceReader = new SequenceReader<byte>(payload);
         if (!sequenceReader.TryReadBigEndian(out int index))
@@ -347,7 +349,7 @@ public sealed class PeerWireClient : IDisposable
         _state.PeerBitfield?.MarkHave(index);
         return true;
     }
-    private bool HandleBitfield(ReadOnlySequence<byte> payload)
+    private bool HandleBitfield(ref ReadOnlySequence<byte> payload)
     {
         Span<byte> buffer = stackalloc byte[(int)payload.Length];
         payload.CopyTo(buffer);
@@ -356,7 +358,7 @@ public sealed class PeerWireClient : IDisposable
         _state.PeerBitfield = bitfield;
         return true;
     }
-    private bool HandleRequest(ReadOnlySequence<byte> payload)
+    private bool HandleRequest(ref ReadOnlySequence<byte> payload)
     {
         var sequenceReader = new SequenceReader<byte>(payload);
         if (!sequenceReader.TryReadBigEndian(out int index))
@@ -371,7 +373,7 @@ public sealed class PeerWireClient : IDisposable
 
         return true;
     }
-    private bool HandlePiece(ReadOnlySequence<byte> payload, int chunkSize)
+    private bool HandlePiece(ref ReadOnlySequence<byte> payload, int chunkSize)
     {
         var reader = new SequenceReader<byte>(payload);
         if (!reader.TryReadBigEndian(out int pieceIndex))
@@ -399,7 +401,7 @@ public sealed class PeerWireClient : IDisposable
         _pieceRequestLimit.Release();
         return true;
     }
-    private bool HandleCancel(ReadOnlySequence<byte> payload)
+    private bool HandleCancel(ref ReadOnlySequence<byte> payload)
     {
         var sequenceReader = new SequenceReader<byte>(payload);
         if (!sequenceReader.TryReadBigEndian(out int index))
@@ -410,7 +412,7 @@ public sealed class PeerWireClient : IDisposable
             return false;
         return true;
     }
-    private bool HandlePort(ReadOnlySequence<byte> payload)
+    private bool HandlePort(ref ReadOnlySequence<byte> payload)
     {
         var reader = new SequenceReader<byte>(payload);
         if (!reader.TryReadBigEndian(out short port))
@@ -451,6 +453,19 @@ public sealed class PeerWireClient : IDisposable
         payload.CopyTo(buffer.Slice(13));
         OUTBOUND_MESSAGES.Writer.TryWrite(pak);
         BytesUploaded += payload.Length;
+    }
+
+    public void SendPiece(int pieceIndex, int begin, byte[] payloadBuffer, int payloadLength)
+    {
+        var pak = new PreparedPacket(13 + payloadLength);
+        Span<byte> buffer = pak.AsSpan();
+        buffer.TryWriteBigEndian(9 + payloadLength);
+        buffer[4] = PeerWireMessageType.Piece;
+        buffer[5..].TryWriteBigEndian(pieceIndex);
+        buffer[9..].TryWriteBigEndian(begin);
+        payloadBuffer.CopyTo(buffer.Slice(13));
+        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
+        BytesUploaded += payloadLength;
     }
 
     public async Task SendCancel(int pieceIndex, int begin, int length) => await SendMessageAsync(PeerWireMessageType.Cancel, pieceIndex, begin, length);
@@ -562,6 +577,7 @@ public sealed class PeerWireClient : IDisposable
 
     public void Dispose()
     {
+        _internalCts.Cancel();
         _connection.Dispose();
     }
 }
@@ -608,7 +624,7 @@ public sealed class PeerPacket : IDisposable
         }
     }
 
-    public void Fill(ReadOnlySequence<byte> payload)
+    public void Fill(ref ReadOnlySequence<byte> payload)
     {
         payload.CopyTo(_buffer);
     }

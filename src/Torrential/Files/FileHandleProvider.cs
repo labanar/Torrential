@@ -15,7 +15,7 @@ internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileSer
 
     public async ValueTask<SafeFileHandle> GetPartFileHandle(InfoHash hash)
     {
-        if (_partFiles.TryGetValue(hash, out SafeFileHandle handle))
+        if (_partFiles.TryGetValue(hash, out SafeFileHandle? handle) && handle != null)
             return handle;
 
         await _creationSemaphore.WaitAsync();

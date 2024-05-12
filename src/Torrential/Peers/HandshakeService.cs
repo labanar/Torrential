@@ -71,7 +71,7 @@ public sealed class HandshakeService(IPeerService peerService, TorrentMetadataCa
 
             if (TryReadHandshake(ref buffer, out var handshakeBytes))
             {
-                var resp = ParseHandshake(handshakeBytes);
+                var resp = ParseHandshake(ref handshakeBytes);
                 reader.AdvanceTo(buffer.Start, buffer.End);
                 return resp;
             }
@@ -119,7 +119,7 @@ public sealed class HandshakeService(IPeerService peerService, TorrentMetadataCa
         buffer = buffer.Slice(handshakeBytes.End);
         return true;
     }
-    private HandshakeResponse ParseHandshake(ReadOnlySequence<byte> handshakeBytes)
+    private HandshakeResponse ParseHandshake(ref ReadOnlySequence<byte> handshakeBytes)
     {
         var reader = new SequenceReader<byte>(handshakeBytes);
 
