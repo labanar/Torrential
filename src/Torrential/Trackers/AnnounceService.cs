@@ -37,6 +37,7 @@ namespace Torrential.Trackers
                         {
                             _ = Task.Run(async () =>
                             {
+                                var conn = default(PeerWireSocketConnection);
                                 try
                                 {
                                     var timeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -45,12 +46,12 @@ namespace Torrential.Trackers
                                     var endpoint = new IPEndPoint(peer.Ip, peer.Port);
                                     await socket.ConnectAsync(endpoint, timeoutToken.Token);
 
-                                    var conn = new PeerWireSocketConnection(socket, handshakeService, logger);
+                                    conn = new PeerWireSocketConnection(socket, handshakeService, logger);
                                     var result = await conn.ConnectOutbound(torrent.InfoHash, peer, stoppingToken);
 
                                     if (!result.Success)
                                     {
-                                        conn.Dispose();
+                                        await conn.DisposeAsync();
                                         return;
                                     }
 
@@ -58,6 +59,8 @@ namespace Torrential.Trackers
                                 }
                                 catch
                                 {
+                                    if (conn != null)
+                                        await conn.DisposeAsync();
                                 }
                             });
                         }

@@ -78,19 +78,20 @@ public sealed class TcpPeerListenerBackgroundService(HandshakeService handshakeS
 
     private async Task ConnectToPeer(Socket socket, CancellationToken stoppingToken)
     {
+        var conn = default(PeerWireSocketConnection);
         try
         {
             var timeOutToken = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             timeOutToken.CancelAfter(TimeSpan.FromSeconds(10));
 
-            var conn = new PeerWireSocketConnection(socket, handshakeService, pwcLogger);
+            conn = new PeerWireSocketConnection(socket, handshakeService, pwcLogger);
             logger.LogInformation("TCP client connected to listener");
             var connectionResult = await conn.ConnectInbound(timeOutToken.Token);
 
             if (!connectionResult.Success)
             {
                 logger.LogWarning("Peer connection failed");
-                conn.Dispose();
+                await conn.DisposeAsync();
             }
 
             logger.LogInformation("Peer connected: {PeerId}", conn.PeerId);
@@ -99,6 +100,10 @@ public sealed class TcpPeerListenerBackgroundService(HandshakeService handshakeS
         catch (Exception ex)
         {
             logger.LogError(ex, "Error handshaking with peer");
+
+            if (conn != null)
+                await conn.DisposeAsync();
+
             socket.Dispose();
         }
     }

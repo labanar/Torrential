@@ -115,9 +115,11 @@ public class PeerWireConnection : IPeerWireConnection
         return false;
     }
 
-    public void Dispose()
+    public ValueTask DisposeAsync()
     {
         if (_client != null)
             _client.Dispose();
+
+        return ValueTask.CompletedTask;
     }
 }

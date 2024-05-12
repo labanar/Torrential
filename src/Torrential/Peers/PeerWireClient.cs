@@ -21,7 +21,7 @@ public sealed class PeerWireState
     public DateTimeOffset PeerLastInterestedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
-public sealed class PeerWireClient : IDisposable
+public sealed class PeerWireClient : IAsyncDisposable
 {
     private const int PIECE_SEGMENT_REQUEST_SIZE = 16384;
     private readonly PeerWireState _state;
@@ -166,7 +166,7 @@ public sealed class PeerWireClient : IDisposable
                         _logger.LogInformation("Disconnecting from Peer: failed to process message - {MessageId} {MessageSize}", messageId, messageSize);
                         await _connection.Reader.CompleteAsync();
                         _processCts.Cancel();
-                        _connection.Dispose();
+                        await _connection.DisposeAsync();
                         return;
                     }
                 }
@@ -184,39 +184,39 @@ public sealed class PeerWireClient : IDisposable
             catch (OperationCanceledException)
             {
                 _processCts.Cancel();
-                _connection.Dispose();
+                await _connection.DisposeAsync();
                 return;
             }
             catch (IOException)
             {
                 _processCts.Cancel();
-                _connection.Dispose();
+                await _connection.DisposeAsync();
                 return;
             }
             catch (SocketException)
             {
                 _processCts.Cancel();
-                _connection.Dispose();
+                await _connection.DisposeAsync();
                 return;
             }
             catch (ObjectDisposedException)
             {
                 _processCts.Cancel();
-                _connection.Dispose();
+                await _connection.DisposeAsync();
                 return;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error reading from peer");
                 _processCts.Cancel();
-                _connection.Dispose();
+                await _connection.DisposeAsync();
                 return;
             }
         }
 
         _logger.LogInformation("Peer read loop ended, disposing connection and exiting");
         _processCts.Cancel();
-        _connection.Dispose();
+        await _connection.DisposeAsync();
     }
 
     private bool TryReadMessage(ref ReadOnlySequence<byte> buffer, out int messageSize, out byte messageId, out ReadOnlySequence<byte> payload)
@@ -575,10 +575,12 @@ public sealed class PeerWireClient : IDisposable
         OUTBOUND_MESSAGES.Writer.TryWrite(pak);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         _internalCts.Cancel();
-        _connection.Dispose();
+
+
+        await _connection.DisposeAsync();
     }
 }
 

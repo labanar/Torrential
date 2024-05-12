@@ -3,7 +3,7 @@ using Torrential.Trackers;
 
 namespace Torrential.Peers;
 
-public interface IPeerWireConnection : IDisposable
+public interface IPeerWireConnection : IAsyncDisposable
 {
     Guid Id { get; }
 
