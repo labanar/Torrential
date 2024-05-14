@@ -112,7 +112,7 @@ public sealed class HalfOpenConnectionShakerService(PeerConnectionManager connec
     }
 }
 
-public sealed class PeerConnectionManager(ILogger<PeerConnectionManager> logger)
+public sealed class PeerConnectionManager(GeoIpService geoService, ILogger<PeerConnectionManager> logger)
 {
     public readonly Channel<HalfOpenConnection> HalfOpenConnections = Channel.CreateBounded<HalfOpenConnection>(new BoundedChannelOptions(50)
     {
@@ -120,8 +120,24 @@ public sealed class PeerConnectionManager(ILogger<PeerConnectionManager> logger)
         SingleWriter = false
     });
 
+
+    private async Task<bool> IsBlockedConnection(IPeerWireConnection connection)
+    {
+        var countryCode = await geoService.GetCountryCodeAsync(connection.PeerInfo.Ip.ToString());
+        return countryCode == "CN";
+    }
+
     public async Task QueueInboundConnection(IPeerWireConnection connection)
     {
+        //Get the IP address of the connection
+        if (await IsBlockedConnection(connection))
+        {
+            logger.LogInformation("Blocked connection from {0}", connection.PeerInfo.Ip);
+            await connection.DisposeAsync();
+            return;
+        }
+
+
         var halfOpenConnection = HalfOpenConnection.Inbound(connection);
         if (!HalfOpenConnections.Writer.TryWrite(halfOpenConnection))
         {
@@ -135,6 +151,13 @@ public sealed class PeerConnectionManager(ILogger<PeerConnectionManager> logger)
 
     public async Task QueueOutboundConnection(IPeerWireConnection connection, InfoHash expectedHash)
     {
+        if (await IsBlockedConnection(connection))
+        {
+            logger.LogInformation("Blocked connection from {0}", connection.PeerInfo.Ip);
+            await connection.DisposeAsync();
+            return;
+        }
+
         var halfOpenConnection = HalfOpenConnection.Outbound(connection, expectedHash);
         if (!HalfOpenConnections.Writer.TryWrite(halfOpenConnection))
         {
