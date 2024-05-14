@@ -13,7 +13,7 @@ public class PeerWireSocketConnection : IPeerWireConnection
     private readonly Task _ingressFillTask;
     private readonly Pipe _egressPipe;
     private readonly Task _egressFillTask;
-    private readonly HandshakeService _handshakeService;
+    //private readonly HandshakeService _handshakeService;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _cts;
     public Guid Id { get; }
@@ -26,61 +26,39 @@ public class PeerWireSocketConnection : IPeerWireConnection
     public PipeReader Reader { get; }
     public PipeWriter Writer { get; }
 
-    public PeerWireSocketConnection(Socket socket, HandshakeService handshakeService, ILogger logger)
+
+    public PeerWireSocketConnection(Socket socket, ILogger logger)
     {
         Id = Guid.NewGuid();
         _socket = socket;
-        _handshakeService = handshakeService;
         _logger = logger;
         _cts = new CancellationTokenSource();
 
 
         //Data flow from the socket to the pipe
-        _ingressPipe = PipePool.Shared.Get();
+        _ingressPipe = new Pipe();
         _ingressFillTask = IngressFillPipeAsync(_socket, _ingressPipe.Writer, _cts.Token);
         Reader = _ingressPipe.Reader;
 
         //Data flow from the pipe to the socket
-        _egressPipe = PipePool.Shared.Get();
+        _egressPipe = new Pipe();
         _egressFillTask = EgressFillSocketAsync(_socket, _egressPipe.Reader, _cts.Token);
         Writer = _egressPipe.Writer;
+        PeerInfo = socket.GetPeerInfo();
     }
 
-    public async Task<PeerConnectionResult> ConnectInbound(CancellationToken cancellationToken)
+    public void SetInfoHash(InfoHash infoHash)
     {
-        var peerHandshake = await _handshakeService.HandleInbound(Writer, Reader, cancellationToken);
-        if (!peerHandshake.Success)
-        {
-            _socket.Dispose();
-            return PeerConnectionResult.Failure;
-        }
+        if (InfoHash != InfoHash.None)
+            throw new InvalidOperationException("InfoHash already set");
 
-        PeerInfo = _socket.GetPeerInfo();
-        PeerId = peerHandshake.PeerId;
-        InfoHash = peerHandshake.InfoHash;
-        IsConnected = true;
-        ConnectionTimestamp = DateTimeOffset.UtcNow;
-        return PeerConnectionResult.FromHandshake(peerHandshake);
-
-    }
-
-    public async Task<PeerConnectionResult> ConnectOutbound(InfoHash infoHash, PeerInfo peer, CancellationToken cancellationToken)
-    {
-        var handshakeResult = await _handshakeService.HandleOutbound(Writer, Reader, infoHash, cancellationToken);
-        if (!handshakeResult.Success)
-        {
-            _socket.Dispose();
-            return PeerConnectionResult.Failure;
-        }
-
-        PeerInfo = peer;
-        PeerId = handshakeResult.PeerId;
         InfoHash = infoHash;
-        IsConnected = true;
-        ConnectionTimestamp = DateTimeOffset.UtcNow;
-        return PeerConnectionResult.FromHandshake(handshakeResult);
     }
 
+    public void SetPeerId(PeerId peerId)
+    {
+        PeerId = peerId;
+    }
 
     //Read from the socket and write to the pipe
     //This pipe will the be read by the PeerWireClient to process the data coming from the peer
@@ -91,10 +69,10 @@ public class PeerWireSocketConnection : IPeerWireConnection
         while (!stoppingToken.IsCancellationRequested)
         {
             // Allocate at least 512 bytes from the PipeWriter
-            Memory<byte> memory = writer.GetMemory(minimumBufferSize);
             try
             {
-                int bytesRead = await socket.ReceiveAsync(memory, SocketFlags.None);
+                Memory<byte> memory = writer.GetMemory(minimumBufferSize);
+                int bytesRead = await socket.ReceiveAsync(memory, SocketFlags.None, stoppingToken);
                 if (bytesRead == 0)
                 {
                     break;
@@ -103,7 +81,7 @@ public class PeerWireSocketConnection : IPeerWireConnection
                 writer.Advance(bytesRead);
 
                 // Make the data available to the PipeReader
-                FlushResult result = await writer.FlushAsync();
+                FlushResult result = await writer.FlushAsync(stoppingToken);
 
                 if (result.IsCompleted)
                 {
@@ -128,12 +106,12 @@ public class PeerWireSocketConnection : IPeerWireConnection
         {
             try
             {
-                ReadResult result = await reader.ReadAsync();
+                ReadResult result = await reader.ReadAsync(stoppingToken);
                 var buffer = result.Buffer;
 
                 foreach (var segment in buffer)
                 {
-                    await socket.SendAsync(segment, SocketFlags.None);
+                    await socket.SendAsync(segment, SocketFlags.None, stoppingToken);
                 }
 
                 reader.AdvanceTo(buffer.End);
@@ -158,12 +136,23 @@ public class PeerWireSocketConnection : IPeerWireConnection
     {
         _cts.Cancel();
 
-        await _ingressFillTask;
-        await _egressFillTask;
+
+        try
+        {
+            await Task.WhenAll(_ingressFillTask, _egressFillTask);
+        }
+        catch (Exception ex)
+        {
+            var foo = "uh oh";
+        }
+        //Let the ingress and egress tasks finish
 
 
-        PipePool.Shared.Return(_ingressPipe);
-        PipePool.Shared.Return(_egressPipe);
+        //We are now safe to dispose the socket
+
+
+        //PipePool.Shared.Return(_ingressPipe);
+        //PipePool.Shared.Return(_egressPipe);
         _socket.Dispose();
 
         _logger.LogInformation("Disposing connection {Id}", Id);

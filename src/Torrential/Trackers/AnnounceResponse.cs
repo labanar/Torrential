@@ -16,5 +16,4 @@ public class PeerInfo
 {
     public required IPAddress Ip { get; init; }
     public required int Port { get; init; }
-    public IPEndPoint Endpoint => new IPEndPoint(Ip, Port);
 }

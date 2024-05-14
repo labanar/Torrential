@@ -12,12 +12,11 @@ namespace Torrential.Trackers
 {
     internal class AnnounceService(
         AnnounceServiceState state,
-        PeerSwarm peerSwarm,
         BitfieldManager bitfields,
         IPeerService peerService,
         IEnumerable<ITrackerClient> trackerClients,
         SettingsManager settingsManager,
-        HandshakeService handshakeService,
+        PeerConnectionManager connectionManager,
         ILogger<AnnounceService> logger)
         : BackgroundService
     {
@@ -38,29 +37,25 @@ namespace Torrential.Trackers
                             _ = Task.Run(async () =>
                             {
                                 var conn = default(PeerWireSocketConnection);
+                                var socket = default(Socket);
                                 try
                                 {
+                                    //TODO - consider splitting the concerns of connecting the socket and performing the handshake
                                     var timeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                                    var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+                                    socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
                                     socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
                                     var endpoint = new IPEndPoint(peer.Ip, peer.Port);
                                     await socket.ConnectAsync(endpoint, timeoutToken.Token);
+                                    conn = new PeerWireSocketConnection(socket, logger);
 
-                                    conn = new PeerWireSocketConnection(socket, handshakeService, logger);
-                                    var result = await conn.ConnectOutbound(torrent.InfoHash, peer, stoppingToken);
-
-                                    if (!result.Success)
-                                    {
-                                        await conn.DisposeAsync();
-                                        return;
-                                    }
-
-                                    await peerSwarm.AddToSwarm(conn);
+                                    await connectionManager.QueueOutboundConnection(conn, torrent.InfoHash);
                                 }
                                 catch
                                 {
                                     if (conn != null)
                                         await conn.DisposeAsync();
+                                    else if (socket != null)
+                                        socket.Dispose();
                                 }
                             });
                         }
