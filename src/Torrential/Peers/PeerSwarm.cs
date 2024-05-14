@@ -2,33 +2,29 @@
 using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
-using System.Net.Sockets;
 using Torrential.Files;
 using Torrential.Settings;
 using Torrential.Torrents;
-using Torrential.Trackers;
 
 namespace Torrential.Peers
 {
 
     public sealed class PeerSwarm(
-        HandshakeService handshakeService,
         TorrentMetadataCache metadataCache,
         TorrentRunner torrentRunner,
-        ILogger<PeerSwarm> logger,
-        IBus bus,
         SettingsManager settingsManager,
         TorrentStatusCache statusCache,
         BitfieldManager bitfieldManager,
+        IBus bus,
         IFileSegmentSaveService fileSegmentSaveService,
+        ILogger<PeerSwarm> logger,
         ILoggerFactory loggerFactory)
     {
 
 
-        private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> _peerSwarms = [];
         private ConcurrentDictionary<InfoHash, CancellationTokenSource> _torrentCts = [];
-        private ConcurrentDictionary<PeerId, CancellationTokenSource> _peerCts = [];
-        private ConcurrentDictionary<PeerId, Task> _peerMessageProcessTasks = [];
+        private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> _peerSwarms = [];
+        private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> _peerProcessTasks = [];
         private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> _peerUploadDownloadTasks = [];
         public IReadOnlyDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> PeerClients => _peerSwarms;
 
@@ -112,27 +108,28 @@ namespace Torrential.Peers
             }
 
             var peerClientLogger = loggerFactory.CreateLogger<PeerWireClient>();
-            var peerClient = new PeerWireClient(connection, peerClientLogger);
-            var cts = _peerCts.GetOrAdd(connection.PeerId.Value, (_) => CancellationTokenSource.CreateLinkedTokenSource(torrentCts.Token));
-            var processTask = peerClient.Process(metadata, bitfieldManager, fileSegmentSaveService, cts.Token);
-            _peerMessageProcessTasks.TryAdd(peerClient.PeerId, processTask);
+            var peerClient = new PeerWireClient(connection, metadataCache, fileSegmentSaveService, peerClientLogger, torrentCts.Token);
+
+            var processTasks = _peerProcessTasks.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, Task>());
+            processTasks.TryAdd(connection.PeerId.Value, peerClient.ProcessMessages());
+
 
 
             logger.LogInformation("Sending our bitfield to peer");
             await peerClient.SendBitfield(verificationBitfield);
             logger.LogInformation("Waiting for peer to send bitfield");
-            while (peerClient.State.PeerBitfield == null && !cts.Token.IsCancellationRequested)
-                await Task.Delay(100);
 
+
+            var bitfieldTimeout = TimeSpan.FromSeconds(10);
+            var started = DateTimeOffset.UtcNow;
+            while (peerClient.State.PeerBitfield == null && DateTimeOffset.UtcNow.Subtract(started) < bitfieldTimeout)
+                await Task.Delay(500);
 
             if (peerClient.State.PeerBitfield == null)
             {
                 logger.LogInformation("Peer did not send bitfield");
-                _peerMessageProcessTasks.TryRemove(peerClient.PeerId, out _);
-                _peerCts.TryRemove(peerClient.PeerId, out _);
 
-
-                cts.Cancel();
+                processTasks.TryRemove(connection.PeerId.Value, out _);
                 await peerClient.DisposeAsync();
                 return;
             }
@@ -142,8 +139,7 @@ namespace Torrential.Peers
             if (verificationBitfield.HasAll() && peerClient.State.PeerBitfield.HasAll())
             {
                 logger.LogInformation("Both self and peer are seeds, denying entry to swarm");
-                _peerMessageProcessTasks.TryRemove(peerClient.PeerId, out _);
-                _peerCts.TryRemove(peerClient.PeerId, out _);
+                processTasks.TryRemove(connection.PeerId.Value, out _);
                 await peerClient.DisposeAsync();
                 return;
             }
@@ -159,27 +155,6 @@ namespace Torrential.Peers
                 Port = connection.PeerInfo.Port,
                 PeerId = connection.PeerId.Value
             });
-        }
-
-        public async Task<bool> TryAddPeerToSwarm(TorrentMetadata metaData, PeerInfo peerInfo, CancellationToken stoppingToken)
-        {
-            var conn = await ConnectToPeer(metaData.InfoHash, peerInfo, stoppingToken);
-            if (conn == null) return true;
-            await AddToSwarm(conn);
-            return true;
-        }
-
-        private async Task<PeerWireConnection?> ConnectToPeer(InfoHash infoHash, PeerInfo peerInfo, CancellationToken stoppingToken)
-        {
-            var conn = new PeerWireConnection(handshakeService, new TcpClient(), loggerFactory.CreateLogger<PeerWireConnection>());
-            var result = await conn.ConnectOutbound(infoHash, peerInfo, stoppingToken);
-            if (result.Success && conn.PeerId != null)
-            {
-                return conn;
-            }
-
-            await conn.DisposeAsync();
-            return null;
         }
 
         private async Task CleanupPeers(CancellationToken stoppingToken)
@@ -212,20 +187,15 @@ namespace Torrential.Peers
         }
         private async Task CleanupPeer(InfoHash infoHash, PeerId peerId)
         {
-            //Get this peer's cancellation token source
-            if (_peerCts.TryGetValue(peerId, out var cts))
+            //Remove the process task
+            if (_peerProcessTasks.TryGetValue(infoHash, out var processTasks))
             {
-                logger.LogInformation("Cancelling peer {PeerId} task", peerId.ToAsciiString());
-                cts.Cancel();
-                _peerCts.TryRemove(peerId, out _);
+                if (processTasks.TryRemove(peerId, out var processTask))
+                {
+                    logger.LogInformation("Removing peer process task");
+                }
             }
 
-            //Remove the peer message processing task
-            if (_peerMessageProcessTasks.TryGetValue(peerId, out var processTask))
-            {
-                logger.LogInformation("Removing peer message processing task");
-                _peerMessageProcessTasks.TryRemove(peerId, out _);
-            }
 
             //Remove the upload/download task
             if (_peerUploadDownloadTasks.TryGetValue(infoHash, out var uploadDownloadTasks))

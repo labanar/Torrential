@@ -9,13 +9,14 @@ public interface IPeerWireConnection : IAsyncDisposable
 
     PeerInfo? PeerInfo { get; }
     PeerId? PeerId { get; }
-    bool IsConnected { get; }
     PipeReader Reader { get; }
     PipeWriter Writer { get; }
     InfoHash InfoHash { get; }
+
+    void SetInfoHash(InfoHash infoHash);
+    void SetPeerId(PeerId peerId);
+
     DateTimeOffset ConnectionTimestamp { get; }
-    Task<PeerConnectionResult> ConnectOutbound(InfoHash infoHash, PeerInfo peer, CancellationToken cancellationToken);
-    Task<PeerConnectionResult> ConnectInbound(CancellationToken cancellationToken);
 }
 
 public readonly struct PeerConnectionResult

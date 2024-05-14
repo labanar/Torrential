@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.IO.Pipelines;
-using System.Net.Sockets;
 using System.Threading.Channels;
 using Torrential.Files;
 using Torrential.Torrents;
@@ -25,7 +24,7 @@ public sealed class PeerWireClient : IAsyncDisposable
 {
     private const int PIECE_SEGMENT_REQUEST_SIZE = 16384;
     private readonly PeerWireState _state;
-    private readonly CancellationTokenSource _internalCts;
+    private readonly CancellationTokenSource _cts;
     private readonly IPeerWireConnection _connection;
     private readonly ILogger _logger;
 
@@ -61,9 +60,7 @@ public sealed class PeerWireClient : IAsyncDisposable
         FullMode = BoundedChannelFullMode.Wait
     });
 
-    private CancellationTokenSource _processCts;
     private TorrentMetadata _meta;
-    private BitfieldManager _bitfields;
     private InfoHash _infoHash;
     private IFileSegmentSaveService _fileSegmentSaveService;
     public PeerWireState State => _state;
@@ -74,43 +71,46 @@ public sealed class PeerWireClient : IAsyncDisposable
 
     public DateTimeOffset LastMessageTimestamp { get; private set; }
 
-    public PeerWireClient(IPeerWireConnection connection, ILogger logger)
+    public PeerWireClient(IPeerWireConnection connection, TorrentMetadataCache metaCache, IFileSegmentSaveService fileSegmentSaveService, ILogger logger, CancellationToken torrentStoppingToken)
     {
         if (!connection.PeerId.HasValue)
             throw new ArgumentException("Peer Id must be set", nameof(connection));
 
+        if (!metaCache.TryGet(connection.InfoHash, out _meta))
+            throw new ArgumentException("Peer Id must be set", nameof(connection));
 
-        _internalCts = new CancellationTokenSource();
-        _connection = connection;
-        _logger = logger;
-        _state = new PeerWireState();
         LastMessageTimestamp = connection.ConnectionTimestamp;
         PeerId = connection.PeerId.Value;
+
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(torrentStoppingToken);
+        _state = new PeerWireState();
+
+        _connection = connection;
+        _fileSegmentSaveService = fileSegmentSaveService;
+        _logger = logger;
+        _infoHash = connection.InfoHash;
     }
 
 
-    public async Task Process(TorrentMetadata meta, BitfieldManager bitfields, IFileSegmentSaveService fileSegmentSaveService, CancellationToken cancellationToken)
+    public async Task ProcessMessages()
     {
-        _meta = meta;
-        _bitfields = bitfields;
-        _infoHash = meta.InfoHash;
-        _fileSegmentSaveService = fileSegmentSaveService;
-        _processCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _internalCts.Token);
-        var readerTask = ProcessReads(_processCts.Token);
-        var writeTask = ProcessWrites(_processCts.Token);
-        var savingTask = ProcessSegments(_processCts.Token);
+        var readerTask = ProcessReads(_cts.Token);
+        var writeTask = ProcessWrites(_cts.Token);
+        var savingTask = ProcessSegments(_cts.Token);
 
-        try
-        {
-            await readerTask;
-            await writeTask;
-            await savingTask;
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing peer connection {PeerId}", PeerId);
-        }
+        await Task.WhenAll(readerTask, writeTask, savingTask);
+
+        //try
+        //{
+        //    await readerTask;
+        //    await writeTask;
+        //    await savingTask;
+        //}
+        //catch (OperationCanceledException) { }
+        //catch (Exception ex)
+        //{
+        //    _logger.LogError(ex, "Error processing peer connection {PeerId}", PeerId);
+        //}
 
 
         OUTBOUND_MESSAGES.Writer.Complete();
@@ -130,14 +130,33 @@ public sealed class PeerWireClient : IAsyncDisposable
 
     private async Task ProcessWrites(CancellationToken cancellationToken)
     {
-        await foreach (var pak in OUTBOUND_MESSAGES.Reader.ReadAllAsync(cancellationToken))
+        try
         {
-            using (pak)
+
+            await foreach (var pak in OUTBOUND_MESSAGES.Reader.ReadAllAsync(cancellationToken))
             {
-                _connection.Writer.Write(pak.AsSpan());
-                await _connection.Writer.FlushAsync(cancellationToken);
+                using (pak)
+                {
+                    try
+                    {
+                        _connection.Writer.Write(pak.AsSpan());
+                        await _connection.Writer.FlushAsync(cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError("Failed to write message to {PeerId} - ending peer connection write processor", PeerId);
+                        return;
+                    }
+                }
             }
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing writes");
+        }
+
+        _logger.LogInformation("Ending peer connection write processor");
+
     }
 
     private async Task ProcessSegments(CancellationToken cancellationToken)
@@ -146,6 +165,8 @@ public sealed class PeerWireClient : IAsyncDisposable
         {
             await _fileSegmentSaveService.SaveSegment(segment);
         }
+
+        _logger.LogInformation("Ending peer connection segment processor");
     }
 
     private async Task ProcessReads(CancellationToken cancellationToken)
@@ -160,13 +181,9 @@ public sealed class PeerWireClient : IAsyncDisposable
 
                 while (TryReadMessage(ref buffer, out var messageSize, out var messageId, out ReadOnlySequence<byte> payload))
                 {
-                    //_logger.LogInformation("GOT A MESSAGE - {MessageId} {MessageSize}", messageId, messageSize);
                     if (!Process(messageSize, messageId, ref payload))
                     {
-                        _logger.LogInformation("Disconnecting from Peer: failed to process message - {MessageId} {MessageSize}", messageId, messageSize);
-                        await _connection.Reader.CompleteAsync();
-                        _processCts.Cancel();
-                        await _connection.DisposeAsync();
+                        _logger.LogInformation("Failed to process message {MessageId} {MessageSize} - ending peer connection read processor", messageId, messageSize);
                         return;
                     }
                 }
@@ -178,45 +195,17 @@ public sealed class PeerWireClient : IAsyncDisposable
                 if (result.IsCompleted)
                 {
                     _logger.LogWarning("No further data from peer");
-                    break;
+                    return;
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                _processCts.Cancel();
-                await _connection.DisposeAsync();
-                return;
-            }
-            catch (IOException)
-            {
-                _processCts.Cancel();
-                await _connection.DisposeAsync();
-                return;
-            }
-            catch (SocketException)
-            {
-                _processCts.Cancel();
-                await _connection.DisposeAsync();
-                return;
-            }
-            catch (ObjectDisposedException)
-            {
-                _processCts.Cancel();
-                await _connection.DisposeAsync();
-                return;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error reading from peer");
-                _processCts.Cancel();
-                await _connection.DisposeAsync();
                 return;
             }
         }
 
-        _logger.LogInformation("Peer read loop ended, disposing connection and exiting");
-        _processCts.Cancel();
-        await _connection.DisposeAsync();
+        _logger.LogInformation("Ending peer connection read processor");
     }
 
     private bool TryReadMessage(ref ReadOnlySequence<byte> buffer, out int messageSize, out byte messageId, out ReadOnlySequence<byte> payload)
@@ -438,7 +427,7 @@ public sealed class PeerWireClient : IAsyncDisposable
     public async Task SendHave(int pieceIndex) => await SendMessageAsync(PeerWireMessageType.Have, pieceIndex);
     public async Task SendPieceRequest(int pieceIndex, int begin, int length = PIECE_SEGMENT_REQUEST_SIZE)
     {
-        await _pieceRequestLimit.WaitAsync(_processCts.Token);
+        await _pieceRequestLimit.WaitAsync(_cts.Token);
         await SendMessageAsync(PeerWireMessageType.Request, pieceIndex, begin, length);
     }
 
@@ -577,9 +566,7 @@ public sealed class PeerWireClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _internalCts.Cancel();
-
-
+        _cts.Cancel();
         await _connection.DisposeAsync();
     }
 }

@@ -114,7 +114,7 @@ namespace Torrential.Torrents
 
             //Wait for peer to be interested then unchoke them
             while (!peer.State.PeerInterested && !stoppingToken.IsCancellationRequested)
-                await Task.Delay(100);
+                await Task.Delay(5000, stoppingToken);
 
             logger.LogInformation("Peer has shown interest, unchoking");
             await peer.SendUnchoke();

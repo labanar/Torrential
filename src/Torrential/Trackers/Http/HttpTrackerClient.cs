@@ -101,6 +101,9 @@ public class HttpTrackerClient : ITrackerClient
         return encoded.ToString();
     }
 
+
+
+    //TODO - if announce fails we need to handle this case
     public async Task<AnnounceResponse> Announce(AnnounceRequest request)
     {
         var info_hash = string.Create(60, request.InfoHash, (span, hash) =>
@@ -109,32 +112,45 @@ public class HttpTrackerClient : ITrackerClient
         });
         var peer_id = HttpUtility.UrlEncode(request.PeerId.ToAsciiString());
 
-
-        using var response = await _client.GetAsync($"{request.Url}?info_hash={info_hash}&port={request.Port}&peer_id={peer_id}&numwant={request.NumWant}&no_peer_id=1&compact=1&downloaded={request.BytesDownloaded}&uploaded={request.BytesUploaded}&left={request.BytesRemaining}");
-
-        var rawContent = await response.Content.ReadAsStringAsync();
-        var parser = new BencodeParser();
-        var responseDictionary = parser.Parse<BDictionary>(await response.Content.ReadAsStreamAsync());
-
-        var interval = responseDictionary.Get<BNumber>("interval")?.Value ?? 0;
-        var seeders = responseDictionary.Get<BNumber>("complete")?.Value ?? 0;
-        var leechers = responseDictionary.Get<BNumber>("incomplete")?.Value ?? 0;
-        var trackerId = responseDictionary.Get<BString>("tracker id")?.ToString() ?? "";
-
-        if (!responseDictionary.TryGetValue("peers", out var bPeers))
-            throw new Exception("Announce response did not contain peers");
-
-        if (!TryParsePeers(bPeers, out var peers))
-            throw new Exception("Failed to parse peers");
-
-
-        return new AnnounceResponse
+        try
         {
-            Interval = (int)interval,
-            Peers = peers,
-            Complete = (int)seeders,
-            Incomplete = (int)leechers,
-            TrackerId = trackerId
-        };
+            using var response = await _client.GetAsync($"{request.Url}?info_hash={info_hash}&port={request.Port}&peer_id={peer_id}&numwant={request.NumWant}&no_peer_id=1&compact=1&downloaded={request.BytesDownloaded}&uploaded={request.BytesUploaded}&left={request.BytesRemaining}");
+
+            var rawContent = await response.Content.ReadAsStringAsync();
+            var parser = new BencodeParser();
+            var responseDictionary = parser.Parse<BDictionary>(await response.Content.ReadAsStreamAsync());
+
+            var interval = responseDictionary.Get<BNumber>("interval")?.Value ?? 0;
+            var seeders = responseDictionary.Get<BNumber>("complete")?.Value ?? 0;
+            var leechers = responseDictionary.Get<BNumber>("incomplete")?.Value ?? 0;
+            var trackerId = responseDictionary.Get<BString>("tracker id")?.ToString() ?? "";
+
+            if (!responseDictionary.TryGetValue("peers", out var bPeers))
+                throw new Exception("Announce response did not contain peers");
+
+            if (!TryParsePeers(bPeers, out var peers))
+                throw new Exception("Failed to parse peers");
+
+            return new AnnounceResponse
+            {
+                Interval = (int)interval,
+                Peers = peers,
+                Complete = (int)seeders,
+                Incomplete = (int)leechers,
+                TrackerId = trackerId
+            };
+        }
+        catch
+        {
+            return new AnnounceResponse
+            {
+                Interval = 60,
+                Peers = Array.Empty<PeerInfo>(),
+                Complete = 0,
+                Incomplete = 0,
+                TrackerId = ""
+            };
+        }
+
     }
 }
