@@ -60,21 +60,21 @@ namespace Torrential.Peers
 
             if (await statusCache.GetStatus(connection.InfoHash) != TorrentStatus.Running)
             {
-                logger.LogInformation("Torrent {InfoHash} is not running, not adding peer", connection.InfoHash);
+                logger.LogWarning("Torrent {InfoHash} is not running, not adding peer", connection.InfoHash);
                 await connection.DisposeAsync();
                 return;
             }
 
             if (peerConnections.Count >= torrentSettings.MaxConnections)
             {
-                logger.LogInformation("Peer limit reached for {InfoHash}", metadata.InfoHash);
+                logger.LogDebug("Peer limit reached for {InfoHash}", metadata.InfoHash);
                 await connection.DisposeAsync();
                 return;
             }
 
             if (_peerSwarms.Values.Sum(x => x.Count) >= globalSettings.MaxConnections)
             {
-                logger.LogInformation("Global peer limit reached");
+                logger.LogDebug("Global peer limit reached");
                 await connection.DisposeAsync();
                 return;
             }
@@ -95,14 +95,14 @@ namespace Torrential.Peers
 
             if (!bitfieldManager.TryGetVerificationBitfield(metadata.InfoHash, out var verificationBitfield))
             {
-                logger.LogInformation("Failed to retrieve verification bitfield");
+                logger.LogWarning("Failed to retrieve verification bitfield");
                 await connection.DisposeAsync();
                 return;
             }
 
             if (!_torrentCts.TryGetValue(metadata.InfoHash, out var torrentCts))
             {
-                logger.LogInformation("Torrent not found in swarm");
+                logger.LogDebug("Torrent not found in swarm");
                 await connection.DisposeAsync();
                 return;
             }
@@ -115,9 +115,9 @@ namespace Torrential.Peers
 
 
 
-            logger.LogInformation("Sending our bitfield to peer");
+            logger.LogDebug("Sending our bitfield to peer");
             await peerClient.SendBitfield(verificationBitfield);
-            logger.LogInformation("Waiting for peer to send bitfield");
+            logger.LogDebug("Waiting for peer to send bitfield");
 
 
             var bitfieldTimeout = TimeSpan.FromSeconds(10);
@@ -127,18 +127,18 @@ namespace Torrential.Peers
 
             if (peerClient.State.PeerBitfield == null)
             {
-                logger.LogInformation("Peer did not send bitfield");
+                logger.LogDebug("Peer did not send bitfield");
 
                 processTasks.TryRemove(connection.PeerId.Value, out _);
                 await peerClient.DisposeAsync();
                 return;
             }
 
-            logger.LogInformation("Peer bitfield received");
+            logger.LogDebug("Peer bitfield received");
 
             if (verificationBitfield.HasAll() && peerClient.State.PeerBitfield.HasAll())
             {
-                logger.LogInformation("Both self and peer are seeds, denying entry to swarm");
+                logger.LogDebug("Both self and peer are seeds, denying entry to swarm");
                 processTasks.TryRemove(connection.PeerId.Value, out _);
                 await peerClient.DisposeAsync();
                 return;

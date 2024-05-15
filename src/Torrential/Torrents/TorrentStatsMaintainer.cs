@@ -90,7 +90,7 @@ namespace Torrential.Torrents
                     var totalDownloaded = rates.GetTotalDownloaded(infoHash);
                     var totalUploaded = rates.GetTotalUploaded(infoHash);
 
-                    logger.LogInformation("Publishing throughput rates for {InfoHash} - Ingress: {IngressRate} Egress: {EgressRate}", infoHash.AsString(), ingressRate, egressRate);
+                    logger.LogDebug("Publishing throughput rates for {InfoHash} - Ingress: {IngressRate} Egress: {EgressRate}", infoHash.AsString(), ingressRate, egressRate);
                     await bus.Publish(new TorrentStatsEvent
                     {
                         InfoHash = infoHash,
