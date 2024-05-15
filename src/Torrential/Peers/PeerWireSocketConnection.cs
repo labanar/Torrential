@@ -13,7 +13,6 @@ public class PeerWireSocketConnection : IPeerWireConnection
     private readonly Task _ingressFillTask;
     private readonly Pipe _egressPipe;
     private readonly Task _egressFillTask;
-    //private readonly HandshakeService _handshakeService;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _cts;
     public Guid Id { get; }
@@ -36,12 +35,12 @@ public class PeerWireSocketConnection : IPeerWireConnection
 
 
         //Data flow from the socket to the pipe
-        _ingressPipe = new Pipe();
+        _ingressPipe = PipePool.Shared.Get();
         _ingressFillTask = IngressFillPipeAsync(_socket, _ingressPipe.Writer, _cts.Token);
         Reader = _ingressPipe.Reader;
 
         //Data flow from the pipe to the socket
-        _egressPipe = new Pipe();
+        _egressPipe = PipePool.Shared.Get();
         _egressFillTask = EgressFillSocketAsync(_socket, _egressPipe.Reader, _cts.Token);
         Writer = _egressPipe.Writer;
         PeerInfo = socket.GetPeerInfo();
@@ -135,24 +134,18 @@ public class PeerWireSocketConnection : IPeerWireConnection
     public async ValueTask DisposeAsync()
     {
         _cts.Cancel();
+        await Task.WhenAll(_ingressFillTask, _egressFillTask);
+        _egressPipe.Reader.Complete();
+        _egressPipe.Writer.Complete();
+        _ingressPipe.Reader.Complete();
+        _ingressPipe.Writer.Complete();
 
 
-        try
-        {
-            await Task.WhenAll(_ingressFillTask, _egressFillTask);
-        }
-        catch (Exception ex)
-        {
-            var foo = "uh oh";
-        }
-        //Let the ingress and egress tasks finish
-
+        PipePool.Shared.Return(_ingressPipe);
+        PipePool.Shared.Return(_egressPipe);
 
         //We are now safe to dispose the socket
 
-
-        //PipePool.Shared.Return(_ingressPipe);
-        //PipePool.Shared.Return(_egressPipe);
         _socket.Dispose();
 
         _logger.LogInformation("Disposing connection {Id}", Id);
