@@ -26,6 +26,7 @@ internal static class Sha1Helper
             if (result.IsCompleted)
             {
                 hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                reader.Complete();
                 return expectedHash.AsSpan().Slice(0, 20).SequenceEqual(hasher.Hash ?? Array.Empty<byte>());
             }
         }
