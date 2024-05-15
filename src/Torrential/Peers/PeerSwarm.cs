@@ -23,6 +23,7 @@ namespace Torrential.Peers
 
 
         private ConcurrentDictionary<InfoHash, CancellationTokenSource> _torrentCts = [];
+        private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, CancellationTokenSource>> _peerCts = [];
         private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> _peerSwarms = [];
         private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> _peerProcessTasks = [];
         private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> _peerUploadDownloadTasks = [];
@@ -107,8 +108,12 @@ namespace Torrential.Peers
                 return;
             }
 
+
+            var torrentPeerCts = _peerCts.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, CancellationTokenSource>());
+            var peerCts = torrentPeerCts.GetOrAdd(connection.PeerId.Value, (_) => CancellationTokenSource.CreateLinkedTokenSource(torrentCts.Token));
             var peerClientLogger = loggerFactory.CreateLogger<PeerWireClient>();
-            var peerClient = new PeerWireClient(connection, metadataCache, fileSegmentSaveService, peerClientLogger, torrentCts.Token);
+            var peerClient = new PeerWireClient(connection, metadataCache, fileSegmentSaveService, peerClientLogger, peerCts.Token);
+
 
             var processTasks = _peerProcessTasks.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, Task>());
             processTasks.TryAdd(connection.PeerId.Value, peerClient.ProcessMessages());
@@ -147,7 +152,7 @@ namespace Torrential.Peers
             peerConnections.TryAdd(connection.PeerId.Value, peerClient);
 
             var peerSwarmTasks = _peerUploadDownloadTasks.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, Task>());
-            peerSwarmTasks.TryAdd(connection.PeerId.Value, torrentRunner.StartSharing(metadata, peerClient, CancellationToken.None));
+            peerSwarmTasks.TryAdd(connection.PeerId.Value, torrentRunner.StartSharing(metadata, peerClient, peerCts.Token));
             await bus.Publish(new PeerConnectedEvent
             {
                 InfoHash = metadata.InfoHash,
@@ -187,6 +192,16 @@ namespace Torrential.Peers
         }
         private async Task CleanupPeer(InfoHash infoHash, PeerId peerId)
         {
+            //Get the peer cts
+            if (_peerCts.TryGetValue(infoHash, out var peerCts))
+            {
+                if (peerCts.TryRemove(peerId, out var cts))
+                {
+                    logger.LogInformation("Cancelling peer cts");
+                    cts.Cancel();
+                }
+            }
+
             //Remove the process task
             if (_peerProcessTasks.TryGetValue(infoHash, out var processTasks))
             {

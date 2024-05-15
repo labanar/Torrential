@@ -45,7 +45,7 @@ namespace Torrential.Files
             var buffer = ArrayPool<byte>.Shared.Rent(20);
             meta.GetPieceHash(request.PieceIndex).CopyTo(buffer);
 
-            var pipe = new System.IO.Pipelines.Pipe();
+            var pipe = PipePool.Shared.Get();
             var fillTask = FillPipeWithPiece(fileHandle, pipe.Writer, request.PieceIndex, (int)meta.PieceSize).ConfigureAwait(true);
 
             var pieceSize = request.PieceIndex == meta.NumberOfPieces - 1 ? meta.FinalPieceSize : meta.PieceSize;
@@ -55,6 +55,8 @@ namespace Torrential.Files
             ArrayPool<byte>.Shared.Return(buffer);
             await fillTask;
             logger.LogInformation("Validation result for {Piece}: {Result}", request.PieceIndex, result);
+            PipePool.Shared.Return(pipe);
+
 
             if (result)
             {
