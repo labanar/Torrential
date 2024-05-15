@@ -18,7 +18,7 @@ public sealed class HandshakeService(IPeerService peerService, TorrentMetadataCa
         var response = await WaitForHandshake(reader, stoppingToken);
         if (!response.Success)
         {
-            logger.LogInformation("Handshake failed - {Error}", response.Error);
+            logger.LogDebug("Handshake failed - {Error}", response.Error);
             return response;
         }
 
@@ -86,7 +86,7 @@ public sealed class HandshakeService(IPeerService peerService, TorrentMetadataCa
             }
         }
 
-        logger.LogWarning("Handshake timed out");
+        logger.LogDebug("Handshake timed out");
         return new HandshakeResponse(HandshakeError.NO_RESPONSE);
     }
 
@@ -128,13 +128,13 @@ public sealed class HandshakeService(IPeerService peerService, TorrentMetadataCa
 
         if (firstByte != 19)
         {
-            logger.LogInformation("Handshake failed - First byte did not match");
+            logger.LogDebug("Handshake failed - First byte did not match");
             return new HandshakeResponse(HandshakeError.INVALID_FIRST_BYTE);
         }
 
         if (!reader.TryReadExact(19, out var protocolSequence))
         {
-            logger.LogInformation("Handshake failed - Failed to read protocol identifier");
+            logger.LogDebug("Handshake failed - Failed to read protocol identifier");
             return new HandshakeResponse(HandshakeError.PROTOCOL_NOT_RECEIVED);
         }
 
@@ -142,26 +142,26 @@ public sealed class HandshakeService(IPeerService peerService, TorrentMetadataCa
         protocolSequence.CopyTo(protocolBuff);
         if (!protocolBuff.SequenceEqual(PROTOCOL_BYTES))
         {
-            logger.LogInformation("Handshake failed - Protocol identifier did not match");
+            logger.LogDebug("Handshake failed - Protocol identifier did not match");
             return new HandshakeResponse(HandshakeError.INVALID_PROTOCOL);
         }
 
         if (!reader.TryReadPeerExtensions(out var peerExtensions))
         {
-            logger.LogInformation("Handshake failed - Failed to read extensions");
+            logger.LogDebug("Handshake failed - Failed to read extensions");
             return new HandshakeResponse(HandshakeError.RESERVED_NOT_RECEIVED);
         }
 
         if (!reader.TryReadInfoHash(out var peerInfoHash))
         {
-            logger.LogInformation("Handshake failed - Failed to read info hash bytes");
+            logger.LogDebug("Handshake failed - Failed to read info hash bytes");
             return new HandshakeResponse(HandshakeError.HASH_NOT_RECEIVED);
         }
 
 
         if (!reader.TryReadPeerId(out var peerId))
         {
-            logger.LogInformation("Handshake failed - Failed to read peerId");
+            logger.LogDebug("Handshake failed - Failed to read peerId");
             return new HandshakeResponse(HandshakeError.PEER_ID_NOT_RECEIVED);
         }
 

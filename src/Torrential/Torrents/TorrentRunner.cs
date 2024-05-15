@@ -49,27 +49,27 @@ namespace Torrential.Torrents
         {
             if (!bitfieldMgr.TryGetVerificationBitfield(meta.InfoHash, out var verificationBitfield))
             {
-                logger.LogInformation("Failed to retrieve verification bitfield");
+                logger.LogWarning("Failed to retrieve verification bitfield");
                 return;
             }
 
             if (verificationBitfield.HasAll())
             {
-                logger.LogInformation("Already have all pieces");
+                logger.LogDebug("Already have all pieces");
                 await peer.SendNotInterested();
                 return;
             }
 
-            logger.LogInformation("Sending interested to peer");
+            logger.LogDebug("Sending interested to peer");
             await peer.SendIntereted();
 
 
-            logger.LogInformation("Waiting for unchoke from peer");
+            logger.LogDebug("Waiting for unchoke from peer");
             while (peer.State.AmChoked && !stoppingToken.IsCancellationRequested)
                 await Task.Delay(100);
 
 
-            logger.LogInformation("Starting piece selection");
+            logger.LogDebug("Starting piece selection");
             var hasMorePieces = true;
             while (!peer.State.AmChoked && !stoppingToken.IsCancellationRequested && hasMorePieces)
             {
@@ -95,20 +95,20 @@ namespace Torrential.Torrents
                 }
             }
 
-            logger.LogInformation("Finished requesting pieces from peer");
+            logger.LogDebug("Finished requesting pieces from peer");
         }
 
         private async Task SeedToPeer(TorrentMetadata meta, PeerWireClient peer, CancellationToken stoppingToken)
         {
             if (peer.State.PeerBitfield == null)
             {
-                logger.LogInformation("Peer has not sent bitfield yet");
+                logger.LogDebug("Peer has not sent bitfield yet");
                 return;
             }
 
             if (peer.State.PeerBitfield.HasAll())
             {
-                logger.LogInformation("Peer has all pieces");
+                logger.LogDebug("Peer has all pieces");
                 return;
             }
 
@@ -116,13 +116,13 @@ namespace Torrential.Torrents
             while (!peer.State.PeerInterested && !stoppingToken.IsCancellationRequested)
                 await Task.Delay(5000, stoppingToken);
 
-            logger.LogInformation("Peer has shown interest, unchoking");
+            logger.LogDebug("Peer has shown interest, unchoking");
             await peer.SendUnchoke();
 
             //Wait for the peer to request a piece;
             await foreach (var request in peer.PeerPeieceRequests.Reader.ReadAllAsync(stoppingToken))
             {
-                logger.LogInformation("Received piece {@Request} from peer", request);
+                logger.LogDebug("Received piece request {@Request} from peer", request);
 
                 //TODO - add pieces to the superseed list as we go
                 var buffer = ArrayPool<byte>.Shared.Rent(request.Length);
@@ -135,7 +135,7 @@ namespace Torrential.Torrents
 
                     await bus.Publish(new TorrentSegmentUploadedEvent { InfoHash = meta.InfoHash, SegmentLength = request.Length });
 
-                    logger.LogInformation("Sent piece {@Request} to peer", request);
+                    logger.LogDebug("Sent piece {@Request} to peer", request);
                 }
                 finally
                 {
