@@ -63,6 +63,7 @@ public sealed class PeerWireClient : IAsyncDisposable
     private TorrentMetadata _meta;
     private InfoHash _infoHash;
     private IFileSegmentSaveService _fileSegmentSaveService;
+
     public PeerWireState State => _state;
 
     public long BytesUploaded { get; private set; }
@@ -98,24 +99,21 @@ public sealed class PeerWireClient : IAsyncDisposable
         var writeTask = ProcessWrites(_cts.Token);
         var savingTask = ProcessSegments(_cts.Token);
 
-        await Task.WhenAll(readerTask, writeTask, savingTask);
-
-        //try
-        //{
-        //    await readerTask;
-        //    await writeTask;
-        //    await savingTask;
-        //}
-        //catch (OperationCanceledException) { }
-        //catch (Exception ex)
-        //{
-        //    _logger.LogError(ex, "Error processing peer connection {PeerId}", PeerId);
-        //}
+        try
+        {
+            await Task.WhenAll(readerTask, writeTask, savingTask);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing peer connection {PeerId}", PeerId);
+        }
 
 
         OUTBOUND_MESSAGES.Writer.Complete();
         PIECE_SEGMENT_CHANNEL.Writer.Complete();
         INBOUND_MESSAGES.Writer.Complete();
+        PeerPeieceRequests.Writer.Complete();
 
         //Clear out any disposables stuck in the channels
         await foreach (var pak in OUTBOUND_MESSAGES.Reader.ReadAllAsync())
@@ -126,6 +124,8 @@ public sealed class PeerWireClient : IAsyncDisposable
 
         await foreach (var pak in INBOUND_MESSAGES.Reader.ReadAllAsync())
             pak.Dispose();
+
+        await foreach (var _ in PeerPeieceRequests.Reader.ReadAllAsync()) ;
     }
 
     private async Task ProcessWrites(CancellationToken cancellationToken)
@@ -566,6 +566,7 @@ public sealed class PeerWireClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _logger.LogDebug("Disposing peer client {PeerId}", PeerId);
         _cts.Cancel();
         await _connection.DisposeAsync();
     }

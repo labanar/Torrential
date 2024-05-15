@@ -140,14 +140,10 @@ public class PeerWireSocketConnection : IPeerWireConnection
         _ingressPipe.Reader.Complete();
         _ingressPipe.Writer.Complete();
 
-
         PipePool.Shared.Return(_ingressPipe);
         PipePool.Shared.Return(_egressPipe);
 
-        //We are now safe to dispose the socket
-
         _socket.Dispose();
-
-        _logger.LogInformation("Disposing connection {Id}", Id);
+        _logger.LogDebug("Disposing connection {Id}", Id);
     }
 }
