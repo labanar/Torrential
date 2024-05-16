@@ -1,4 +1,6 @@
-﻿namespace Torrential;
+﻿using System.Buffers;
+
+namespace Torrential;
 
 public static class BitConverterExtensions
 {
@@ -15,6 +17,14 @@ public static class BitConverterExtensions
         return value;
     }
 
+    public static ushort ReadBigEndianUInt16(this ReadOnlySequence<byte> sequence)
+    {
+        Span<byte> buffer = stackalloc byte[2];
+        sequence.CopyTo(buffer);
+        return buffer.ReadBigEndianUInt16();
+    }
+
+
     public static int ReadBigEndianInt32(this Span<byte> buffer)
     {
         if (BitConverter.IsLittleEndian)
@@ -28,6 +38,13 @@ public static class BitConverterExtensions
         return value;
     }
 
+    public static int ReadBigEndianInt32(this ReadOnlySequence<byte> sequence)
+    {
+        Span<byte> buffer = stackalloc byte[4];
+        sequence.CopyTo(buffer);
+        return buffer.ReadBigEndianInt32();
+    }
+
     public static long ReadBigEndianInt64(this Span<byte> buffer)
     {
         if (BitConverter.IsLittleEndian)
@@ -39,6 +56,13 @@ public static class BitConverterExtensions
             buffer[..8].Reverse();
 
         return value;
+    }
+
+    public static long ReadBigEndianInt64(this ReadOnlySequence<byte> sequence)
+    {
+        Span<byte> buffer = stackalloc byte[8];
+        sequence.CopyTo(buffer);
+        return buffer.ReadBigEndianInt64();
     }
 
     public static bool TryWriteBigEndian(this Span<byte> buffer, int value)

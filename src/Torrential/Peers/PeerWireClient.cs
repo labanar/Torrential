@@ -367,10 +367,20 @@ public sealed class PeerWireClient : IAsyncDisposable
             return false;
         }
 
-        //_logger.LogInformation("Piece received from peer {Index} {Offset} {Length}", pieceIndex, pieceOffset, PIECE_SEGMENT_REQUEST_SIZE);
-
         var segment = PooledPieceSegment.FromReadOnlySequence(ref segmentSequence, _infoHash, pieceIndex, pieceOffset);
-        PIECE_SEGMENT_CHANNEL.Writer.TryWrite(segment);
+
+
+        //If this is not async, then there is a chance we silently drop the segment
+        //TryWrite will return false if the channel
+        if (!PIECE_SEGMENT_CHANNEL.Writer.TryWrite(segment))
+        {
+            segment.Dispose();
+
+            //We return true here because we don't want to disconnect the peer if we can't write to the channel, we just want to drop the segment
+            return true;
+        }
+
+
         BytesDownloaded += segment.Buffer.Length;
         _state.PiecesReceived += 1;
         return true;
