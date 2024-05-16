@@ -19,7 +19,6 @@ public sealed class PeerWireState
     public Bitfield? PeerBitfield { get; set; } = null;
     public DateTimeOffset PeerLastInterestedAt { get; set; } = DateTimeOffset.UtcNow;
 }
-
 public sealed class PeerWireClient : IAsyncDisposable
 {
     private const int PIECE_SEGMENT_REQUEST_SIZE = 16384;
@@ -30,17 +29,8 @@ public sealed class PeerWireClient : IAsyncDisposable
 
     public PeerInfo PeerInfo => _connection.PeerInfo;
 
-    private SemaphoreSlim _pieceRequestLimit = new SemaphoreSlim(10, 10);
 
-    private readonly Channel<PreparedPacket> OUTBOUND_MESSAGES = Channel.CreateBounded<PreparedPacket>(new BoundedChannelOptions(10)
-    {
-        FullMode = BoundedChannelFullMode.Wait,
-        SingleReader = true,
-        SingleWriter = false
-    });
-
-
-    private readonly Channel<PeerPacket> INBOUND_MESSAGES = Channel.CreateBounded<PeerPacket>(new BoundedChannelOptions(5)
+    private readonly Channel<PreparedPacket> OUTBOUND_MESSAGES = Channel.CreateBounded<PreparedPacket>(new BoundedChannelOptions(20)
     {
         FullMode = BoundedChannelFullMode.Wait,
         SingleReader = true,
@@ -112,7 +102,6 @@ public sealed class PeerWireClient : IAsyncDisposable
 
         OUTBOUND_MESSAGES.Writer.Complete();
         PIECE_SEGMENT_CHANNEL.Writer.Complete();
-        INBOUND_MESSAGES.Writer.Complete();
         PeerPeieceRequests.Writer.Complete();
 
         //Clear out any disposables stuck in the channels
@@ -120,9 +109,6 @@ public sealed class PeerWireClient : IAsyncDisposable
             pak.Dispose();
 
         await foreach (var pak in PIECE_SEGMENT_CHANNEL.Reader.ReadAllAsync())
-            pak.Dispose();
-
-        await foreach (var pak in INBOUND_MESSAGES.Reader.ReadAllAsync())
             pak.Dispose();
 
         await foreach (var _ in PeerPeieceRequests.Reader.ReadAllAsync()) ;
@@ -387,7 +373,6 @@ public sealed class PeerWireClient : IAsyncDisposable
         PIECE_SEGMENT_CHANNEL.Writer.TryWrite(segment);
         BytesDownloaded += segment.Buffer.Length;
         _state.PiecesReceived += 1;
-        _pieceRequestLimit.Release();
         return true;
     }
     private bool HandleCancel(ref ReadOnlySequence<byte> payload)
@@ -412,157 +397,40 @@ public sealed class PeerWireClient : IAsyncDisposable
         return true;
     }
 
-    public async Task SendBitfield(IBitfield bitfield)
-    {
-        WriteBitfield(bitfield);
-    }
-    public async Task SendKeepAlive()
-    {
-        WriteKeepAlive();
-    }
+
+    public async Task SendBitfield(IBitfield bitfield) => await WriteBitfieldAsync(bitfield);
     public async Task SendIntereted() => await SendMessageAsync(PeerWireMessageType.Interested);
     public async Task SendNotInterested() => await SendMessageAsync(PeerWireMessageType.NotInterested);
     public async Task SendChoke() => await SendMessageAsync(PeerWireMessageType.Choke);
     public async Task SendUnchoke() => await SendMessageAsync(PeerWireMessageType.Unchoke);
     public async Task SendHave(int pieceIndex) => await SendMessageAsync(PeerWireMessageType.Have, pieceIndex);
-    public async Task SendPieceRequest(int pieceIndex, int begin, int length = PIECE_SEGMENT_REQUEST_SIZE)
-    {
-        await _pieceRequestLimit.WaitAsync(_cts.Token);
+    public async Task SendPieceRequest(int pieceIndex, int begin, int length = PIECE_SEGMENT_REQUEST_SIZE) =>
         await SendMessageAsync(PeerWireMessageType.Request, pieceIndex, begin, length);
-    }
 
-    public void SendPiece(int pieceIndex, int begin, ReadOnlySpan<byte> payload)
+    public async Task SendPiece(PreparedPacket pak)
     {
-        var pak = new PreparedPacket(13 + payload.Length);
-        Span<byte> buffer = pak.AsSpan();
-        buffer.TryWriteBigEndian(9 + payload.Length);
-        buffer[4] = PeerWireMessageType.Piece;
-        buffer[5..].TryWriteBigEndian(pieceIndex);
-        buffer[9..].TryWriteBigEndian(begin);
-        payload.CopyTo(buffer.Slice(13));
-        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
-        BytesUploaded += payload.Length;
-    }
-
-    public void SendPiece(int pieceIndex, int begin, byte[] payloadBuffer, int payloadLength)
-    {
-        var pak = new PreparedPacket(13 + payloadLength);
-        Span<byte> buffer = pak.AsSpan();
-        buffer.TryWriteBigEndian(9 + payloadLength);
-        buffer[4] = PeerWireMessageType.Piece;
-        buffer[5..].TryWriteBigEndian(pieceIndex);
-        buffer[9..].TryWriteBigEndian(begin);
-        payloadBuffer.CopyTo(buffer.Slice(13));
-        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
-        BytesUploaded += payloadLength;
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(pak, _cts.Token);
+        BytesUploaded += pak.Size - 13;
     }
 
     public async Task SendCancel(int pieceIndex, int begin, int length) => await SendMessageAsync(PeerWireMessageType.Cancel, pieceIndex, begin, length);
-    private async Task SendMessageAsync(byte messageId)
-    {
-        WritePacket(messageId);
-    }
-    private async Task SendMessageAsync(byte messageId, int p1)
-    {
-        WritePacket(messageId, p1);
-    }
-    private async Task SendMessageAsync(byte messageId, int p1, int p2)
-    {
-        WritePacket(messageId, p1, p2);
-    }
-    private async Task SendMessageAsync(byte messageId, int p1, int p2, int p3)
-    {
-        WritePacket(messageId, p1, p2, p3);
-    }
 
-    private void SendMessage(byte messageId)
-    {
-        WritePacket(messageId);
-    }
-    private void SendMessage(byte messageId, int p1)
-    {
-        WritePacket(messageId, p1);
-    }
-    private void SendMessage(byte messageId, int p1, int p2)
-    {
-        WritePacket(messageId, p1, p2);
-    }
-    private void SendMessage(byte messageId, int p1, int p2, int p3)
-    {
-        WritePacket(messageId, p1, p2, p3);
-    }
-    private void SendMessage(byte messageId, Span<byte> payload)
-    {
-        WritePacket(messageId, payload);
-    }
+    private async Task SendMessageAsync(byte messageId) => await WritePacketAsync(messageId);
+    private async Task SendMessageAsync(byte messageId, int p1) => await WritePacketAsync(messageId, p1);
+    private async Task SendMessageAsync(byte messageId, int p1, int p2) => await WritePacketAsync(messageId, p1, p2);
+    private async Task SendMessageAsync(byte messageId, int p1, int p2, int p3) => await WritePacketAsync(messageId, p1, p2, p3);
 
-    private void WriteBitfield(IBitfield bitfield)
-    {
-        var pak = new PreparedPacket(bitfield.Bytes.Length + 5);
-        var buffer = pak.AsSpan();
-        buffer.TryWriteBigEndian(bitfield.Bytes.Length + 1);
-        buffer[4] = PeerWireMessageType.Bitfield;
-        bitfield.Bytes.CopyTo(buffer[5..]);
-        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
-    }
-    private void WriteKeepAlive()
-    {
-        var pak = new PreparedPacket(4);
-        var buffer = pak.AsSpan();
-        buffer[0] = 0;
-        buffer[1] = 0;
-        buffer[2] = 0;
-        buffer[3] = 0;
-        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
-    }
-    private void WritePacket(byte messageId)
-    {
-        var pak = new PreparedPacket(5);
-        var buffer = pak.AsSpan();
-        buffer.TryWriteBigEndian(1);
-        buffer[4] = messageId;
-        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
-    }
-    private void WritePacket(byte messageId, int p1)
-    {
-        var pak = new PreparedPacket(9);
-        var buffer = pak.AsSpan();
-        buffer.TryWriteBigEndian(5);
-        buffer[4] = messageId;
-        buffer[5..].TryWriteBigEndian(p1);
-        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
-    }
-    private void WritePacket(byte messageId, int p1, int p2)
-    {
-        var pak = new PreparedPacket(13);
-        var buffer = pak.AsSpan();
-        buffer.TryWriteBigEndian(9);
-        buffer[4] = messageId;
-        buffer[5..].TryWriteBigEndian(p1);
-        buffer[9..].TryWriteBigEndian(p2);
-        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
-    }
-    private void WritePacket(byte messageId, int p1, int p2, int p3)
-    {
-        var pak = new PreparedPacket(17);
-        var buffer = pak.AsSpan();
-        buffer.TryWriteBigEndian(13);
-        buffer[4] = messageId;
-        buffer[5..].TryWriteBigEndian(p1);
-        buffer[9..].TryWriteBigEndian(p2);
-        buffer[13..].TryWriteBigEndian(p3);
-        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
-    }
+    private async Task WriteBitfieldAsync(IBitfield bitfield) =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(MessagePacker.Pack(bitfield), _cts.Token);
+    private async Task WritePacketAsync(byte messageId) =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(MessagePacker.Pack(messageId), _cts.Token);
+    private async Task WritePacketAsync(byte messageId, int p1) =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(MessagePacker.Pack(messageId, p1), _cts.Token);
+    private async Task WritePacketAsync(byte messageId, int p1, int p2) =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(MessagePacker.Pack(messageId, p1, p2), _cts.Token);
+    private async Task WritePacketAsync(byte messageId, int p1, int p2, int p3) =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(MessagePacker.Pack(messageId, p1, p2, p3), _cts.Token);
 
-    private void WritePacket(byte messageId, Span<byte> payload)
-    {
-        var pak = new PreparedPacket(5 + payload.Length);
-        var buffer = pak.AsSpan();
-        buffer.TryWriteBigEndian(payload.Length + 1);
-        buffer[4] = messageId;
-        payload.CopyTo(buffer.Slice(5, payload.Length));
-        OUTBOUND_MESSAGES.Writer.TryWrite(pak);
-    }
 
     public async ValueTask DisposeAsync()
     {
@@ -593,38 +461,4 @@ public sealed class PreparedPacket : IDisposable
     }
 
     public Span<byte> AsSpan() => _buffer.AsSpan()[..Size];
-}
-
-public sealed class PeerPacket : IDisposable
-{
-    public byte MessageId => _messageId;
-    public ReadOnlySpan<byte> Payload => _buffer.AsSpan().Slice(0, _length);
-
-    private readonly byte _messageId;
-    private readonly byte[]? _buffer;
-    private readonly int _length;
-
-    public PeerPacket(byte messageId, int payloadLength)
-    {
-        _messageId = messageId;
-        _length = payloadLength;
-        if (payloadLength > 0)
-        {
-            _buffer = ArrayPool<byte>.Shared.Rent(payloadLength);
-        }
-    }
-
-    public void Fill(ref ReadOnlySequence<byte> payload)
-    {
-        payload.CopyTo(_buffer);
-    }
-
-    public void Dispose()
-    {
-        if (_buffer != null)
-        {
-            ArrayPool<byte>.Shared.Return(_buffer);
-
-        }
-    }
 }
