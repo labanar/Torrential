@@ -1,6 +1,6 @@
 ﻿namespace Torrential.Peers;
 
-internal static class PeerWireMessageType
+public static class PeerWireMessageType
 {
     public const byte Choke = 0;
     public const byte Unchoke = 1;

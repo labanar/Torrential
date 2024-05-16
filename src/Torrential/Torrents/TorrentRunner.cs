@@ -131,7 +131,8 @@ namespace Torrential.Torrents
                     var fileHandle = await fileHandleProvider.GetPartFileHandle(meta.InfoHash);
                     long fileOffset = (request.PieceIndex * meta.PieceSize) + request.Begin;
                     RandomAccess.Read(fileHandle, buffer, fileOffset);
-                    peer.SendPiece(request.PieceIndex, request.Begin, buffer, request.Length);
+                    var pak = MessagePacker.Pack(request.PieceIndex, request.Begin, buffer.AsSpan().Slice(0, request.Length));
+                    await peer.SendPiece(pak);
 
                     await bus.Publish(new TorrentSegmentUploadedEvent { InfoHash = meta.InfoHash, SegmentLength = request.Length });
 
