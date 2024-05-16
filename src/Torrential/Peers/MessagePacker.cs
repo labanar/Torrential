@@ -1,4 +1,6 @@
-﻿namespace Torrential.Peers;
+﻿using System.Buffers;
+
+namespace Torrential.Peers;
 
 public static class MessagePacker
 {
@@ -44,6 +46,18 @@ public static class MessagePacker
         return pak;
     }
 
+    public static PreparedPacket Pack(int pieceIndex, int begin, ReadOnlySequence<byte> pieceData)
+    {
+        var pak = new PreparedPacket(13 + (int)pieceData.Length);
+        var buffer = pak.AsSpan();
+        buffer.TryWriteBigEndian(9 + (int)pieceData.Length);
+        buffer[4] = PeerWireMessageType.Piece;
+        buffer[5..].TryWriteBigEndian(pieceIndex);
+        buffer[9..].TryWriteBigEndian(begin);
+        pieceData.CopyTo(buffer.Slice(13));
+        return pak;
+    }
+
     public static PreparedPacket Pack(int pieceIndex, int begin, ReadOnlySpan<byte> pieceData)
     {
         var pak = new PreparedPacket(13 + pieceData.Length);
@@ -56,6 +70,18 @@ public static class MessagePacker
         return pak;
     }
 
+
+    public static PreparedPacket PackBitfield(ReadOnlySequence<byte> bitfieldData)
+    {
+        var bitfieldLength = (int)bitfieldData.Length;
+        var pak = new PreparedPacket(5 + bitfieldLength);
+        var buffer = pak.AsSpan();
+        buffer.TryWriteBigEndian(bitfieldLength + 1);
+        buffer[4] = PeerWireMessageType.Bitfield;
+        bitfieldData.CopyTo(buffer[5..]);
+        return pak;
+    }
+
     public static PreparedPacket Pack(IBitfield bitfield)
     {
         var pak = new PreparedPacket(bitfield.Bytes.Length + 5);
@@ -64,5 +90,27 @@ public static class MessagePacker
         buffer[4] = PeerWireMessageType.Bitfield;
         bitfield.Bytes.CopyTo(buffer[5..]);
         return pak;
+    }
+
+    public static PreparedPacket? Pack(int messageSize, byte messageId, ReadOnlySequence<byte> payload)
+    {
+        switch (messageId)
+        {
+            case PeerWireMessageType.Choke:
+            case PeerWireMessageType.Unchoke:
+            case PeerWireMessageType.Interested:
+            case PeerWireMessageType.NotInterested:
+                return Pack(messageId);
+            case PeerWireMessageType.Have:
+                return Pack(messageId, payload.Slice(0, 4).ReadBigEndianInt32());
+            case PeerWireMessageType.Request:
+                return Pack(messageId, payload.Slice(0, 4).ReadBigEndianInt32(), payload.Slice(4, 4).ReadBigEndianInt32(), payload.Slice(8, 4).ReadBigEndianInt32());
+            case PeerWireMessageType.Piece:
+                return Pack(payload.Slice(0, 4).ReadBigEndianInt32(), payload.Slice(4, 4).ReadBigEndianInt32(), payload.Slice(8));
+            case PeerWireMessageType.Bitfield:
+                return PackBitfield(payload);
+            default:
+                return null;
+        }
     }
 }
