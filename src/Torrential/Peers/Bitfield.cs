@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System.Buffers;
+using System.Numerics;
 
 namespace Torrential.Peers
 {
@@ -32,6 +33,14 @@ namespace Torrential.Peers
         public Bitfield(Span<byte> data)
         {
             _sizeInBytes = data.Length;
+            _numOfPieces = _sizeInBytes * 8;
+            _bitfield = new byte[_sizeInBytes];
+            data.CopyTo(_bitfield);
+        }
+
+        public Bitfield(ReadOnlySequence<byte> data)
+        {
+            _sizeInBytes = (int)data.Length;
             _numOfPieces = _sizeInBytes * 8;
             _bitfield = new byte[_sizeInBytes];
             data.CopyTo(_bitfield);

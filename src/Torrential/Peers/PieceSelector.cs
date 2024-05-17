@@ -26,7 +26,7 @@ namespace Torrential.Peers
             var reserved = await pieceReservationService.TryReservePiece(infohash, suggestedIndex, reservationLengthSeconds);
             if (!reserved)
             {
-                logger.LogWarning("Piece already reserved - {Index}", suggestedIndex);
+                logger.LogDebug("Piece already reserved - {Index}", suggestedIndex);
                 return new PieceSuggestionResult(null, suggestedPiece.MorePiecesAvailable);
             };
 
