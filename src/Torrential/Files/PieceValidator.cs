@@ -28,7 +28,6 @@ namespace Torrential.Files
                 return;
             }
 
-            //Have we already verified this piece?
             if (!bitfieldMgr.TryGetDownloadBitfield(request.InfoHash, out var downloadBitfield))
                 return;
 
@@ -54,7 +53,7 @@ namespace Torrential.Files
 
             ArrayPool<byte>.Shared.Return(buffer);
             await fillTask;
-            logger.LogInformation("Validation result for {Piece}: {Result}", request.PieceIndex, result);
+            logger.LogDebug("Validation result for {Piece}: {Result}", request.PieceIndex, result);
             PipePool.Shared.Return(pipe);
 
 
