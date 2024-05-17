@@ -30,14 +30,14 @@ public sealed class PeerWireClient : IAsyncDisposable
     public PeerInfo PeerInfo => _connection.PeerInfo;
 
 
-    private readonly Channel<PreparedPacket> OUTBOUND_MESSAGES = Channel.CreateBounded<PreparedPacket>(new BoundedChannelOptions(20)
+    private readonly Channel<PreparedPacket> OUTBOUND_MESSAGES = Channel.CreateBounded<PreparedPacket>(new BoundedChannelOptions(5)
     {
         FullMode = BoundedChannelFullMode.Wait,
         SingleReader = true,
         SingleWriter = false
     });
 
-    private readonly Channel<PooledPieceSegment> PIECE_SEGMENT_CHANNEL = Channel.CreateBounded<PooledPieceSegment>(new BoundedChannelOptions(10)
+    private readonly Channel<PooledPieceSegment> PIECE_SEGMENT_CHANNEL = Channel.CreateBounded<PooledPieceSegment>(new BoundedChannelOptions(5)
     {
         SingleReader = false,
         SingleWriter = true
@@ -167,7 +167,7 @@ public sealed class PeerWireClient : IAsyncDisposable
 
                 while (TryReadMessage(ref buffer, out var messageSize, out var messageId, out ReadOnlySequence<byte> payload))
                 {
-                    if (!Process(messageSize, messageId, ref payload))
+                    if (!await ProcessAsync(messageSize, messageId, payload))
                     {
                         _logger.LogInformation("Failed to process message {MessageId} {MessageSize} - ending peer connection read processor", messageId, messageSize);
                         return;
@@ -240,11 +240,14 @@ public sealed class PeerWireClient : IAsyncDisposable
         return true;
     }
 
-    private bool Process(int messageSize, byte messageId, ref ReadOnlySequence<byte> payload)
+    private async ValueTask<bool> ProcessAsync(int messageSize, byte messageId, ReadOnlySequence<byte> payload)
     {
+        //Discard keep alive messages
         if (messageId == 0 && messageSize == 0)
             return true;
 
+
+        //Certain messages can be processed immediately, so we'll handle those upfront
         bool handled;
         switch (messageId)
         {
@@ -264,35 +267,36 @@ public sealed class PeerWireClient : IAsyncDisposable
                 HandleNotInterested();
                 handled = true;
                 break;
-            case PeerWireMessageType.Piece:
-                HandlePiece(ref payload, messageSize - 9);
-                handled = true;
-                break;
             case PeerWireMessageType.Bitfield:
-                HandleBitfield(ref payload);
+                HandleBitfield(payload);
                 handled = true;
                 break;
             case PeerWireMessageType.Have:
-                HandleHave(ref payload);
+                HandleHave(payload);
                 handled = true;
+                break;
+            case PeerWireMessageType.Piece:
+                handled = await HandlePieceAsync(payload, messageSize - 9);
                 break;
             case PeerWireMessageType.Request:
-                HandleRequest(ref payload);
-                handled = true;
+                handled = await HandleRequestAsync(payload);
                 break;
             default:
-                //Return false here when we cannot process the message. It tells the main loop to disconnect and stop comms with this peer
-                //For now we'll return true, but we should change this to false once we've implemented all the message handlers
                 handled = true;
                 break;
+                ////Return false here when we cannot process the message. It tells the main loop to disconnect and stop comms with this peer
+                ////For now we'll return true, but we should change this to false once we've implemented all the message handlers
+                //handled = true;
+                //break;
         }
 
-        //If we recieve any event that is not the Bitfield, then we can assume that the peer has an empty bitfield
+        //If the peer bitfield is null, then we can assume that the peer has an empty bitfield
         _state.PeerBitfield ??= new Bitfield(_meta.NumberOfPieces);
         LastMessageTimestamp = DateTimeOffset.UtcNow;
         return handled;
     }
 
+    //These methods modify peer wire state and can be called from the main loop
     private bool HandleChoke()
     {
         _state.AmChoked = true;
@@ -315,7 +319,7 @@ public sealed class PeerWireClient : IAsyncDisposable
         _state.PeerInterested = false;
         return true;
     }
-    private bool HandleHave(ref ReadOnlySequence<byte> payload)
+    private bool HandleHave(ReadOnlySequence<byte> payload)
     {
         var sequenceReader = new SequenceReader<byte>(payload);
         if (!sequenceReader.TryReadBigEndian(out int index))
@@ -324,7 +328,7 @@ public sealed class PeerWireClient : IAsyncDisposable
         _state.PeerBitfield?.MarkHave(index);
         return true;
     }
-    private bool HandleBitfield(ref ReadOnlySequence<byte> payload)
+    private bool HandleBitfield(ReadOnlySequence<byte> payload)
     {
         Span<byte> buffer = stackalloc byte[(int)payload.Length];
         payload.CopyTo(buffer);
@@ -333,58 +337,25 @@ public sealed class PeerWireClient : IAsyncDisposable
         _state.PeerBitfield = bitfield;
         return true;
     }
-    private bool HandleRequest(ref ReadOnlySequence<byte> payload)
+
+
+    //This should be placed into a request channel and processed sequentially in a separate thread
+    private async ValueTask<bool> HandleRequestAsync(ReadOnlySequence<byte> payload)
     {
-        var sequenceReader = new SequenceReader<byte>(payload);
-        if (!sequenceReader.TryReadBigEndian(out int index))
-            return false;
-        if (!sequenceReader.TryReadBigEndian(out int begin))
-            return false;
-        if (!sequenceReader.TryReadBigEndian(out int length))
-            return false;
-
-
-        PeerPeieceRequests.Writer.TryWrite(new(index, begin, length));
-
+        var pieceRequest = PieceRequestMessage.FromReadOnlySequence(payload);
+        await PeerPeieceRequests.Writer.WriteAsync(pieceRequest);
         return true;
     }
-    private bool HandlePiece(ref ReadOnlySequence<byte> payload, int chunkSize)
+
+    private async ValueTask<bool> HandlePieceAsync(ReadOnlySequence<byte> payload, int chunkSize)
     {
-        var reader = new SequenceReader<byte>(payload);
-        if (!reader.TryReadBigEndian(out int pieceIndex))
-        {
-            _logger.LogError("Error reading piece index value");
-            return false;
-        }
-        if (!reader.TryReadBigEndian(out int pieceOffset))
-        {
-            _logger.LogError("Error reading piece offset value");
-            return false;
-        }
-        if (!reader.TryReadExact(chunkSize, out var segmentSequence))
-        {
-            _logger.LogError("Error reading piece chunk value");
-            return false;
-        }
-
-        var segment = PooledPieceSegment.FromReadOnlySequence(ref segmentSequence, _infoHash, pieceIndex, pieceOffset);
-
-
-        //If this is not async, then there is a chance we silently drop the segment
-        //TryWrite will return false if the channel
-        if (!PIECE_SEGMENT_CHANNEL.Writer.TryWrite(segment))
-        {
-            segment.Dispose();
-
-            //We return true here because we don't want to disconnect the peer if we can't write to the channel, we just want to drop the segment
-            return true;
-        }
-
-
+        var segment = PooledPieceSegment.FromReadOnlySequence(payload, chunkSize, _infoHash);
+        await PIECE_SEGMENT_CHANNEL.Writer.WriteAsync(segment, _cts.Token);
         BytesDownloaded += segment.Buffer.Length;
         _state.PiecesReceived += 1;
         return true;
     }
+
     private bool HandleCancel(ref ReadOnlySequence<byte> payload)
     {
         var sequenceReader = new SequenceReader<byte>(payload);
@@ -396,6 +367,7 @@ public sealed class PeerWireClient : IAsyncDisposable
             return false;
         return true;
     }
+
     private bool HandlePort(ref ReadOnlySequence<byte> payload)
     {
         var reader = new SequenceReader<byte>(payload);
@@ -450,7 +422,21 @@ public sealed class PeerWireClient : IAsyncDisposable
     }
 }
 
-public readonly record struct PieceRequestMessage(int PieceIndex, int Begin, int Length);
+public readonly record struct PieceRequestMessage(int PieceIndex, int Begin, int Length)
+{
+    public static PieceRequestMessage FromReadOnlySequence(ReadOnlySequence<byte> payload)
+    {
+        var reader = new SequenceReader<byte>(payload);
+        if (!reader.TryReadBigEndian(out int pieceIndex))
+            throw new InvalidDataException("Could not read piece index");
+        if (!reader.TryReadBigEndian(out int begin))
+            throw new InvalidDataException("Could not read begin index");
+        if (!reader.TryReadBigEndian(out int length))
+            throw new InvalidDataException("Could not read length");
+
+        return new PieceRequestMessage(pieceIndex, begin, length);
+    }
+}
 
 public sealed class PreparedPacket : IDisposable
 {

@@ -21,10 +21,19 @@ public sealed class PooledPieceSegment : IPieceSegment, IDisposable
     public int PieceIndex { get; private set; }
     public int Offset { get; private set; }
 
-    public static PooledPieceSegment FromReadOnlySequence(ref ReadOnlySequence<byte> sequence, InfoHash infoHash, int index, int offset)
+    public static PooledPieceSegment FromReadOnlySequence(ReadOnlySequence<byte> sequence, int chunkSize, InfoHash infoHash)
     {
-        var segment = new PooledPieceSegment((int)sequence.Length, ArrayPool<byte>.Shared, infoHash, index, offset);
-        segment.Fill(ref sequence);
+        var reader = new SequenceReader<byte>(sequence);
+
+        if (!reader.TryReadBigEndian(out int pieceIndex))
+            throw new ArgumentException("Error reading piece index value");
+        if (!reader.TryReadBigEndian(out int pieceOffset))
+            throw new ArgumentException("Error reading piece offset value");
+        if (!reader.TryReadExact(chunkSize, out var segmentSequence))
+            throw new ArgumentException("Error reading piece segment value");
+
+        var segment = new PooledPieceSegment((int)segmentSequence.Length, ArrayPool<byte>.Shared, infoHash, pieceIndex, pieceOffset);
+        segmentSequence.CopyTo(segment._buffer);
         return segment;
     }
 
