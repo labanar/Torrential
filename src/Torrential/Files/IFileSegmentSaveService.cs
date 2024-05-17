@@ -25,15 +25,19 @@ namespace Torrential.Files
                     return;
 
                 //Have we already saved this piece?
-                if (!bitfieldManager.TryGetDownloadBitfield(segment.InfoHash, out var downloadBitfield))
+                if (!bitfieldManager.TryGetVerificationBitfield(segment.InfoHash, out var verificationBitfield))
                 {
                     logger.LogError("Could not find download bitfield for {InfoHash}", segment.InfoHash);
                     return;
                 }
 
-                if (downloadBitfield.HasPiece(segment.PieceIndex))
+                //Have we already verified this piece?
+                if (!bitfieldManager.TryGetDownloadBitfield(segment.InfoHash, out var downloadBitfield))
+                    return;
+
+                if (verificationBitfield.HasPiece(segment.PieceIndex))
                 {
-                    logger.LogInformation("Already downloaded {Piece} - ignoring segment data!", segment.PieceIndex);
+                    logger.LogDebug("Already downloaded {Piece} - ignoring segment data!", segment.PieceIndex);
                     return;
                 }
 

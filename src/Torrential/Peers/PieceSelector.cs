@@ -6,7 +6,7 @@ namespace Torrential.Peers
     {
         public async Task<PieceSuggestionResult> SuggestNextPieceAsync(InfoHash infohash, Bitfield peerBitfield)
         {
-            if (!bitfieldManager.TryGetDownloadBitfield(infohash, out var myBitfield))
+            if (!bitfieldManager.TryGetVerificationBitfield(infohash, out var myBitfield))
                 return PieceSuggestionResult.NoMorePieces;
 
             var suggestedPiece = myBitfield.SuggestPieceToDownload(peerBitfield);
