@@ -9,7 +9,6 @@ namespace Torrential.Torrents
     public class TorrentRunner(ILogger<TorrentRunner> logger,
                                BitfieldManager bitfieldMgr,
                                IFileHandleProvider fileHandleProvider,
-                               IFileSegmentSaveService segmentSaveService,
                                IBus bus,
                                PieceSelector pieceSelector)
     {
@@ -134,7 +133,7 @@ namespace Torrential.Torrents
                     var pak = MessagePacker.Pack(request.PieceIndex, request.Begin, buffer.AsSpan().Slice(0, request.Length));
                     await peer.SendPiece(pak);
 
-                    await bus.Publish(new TorrentSegmentUploadedEvent { InfoHash = meta.InfoHash, SegmentLength = request.Length });
+                    await bus.Publish(new TorrentBlockUploadedEvent { InfoHash = meta.InfoHash, Length = request.Length });
 
                     logger.LogDebug("Sent piece {@Request} to peer", request);
                 }

@@ -24,7 +24,7 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IFileHandleProvider, FileHandleProvider>();
         services.AddSingleton<IMetadataFileService, MetadataFileService>();
-        services.AddSingleton<IFileSegmentSaveService, FileSegmentSaveService>();
+        services.AddSingleton<IBlockSaveService, BlockSaveService>();
         services.AddSingleton<PeerSwarm>();
         services.AddSingleton<TorrentRunner>();
         services.AddSingleton<TorrentTaskManager>();

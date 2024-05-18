@@ -15,13 +15,12 @@ public sealed class PeerWireState
     public bool PeerChoked { get; set; } = true;
     public bool AmInterested { get; set; } = false;
     public bool PeerInterested { get; set; } = false;
-    public int PiecesReceived { get; set; } = 0;
     public Bitfield? PeerBitfield { get; set; } = null;
     public DateTimeOffset PeerLastInterestedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 public sealed class PeerWireClient : IAsyncDisposable
 {
-    private const int PIECE_SEGMENT_REQUEST_SIZE = 16384;
+    private const int DEFAULT_BLOCK_SIZE = 16384;
     private readonly PeerWireState _state;
     private readonly CancellationTokenSource _cts;
     private readonly IPeerWireConnection _connection;
@@ -37,7 +36,7 @@ public sealed class PeerWireClient : IAsyncDisposable
         SingleWriter = false
     });
 
-    private readonly Channel<PooledPieceSegment> PIECE_SEGMENT_CHANNEL = Channel.CreateBounded<PooledPieceSegment>(new BoundedChannelOptions(5)
+    private readonly Channel<PooledBlock> INBOUND_BLOCK_CHANNEL = Channel.CreateBounded<PooledBlock>(new BoundedChannelOptions(5)
     {
         SingleReader = false,
         SingleWriter = true
@@ -52,7 +51,7 @@ public sealed class PeerWireClient : IAsyncDisposable
 
     private TorrentMetadata _meta;
     private InfoHash _infoHash;
-    private IFileSegmentSaveService _fileSegmentSaveService;
+    private IBlockSaveService _blockSaveService;
 
     public PeerWireState State => _state;
 
@@ -62,7 +61,7 @@ public sealed class PeerWireClient : IAsyncDisposable
 
     public DateTimeOffset LastMessageTimestamp { get; private set; }
 
-    public PeerWireClient(IPeerWireConnection connection, TorrentMetadataCache metaCache, IFileSegmentSaveService fileSegmentSaveService, ILogger logger, CancellationToken torrentStoppingToken)
+    public PeerWireClient(IPeerWireConnection connection, TorrentMetadataCache metaCache, IBlockSaveService blockSaveService, ILogger logger, CancellationToken torrentStoppingToken)
     {
         if (!connection.PeerId.HasValue)
             throw new ArgumentException("Peer Id must be set", nameof(connection));
@@ -77,7 +76,7 @@ public sealed class PeerWireClient : IAsyncDisposable
         _state = new PeerWireState();
 
         _connection = connection;
-        _fileSegmentSaveService = fileSegmentSaveService;
+        _blockSaveService = blockSaveService;
         _logger = logger;
         _infoHash = connection.InfoHash;
     }
@@ -87,7 +86,7 @@ public sealed class PeerWireClient : IAsyncDisposable
     {
         var readerTask = ProcessReads(_cts.Token);
         var writeTask = ProcessWrites(_cts.Token);
-        var savingTask = ProcessSegments(_cts.Token);
+        var savingTask = ProcessInboundBlocks(_cts.Token);
 
         try
         {
@@ -101,14 +100,14 @@ public sealed class PeerWireClient : IAsyncDisposable
 
 
         OUTBOUND_MESSAGES.Writer.Complete();
-        PIECE_SEGMENT_CHANNEL.Writer.Complete();
+        INBOUND_BLOCK_CHANNEL.Writer.Complete();
         PeerPeieceRequests.Writer.Complete();
 
         //Clear out any disposables stuck in the channels
         await foreach (var pak in OUTBOUND_MESSAGES.Reader.ReadAllAsync())
             pak.Dispose();
 
-        await foreach (var pak in PIECE_SEGMENT_CHANNEL.Reader.ReadAllAsync())
+        await foreach (var pak in INBOUND_BLOCK_CHANNEL.Reader.ReadAllAsync())
             pak.Dispose();
 
         await foreach (var _ in PeerPeieceRequests.Reader.ReadAllAsync()) ;
@@ -145,14 +144,12 @@ public sealed class PeerWireClient : IAsyncDisposable
 
     }
 
-    private async Task ProcessSegments(CancellationToken cancellationToken)
+    private async Task ProcessInboundBlocks(CancellationToken cancellationToken)
     {
-        await foreach (var segment in PIECE_SEGMENT_CHANNEL.Reader.ReadAllAsync(cancellationToken))
-        {
-            await _fileSegmentSaveService.SaveSegment(segment);
-        }
+        await foreach (var block in INBOUND_BLOCK_CHANNEL.Reader.ReadAllAsync(cancellationToken))
+            await _blockSaveService.SaveBlock(block);
 
-        _logger.LogInformation("Ending peer connection segment processor");
+        _logger.LogInformation("Ending peer connection block processor");
     }
 
     private async Task ProcessReads(CancellationToken cancellationToken)
@@ -281,7 +278,11 @@ public sealed class PeerWireClient : IAsyncDisposable
             case PeerWireMessageType.Request:
                 handled = await HandleRequestAsync(payload);
                 break;
+            case PeerWireMessageType.Cancel:
+                handled = HandleCancel(payload);
+                break;
             default:
+                _logger.LogWarning("Unhandled message type {MessageType}", messageId);
                 handled = true;
                 break;
                 ////Return false here when we cannot process the message. It tells the main loop to disconnect and stop comms with this peer
@@ -349,14 +350,13 @@ public sealed class PeerWireClient : IAsyncDisposable
 
     private async ValueTask<bool> HandlePieceAsync(ReadOnlySequence<byte> payload, int chunkSize)
     {
-        var segment = PooledPieceSegment.FromReadOnlySequence(payload, chunkSize, _infoHash);
-        await PIECE_SEGMENT_CHANNEL.Writer.WriteAsync(segment, _cts.Token);
-        BytesDownloaded += segment.Buffer.Length;
-        _state.PiecesReceived += 1;
+        var block = PooledBlock.FromReadOnlySequence(payload, chunkSize, _infoHash);
+        await INBOUND_BLOCK_CHANNEL.Writer.WriteAsync(block, _cts.Token);
+        BytesDownloaded += block.Buffer.Length;
         return true;
     }
 
-    private bool HandleCancel(ref ReadOnlySequence<byte> payload)
+    private bool HandleCancel(ReadOnlySequence<byte> payload)
     {
         var sequenceReader = new SequenceReader<byte>(payload);
         if (!sequenceReader.TryReadBigEndian(out int index))
@@ -365,10 +365,11 @@ public sealed class PeerWireClient : IAsyncDisposable
             return false;
         if (!sequenceReader.TryReadBigEndian(out int length))
             return false;
+
         return true;
     }
 
-    private bool HandlePort(ref ReadOnlySequence<byte> payload)
+    private bool HandlePort(ReadOnlySequence<byte> payload)
     {
         var reader = new SequenceReader<byte>(payload);
         if (!reader.TryReadBigEndian(out short port))
@@ -386,7 +387,7 @@ public sealed class PeerWireClient : IAsyncDisposable
     public async Task SendChoke() => await SendMessageAsync(PeerWireMessageType.Choke);
     public async Task SendUnchoke() => await SendMessageAsync(PeerWireMessageType.Unchoke);
     public async Task SendHave(int pieceIndex) => await SendMessageAsync(PeerWireMessageType.Have, pieceIndex);
-    public async Task SendPieceRequest(int pieceIndex, int begin, int length = PIECE_SEGMENT_REQUEST_SIZE) =>
+    public async Task SendPieceRequest(int pieceIndex, int begin, int length = DEFAULT_BLOCK_SIZE) =>
         await SendMessageAsync(PeerWireMessageType.Request, pieceIndex, begin, length);
 
     public async Task SendPiece(PreparedPacket pak)
