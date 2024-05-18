@@ -44,6 +44,7 @@ public class PeerWireSocketConnection : IPeerWireConnection
         _egressFillTask = EgressFillSocketAsync(_socket, _egressPipe.Reader, _cts.Token);
         Writer = _egressPipe.Writer;
         PeerInfo = socket.GetPeerInfo();
+
     }
 
     public void SetInfoHash(InfoHash infoHash)
@@ -52,6 +53,7 @@ public class PeerWireSocketConnection : IPeerWireConnection
             throw new InvalidOperationException("InfoHash already set");
 
         InfoHash = infoHash;
+        PeerMetrics.IncrementConnectedPeersCount(InfoHash);
     }
 
     public void SetPeerId(PeerId peerId)
@@ -72,6 +74,7 @@ public class PeerWireSocketConnection : IPeerWireConnection
             {
                 Memory<byte> memory = writer.GetMemory(minimumBufferSize);
                 int bytesRead = await socket.ReceiveAsync(memory, SocketFlags.None, stoppingToken);
+                PeerMetrics.IncrementIngressBytes(InfoHash, bytesRead);
                 if (bytesRead == 0)
                 {
                     break;
@@ -110,7 +113,8 @@ public class PeerWireSocketConnection : IPeerWireConnection
 
                 foreach (var segment in buffer)
                 {
-                    await socket.SendAsync(segment, SocketFlags.None, stoppingToken);
+                    var bytesWritten = await socket.SendAsync(segment, SocketFlags.None, stoppingToken);
+                    PeerMetrics.IncrementEgressBytes(InfoHash, bytesWritten);
                 }
 
                 reader.AdvanceTo(buffer.End);
@@ -145,5 +149,9 @@ public class PeerWireSocketConnection : IPeerWireConnection
 
         _socket.Dispose();
         _logger.LogDebug("Disposing connection {Id}", Id);
+
+
+        if (InfoHash != InfoHash.None)
+            PeerMetrics.DecrementConnectedPeersCount(InfoHash);
     }
 }

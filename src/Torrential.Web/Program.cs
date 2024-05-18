@@ -2,6 +2,7 @@ using MassTransit;
 using MassTransit.Initializers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using OpenTelemetry.Metrics;
 using Serilog;
 using Serilog.Core;
 using Serilog.Sinks.Grafana.Loki;
@@ -26,6 +27,15 @@ builder.Services.AddTorrential();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(b =>
+    {
+        b.AddAspNetCoreInstrumentation()
+         .AddMeter(PeerMetrics.MeterName)
+         .AddRuntimeInstrumentation()
+         .AddPrometheusExporter();
+    });
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -51,6 +61,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddHostedService<InitializationService>();
 
 var app = builder.Build();
+app.UseOpenTelemetryPrometheusScrapingEndpoint();
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors();
@@ -214,7 +225,6 @@ app.MapPost("settings/torrent/global", async (GlobalTorrentSettingsUpdateRequest
     await mgr.SaveGlobalTorrentSettings(new() { MaxConnections = request.MaxConnections });
     return ActionResponse.SuccessResponse;
 });
-
 
 await app.RunAsync();
 

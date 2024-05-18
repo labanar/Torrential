@@ -41,6 +41,8 @@ public sealed class HalfOpenConnectionShakerService(PeerConnectionManager connec
             {
                 await _connectionTasks.Writer.WriteAsync(ConnectInbound(halfOpenConnection));
             }
+
+            PeerMetrics.HALF_OPEN_CONNECTIONS_COUNT.Add(-1);
         }
     }
 
@@ -129,11 +131,15 @@ public sealed class PeerConnectionManager(GeoIpService geoService, ILogger<PeerC
 
     public async Task QueueInboundConnection(IPeerWireConnection connection)
     {
+        PeerMetrics.HALF_OPEN_CONNECTIONS_COUNT.Add(1);
+
+
         //Get the IP address of the connection
         if (await IsBlockedConnection(connection))
         {
             logger.LogInformation("Blocked connection from {0}", connection.PeerInfo.Ip);
             await connection.DisposeAsync();
+            PeerMetrics.HALF_OPEN_CONNECTIONS_COUNT.Add(-1);
             return;
         }
 
@@ -143,6 +149,7 @@ public sealed class PeerConnectionManager(GeoIpService geoService, ILogger<PeerC
         {
             logger.LogInformation("Max half open connections reached, closing connection");
             await connection.DisposeAsync();
+            PeerMetrics.HALF_OPEN_CONNECTIONS_COUNT.Add(-1);
             return;
         }
 
@@ -151,10 +158,13 @@ public sealed class PeerConnectionManager(GeoIpService geoService, ILogger<PeerC
 
     public async Task QueueOutboundConnection(IPeerWireConnection connection, InfoHash expectedHash)
     {
+        PeerMetrics.HALF_OPEN_CONNECTIONS_COUNT.Add(1);
+
         if (await IsBlockedConnection(connection))
         {
             logger.LogInformation("Blocked connection from {0}", connection.PeerInfo.Ip);
             await connection.DisposeAsync();
+            PeerMetrics.HALF_OPEN_CONNECTIONS_COUNT.Add(-1);
             return;
         }
 
@@ -163,6 +173,7 @@ public sealed class PeerConnectionManager(GeoIpService geoService, ILogger<PeerC
         {
             logger.LogInformation("Max half open connections reached, closing connection");
             await connection.DisposeAsync();
+            PeerMetrics.HALF_OPEN_CONNECTIONS_COUNT.Add(-1);
             return;
         }
         logger.LogInformation("Outbound connection queued successfully");
