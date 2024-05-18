@@ -9,7 +9,7 @@ namespace Torrential.Peers;
 public sealed class TcpPeerListenerBackgroundService(
     PeerConnectionManager connectionManager,
     SettingsManager settingsManager,
-    ILogger<PeerWireConnection> pwcLogger,
+    ILogger<IPeerWireConnection> pwcLogger,
     ILogger<TcpPeerListenerBackgroundService> logger)
     : BackgroundService
 {

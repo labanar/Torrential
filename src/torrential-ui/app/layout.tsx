@@ -7,6 +7,10 @@ import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
 import { useEffect } from "react";
 import SignalRService from "./signalRService";
+import styles from "./layout.module.css";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { ColorModeScript, Divider, Text } from "@chakra-ui/react";
 config.autoAddCss = false;
 
 const inter = Inter({ subsets: ["latin"] });
@@ -21,22 +25,54 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-
   useEffect(() => {
-    const signalRService = new SignalRService("http://localhost:5142/torrents/hub");
+    const signalRService = new SignalRService(
+      "http://localhost:5142/torrents/hub"
+    );
     signalRService.startConnection();
 
     return () => {
-        signalRService.stopConnection();
+      signalRService.stopConnection();
     };
-}, []);
+  }, []);
 
+  // const { colorMode, toggleColorMode } = useColorMode();
+  const router = useRouter();
 
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <Providers>{children}</Providers>
+    <html lang="en" style={{ height: "100%", margin: 0 }}>
+      <body
+        style={{
+          height: "100%",
+          margin: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <ColorModeScript initialColorMode={"system"} />
+        <Providers>
+          <div className={styles.root}>
+            <SideBar/>
+            <div className={styles.divider}>
+              <Divider orientation="vertical" />
+            </div>
+            <div id="main" className={styles.main}>
+              {children}
+            </div>
+          </div>
+        </Providers>
       </body>
     </html>
+  );
+}
+
+function SideBar() {
+  return (
+    <div id="sidebar" className={styles.sidebar}>
+      <Text className={styles.sidebarItem}>TORRENTS</Text>
+      <Text className={styles.sidebarItem}>PEERS</Text>
+      <Text className={styles.sidebarItem}>INTEGRATIONS</Text>
+      <Text className={styles.sidebarItem}>SETTINGS</Text>
+    </div>
   );
 }
