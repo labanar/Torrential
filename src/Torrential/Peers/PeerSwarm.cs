@@ -16,7 +16,7 @@ namespace Torrential.Peers
         TorrentStatusCache statusCache,
         BitfieldManager bitfieldManager,
         IBus bus,
-        IFileSegmentSaveService fileSegmentSaveService,
+        IBlockSaveService blockSaveService,
         ILogger<PeerSwarm> logger,
         ILoggerFactory loggerFactory)
     {
@@ -112,7 +112,7 @@ namespace Torrential.Peers
             var torrentPeerCts = _peerCts.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, CancellationTokenSource>());
             var peerCts = torrentPeerCts.GetOrAdd(connection.PeerId.Value, (_) => CancellationTokenSource.CreateLinkedTokenSource(torrentCts.Token));
             var peerClientLogger = loggerFactory.CreateLogger<PeerWireClient>();
-            var peerClient = new PeerWireClient(connection, metadataCache, fileSegmentSaveService, peerClientLogger, peerCts.Token);
+            var peerClient = new PeerWireClient(connection, metadataCache, blockSaveService, peerClientLogger, peerCts.Token);
 
 
             var processTasks = _peerProcessTasks.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, Task>());

@@ -113,7 +113,7 @@ namespace Torrential.Tests
         {
             var meta = TorrentMetadataParser.FromFile("./debian-12.5.0-arm64-netinst.iso.torrent");
             var chunkField = new AsyncBitfield(meta.TotalNumberOfChunks);
-            var segmentLength = (int)Math.Pow(2, 14);
+            var blockLength = (int)Math.Pow(2, 14);
 
             var chunksPerFullPiece = (int)(meta.PieceSize / Math.Pow(2, 14));
             var chunkOffset = 2105 * chunksPerFullPiece;
@@ -121,35 +121,35 @@ namespace Torrential.Tests
 
             var finalPieceLength = 45056;
 
-            var chunksInThisPiece = (int)Math.Ceiling((decimal)finalPieceLength / segmentLength);
+            var chunksInThisPiece = (int)Math.Ceiling((decimal)finalPieceLength / blockLength);
 
 
             var offset = 0;
-            var extra = offset / segmentLength;
+            var extra = offset / blockLength;
             var chunkIndex = 2105 * chunksPerFullPiece + extra;
             await chunkField.MarkHaveAsync(chunkIndex, CancellationToken.None);
 
             offset = (int)Math.Pow(2, 14);
-            extra = offset / segmentLength;
+            extra = offset / blockLength;
             chunkIndex = 2105 * chunksPerFullPiece + extra;
             await chunkField.MarkHaveAsync(chunkIndex, CancellationToken.None);
 
             offset = (int)Math.Pow(2, 14) * 2;
-            extra = offset / segmentLength;
+            extra = offset / blockLength;
             chunkIndex = 2105 * chunksPerFullPiece + extra;
             await chunkField.MarkHaveAsync(chunkIndex, CancellationToken.None);
 
 
-            var hasAll = HasAllSegmentsForPiece(chunkField, 2105, chunksInThisPiece, chunksPerFullPiece);
+            var hasAll = HasAllBlocksForPiece(chunkField, 2105, chunksInThisPiece, chunksPerFullPiece);
             Assert.True(hasAll);
         }
 
-        public bool HasAllSegmentsForPiece(AsyncBitfield chunkField, int pieceIndex, int chunksInThisPiece, int chunksInFullPiece)
+        public bool HasAllBlocksForPiece(AsyncBitfield chunkField, int pieceIndex, int chunksInThisPiece, int chunksInFullPiece)
         {
-            var segmentIndex = pieceIndex * chunksInFullPiece;
+            var blockIndex = pieceIndex * chunksInFullPiece;
             for (int i = 0; i < chunksInThisPiece; i++)
             {
-                if (!chunkField.HasPiece(segmentIndex + i)) return false;
+                if (!chunkField.HasPiece(blockIndex + i)) return false;
             }
             return true;
         }

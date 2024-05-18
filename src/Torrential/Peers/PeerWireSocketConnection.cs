@@ -111,9 +111,9 @@ public class PeerWireSocketConnection : IPeerWireConnection
                 ReadResult result = await reader.ReadAsync(stoppingToken);
                 var buffer = result.Buffer;
 
-                foreach (var segment in buffer)
+                foreach (var block in buffer)
                 {
-                    var bytesWritten = await socket.SendAsync(segment, SocketFlags.None, stoppingToken);
+                    var bytesWritten = await socket.SendAsync(block, SocketFlags.None, stoppingToken);
                     PeerMetrics.IncrementEgressBytes(InfoHash, bytesWritten);
                 }
 

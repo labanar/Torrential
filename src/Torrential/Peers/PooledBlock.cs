@@ -2,15 +2,7 @@
 
 namespace Torrential.Peers;
 
-public interface IPieceSegment
-{
-    public ReadOnlySpan<byte> Buffer { get; }
-    public InfoHash InfoHash { get; }
-    public int PieceIndex { get; }
-    public int Offset { get; }
-}
-
-public sealed class PooledPieceSegment : IPieceSegment, IDisposable
+public sealed class PooledBlock : IDisposable
 {
     private readonly ArrayPool<byte> _pool;
     private readonly int _size;
@@ -21,23 +13,23 @@ public sealed class PooledPieceSegment : IPieceSegment, IDisposable
     public int PieceIndex { get; private set; }
     public int Offset { get; private set; }
 
-    public static PooledPieceSegment FromReadOnlySequence(ReadOnlySequence<byte> sequence, int chunkSize, InfoHash infoHash)
+    public static PooledBlock FromReadOnlySequence(ReadOnlySequence<byte> sequence, int chunkSize, InfoHash infoHash)
     {
         var reader = new SequenceReader<byte>(sequence);
 
         if (!reader.TryReadBigEndian(out int pieceIndex))
-            throw new ArgumentException("Error reading piece index value");
+            throw new ArgumentException("Error reading block pieceIndex");
         if (!reader.TryReadBigEndian(out int pieceOffset))
-            throw new ArgumentException("Error reading piece offset value");
-        if (!reader.TryReadExact(chunkSize, out var segmentSequence))
-            throw new ArgumentException("Error reading piece segment value");
+            throw new ArgumentException("Error reading block offset");
+        if (!reader.TryReadExact(chunkSize, out var blockSequence))
+            throw new ArgumentException("Error reading piece block data");
 
-        var segment = new PooledPieceSegment((int)segmentSequence.Length, ArrayPool<byte>.Shared, infoHash, pieceIndex, pieceOffset);
-        segmentSequence.CopyTo(segment._buffer);
-        return segment;
+        var block = new PooledBlock((int)blockSequence.Length, ArrayPool<byte>.Shared, infoHash, pieceIndex, pieceOffset);
+        blockSequence.CopyTo(block._buffer);
+        return block;
     }
 
-    private PooledPieceSegment(int size, ArrayPool<byte> pool, InfoHash infoHash, int index, int offset)
+    private PooledBlock(int size, ArrayPool<byte> pool, InfoHash infoHash, int index, int offset)
     {
         InfoHash = infoHash;
         PieceIndex = index;
