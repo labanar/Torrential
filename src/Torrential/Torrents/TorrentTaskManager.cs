@@ -35,6 +35,7 @@ namespace Torrential.Torrents
                 PieceSize = torrentMetadata.PieceSize
             });
             Torrents[torrentMetadata.InfoHash] = "Idle";
+
             return new() { InfoHash = torrentMetadata.InfoHash, Success = true };
         }
 

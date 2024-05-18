@@ -1,12 +1,17 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Torrential;
 
+
+
 [JsonConverter(typeof(InfoHashJsonConverter))]
 public readonly record struct InfoHash(long P1, long P2, int P3) : IParsable<InfoHash>
 {
+    private static ConcurrentDictionary<InfoHash, string> _stringCache = new();
+
     public static readonly InfoHash None = new InfoHash(long.MaxValue, long.MaxValue, int.MaxValue);
 
     public static implicit operator InfoHash(string value) => FromHexString(value);
@@ -74,6 +79,11 @@ public readonly record struct InfoHash(long P1, long P2, int P3) : IParsable<Inf
 
     public string AsString()
     {
+        //Check the cache first, to avoid the allocation
+        if (_stringCache.TryGetValue(this, out var cached))
+            return cached;
+
+
         Span<byte> hash = stackalloc byte[20];
         CopyTo(hash);
 
@@ -83,7 +93,9 @@ public readonly record struct InfoHash(long P1, long P2, int P3) : IParsable<Inf
             encoded[i * 2] = HexDigit(hash[i] >> 4);
             encoded[(i * 2) + 1] = HexDigit(hash[i] & 0x0F);
         }
-        return new string(encoded);
+        var str = new string(encoded);
+        _stringCache.TryAdd(this, str);
+        return str;
     }
 
     public void CopyHexString(Span<char> destination)
