@@ -10,7 +10,7 @@
 }
 
 .torrent {
-  background-color: #fff;
+  /* background-color: #fff; */
   display: flex;
   flex-direction: row;
   padding: 0.4em;
@@ -30,7 +30,7 @@
 }
 
 .torrent:nth-child(even) {
-  background-color: #eee;
+  /* background-color: #eee; */
 }
 
 .progress {
@@ -43,4 +43,15 @@
 
 .progressDetails {
   padding-top: 0.6em;
+}
+
+
+.actionBar{
+  min-height: 4em;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 2em
+  
 }

@@ -7,7 +7,7 @@ public interface IPeerWireConnection : IAsyncDisposable
 {
     Guid Id { get; }
 
-    PeerInfo? PeerInfo { get; }
+    PeerInfo PeerInfo { get; }
     PeerId? PeerId { get; }
     PipeReader Reader { get; }
     PipeWriter Writer { get; }
