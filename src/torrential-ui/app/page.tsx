@@ -2,8 +2,11 @@
 
 import {
   Button,
+  Card,
   Container,
+  Divider,
   IconButton,
+  Input,
   Link,
   Progress,
   Text,
@@ -23,7 +26,7 @@ import {
   faUpLong,
   faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
-import { MutableRefObject, useEffect, useMemo, useRef } from "react";
+import { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
 import { FileUpload, FileUploadElement } from "@/components/FileUpload";
 import { useAppDispatch } from "./hooks";
 import { TorrentsState, setTorrents } from "@/features/torrentsSlice";
@@ -33,11 +36,41 @@ import { setPeers } from "@/features/peersSlice";
 import { useSelector } from "react-redux";
 import { torrentsWithPeersSelector } from "./selectors";
 import { useRouter } from "next/navigation";
+import classNames from "classnames";
 
 export default function Home() {
   const dispatch = useAppDispatch();
   const torrents = useSelector(torrentsWithPeersSelector);
+  const [selectedTorrents, setSelectedTorrents] = useState<string[]>([]);
 
+  const selectTorrent = (infoHash: string, event: React.MouseEvent) => {
+    if (event.ctrlKey || event.metaKey) {
+      // Multi-select with Ctrl or Cmd key
+      if (selectedTorrents.includes(infoHash)) {
+        // If item is already selected, deselect it
+        setSelectedTorrents(
+          selectedTorrents.filter((item) => item !== infoHash)
+        );
+      } else {
+        // Add the item to the selected items
+        setSelectedTorrents([...selectedTorrents, infoHash]);
+      }
+    } else {
+      // Single select or deselect if already selected
+      if (selectedTorrents.includes(infoHash)) {
+        setSelectedTorrents([]);
+      } else {
+        setSelectedTorrents([infoHash]);
+      }
+    }
+  };
+
+  const isSelected = (infoHash: string) => {
+    return selectedTorrents.includes(infoHash);
+  };
+
+
+  
   const fetchTorrents = async () => {
     try {
       const response = await fetch(`http://localhost:5142/torrents`);
@@ -106,31 +139,38 @@ export default function Home() {
   return (
     <>
       <div className={styles.root}>
-        <ActionsRow />
+        <ActionsRow selectedTorrents={selectedTorrents} />
+        <div className={styles.torrentDivider}>
+          <Divider orientation="horizontal" />
+        </div>
         <div className={styles.torrentList}>
           {torrents.map((t) => (
-            <TorrentRow
-              uploadRate={t.uploadRate}
-              downloadRate={t.downloadRate}
-              status={t.status}
-              key={t.infoHash}
-              progress={t.progress ?? 0}
-              infoHash={t.infoHash ?? ""}
-              seeders={
-                t.peers?.reduce((pv, cv) => {
-                  if (cv.isSeed) return pv + 1;
-                  return pv;
-                }, 0) ?? 0
-              }
-              leechers={
-                t.peers?.reduce((pv, cv) => {
-                  if (!cv.isSeed) return pv + 1;
-                  return pv;
-                }, 0) ?? 0
-              }
-              totalBytes={t.sizeInBytes ?? 0}
-              title={t.name ?? "???"}
-            />
+            <>
+              <TorrentRow
+                onSelect={selectTorrent}
+                isSelected={isSelected(t.infoHash)}
+                uploadRate={t.uploadRate}
+                downloadRate={t.downloadRate}
+                status={t.status}
+                key={t.infoHash}
+                progress={t.progress ?? 0}
+                infoHash={t.infoHash ?? ""}
+                seeders={
+                  t.peers?.reduce((pv, cv) => {
+                    if (cv.isSeed) return pv + 1;
+                    return pv;
+                  }, 0) ?? 0
+                }
+                leechers={
+                  t.peers?.reduce((pv, cv) => {
+                    if (!cv.isSeed) return pv + 1;
+                    return pv;
+                  }, 0) ?? 0
+                }
+                totalBytes={t.sizeInBytes ?? 0}
+                title={t.name ?? "???"}
+              />
+            </>
           ))}
         </div>
       </div>
@@ -138,15 +178,13 @@ export default function Home() {
   );
 }
 
-// interface ActionsRowProps
-// {
-//   uploadRef: MutableRefObject<FileUploadElement>
-// }
+interface ActionsRowProps {
+  selectedTorrents: string[];
+}
 
-const ActionsRow = () => {
-
-
+const ActionsRow = ({ selectedTorrents }: ActionsRowProps) => {
   const uploadRef = useRef<FileUploadElement | null>(null);
+  
   const onUpload = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -170,50 +208,104 @@ const ActionsRow = () => {
     }
   };
 
+  const stopTorrent = async (infoHash: string) => {
+    try {
+      const response = await fetch(`http://localhost:5142/torrents/${infoHash}/stop`, {method: 'POST'})
+    }
+    catch(e) {
+      console.log(e);
+      console.log("Error stopping torrent")
+    }
+  }
+
+  const startTorrent = async (infoHash: string) => {
+    try {
+      const response = await fetch(`http://localhost:5142/torrents/${infoHash}/start`, {method: 'POST'})
+    }
+    catch(e) {
+      console.log(e);
+      console.log("Error stopping torrent")
+    }
+  }
+
+
+  const stopTorrents = async () => {
+    selectedTorrents.forEach( infoHash => {
+       stopTorrent(infoHash);
+    });
+  }
+
+  const startTorrents = async () => {
+    selectedTorrents.forEach( infoHash => {
+      startTorrent(infoHash);
+   }); 
+  }
+
+
+  const torrentActionsDisabled = useMemo(() => {
+    return selectedTorrents.length === 0;
+  }, [selectedTorrents]);
+
   return (
-    <Container className={styles.actionBar}>
+    <div className={styles.actionBar}>
       <FileUpload
         accept=".torrent"
         ref={uploadRef}
         onFileChange={(f) => onUpload(f)}
       />
 
-      <Tooltip label="Start">
-        <IconButton
-          colorScheme={"green"}
-          aria-label="Start"
-          icon={<FontAwesomeIcon  icon={faPlay} />}
+      <div className={styles.actionSearch}>
+        <Input
+          variant={"filed"}
+          placeholder="Filter"
+          style={{ maxWidth: "200px", justifySelf: "start" }}
         />
-      </Tooltip>
+      </div>
 
-      <Tooltip label="Stop">
-        <IconButton
-          colorScheme={"orange"}
-          aria-label="Stop"
-          icon={<FontAwesomeIcon icon={faPause} />}
-        />
-      </Tooltip>
+      <div className={styles.actionButtons}>
+        <Tooltip label="Start">
+          <IconButton
+            isDisabled={torrentActionsDisabled}
+            onClick={() => startTorrents()}
+            colorScheme={"green"}
+            aria-label="Start"
+            icon={<FontAwesomeIcon icon={faPlay} />}
+          />
+        </Tooltip>
 
-      <Tooltip label="Delete">
-        <IconButton
-          colorScheme={"red"}
-          aria-label="Remove"
-          icon={<FontAwesomeIcon icon={faTrash} />}
-        />
-      </Tooltip>
+        <Tooltip label="Stop">
+          <IconButton
+            onClick={() => stopTorrents()}
+            isDisabled={torrentActionsDisabled}
+            colorScheme={"orange"}
+            aria-label="Stop"
+            icon={<FontAwesomeIcon icon={faPause} />}
+          />
+        </Tooltip>
 
-      <Tooltip label="Add Torrent">
-        <IconButton
-          colorScheme={"blue"}
-          aria-label="Add"
-          icon={<FontAwesomeIcon icon={faPlus} />}
-          onClick={() => {
-            if (uploadRef === null || uploadRef.current === null) return;
-            uploadRef.current.openFilePicker();
-          }}
-        />
-      </Tooltip>
-    </Container>
+        <Tooltip label="Delete">
+          <IconButton
+            isDisabled={torrentActionsDisabled}
+            colorScheme={"red"}
+            aria-label="Remove"
+            icon={<FontAwesomeIcon icon={faTrash} />}
+          />
+        </Tooltip>
+
+        <Tooltip label="Add Torrent">
+          <IconButton
+            colorScheme={"blue"}
+            aria-label="Add"
+            icon={<FontAwesomeIcon icon={faPlus} />}
+            onClick={() => {
+              if (uploadRef === null || uploadRef.current === null) return;
+              uploadRef.current.openFilePicker();
+            }}
+          />
+        </Tooltip>
+      </div>
+      <div style={{ flexGrow: 1, flexShrink: 1 }}></div>
+    </div>
   );
 };
 
@@ -227,6 +319,8 @@ interface TorrentRowProps {
   status: string;
   uploadRate: number;
   downloadRate: number;
+  isSelected: boolean;
+  onSelect: (innfoHash: string, e: React.MouseEvent) => void;
 }
 
 function TorrentRow({
@@ -239,6 +333,8 @@ function TorrentRow({
   status,
   uploadRate,
   downloadRate,
+  isSelected,
+  onSelect,
 }: TorrentRowProps) {
   const color = useMemo(() => {
     if (status === "Stopped") return "orange";
@@ -253,92 +349,108 @@ function TorrentRow({
     return (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i];
   }
 
+  const className = useMemo(() => {
+    if (!isSelected) return classNames(styles.torrentContainer);
+
+    return classNames(styles.torrentContainer, styles.torrentContainerSelected);
+  }, [isSelected]);
+
   return (
-    <div className={styles.torrent}>
-      <div className={styles.torrentIcon}>
-        {status === "Running" && progress < 1 && (
-          <FontAwesomeIcon
-            icon={faDownLong}
-            size={"xl"}
-            style={{
-              paddingRight: "0.8em",
-              paddingLeft: "0.4em",
-              color,
-            }}
-          />
-        )}
-        {status === "Running" && progress >= 1 && (
-          <FontAwesomeIcon
-            icon={faUpLong}
-            size={"xl"}
-            style={{
-              paddingRight: "0.8em",
-              paddingLeft: "0.4em",
-              color,
-            }}
-          />
-        )}
-        {status === "Stopped" && (
-          <FontAwesomeIcon
-            icon={faPause}
-            size={"xl"}
-            style={{
-              paddingRight: "0.8em",
-              paddingLeft: "0.4em",
-              color,
-            }}
-          />
-        )}
-      </div>
-      <div className={styles.torrentInfo} key={infoHash}>
-        <Text className={styles.title} fontSize={"md"} noOfLines={1}>
-          {title}
-        </Text>
-        <Text className={styles.progress} fontSize={"xs"}>
-          {`${prettyPrintBytes(totalBytes * progress)} of ${prettyPrintBytes(
-            totalBytes
-          )} (${(progress * 100).toFixed(1)}%)`}
-        </Text>
-        <Progress value={progress * 100} colorScheme={color} color={'#1a1a1a'} height={"1em"} />
-        <Text className={styles.progressDetails} fontSize={"xs"}>
-          <Tooltip label={`${seeders + leechers} peers`}>
-            <span>
-              <FontAwesomeIcon
-                icon={faUserGroup}
-                size={"sm"}
-                style={{ paddingRight: "0.3em" }}
-              />
-              {`${seeders + leechers}`}
-            </span>
-          </Tooltip>
-          {` • `}
-          <Tooltip label={`${seeders} seeders`}>
-            <span>
-              <FontAwesomeIcon
-                icon={faSeedling}
-                size={"sm"}
-                style={{ paddingRight: "0.3em" }}
-              />
-              {seeders}
-            </span>
-          </Tooltip>
-          <span>
+    <div className={className} onClick={(e) => onSelect(infoHash, e)}>
+      <div className={styles.torrent}>
+        <div className={styles.torrentIcon}>
+          {status === "Running" && progress < 1 && (
             <FontAwesomeIcon
               icon={faDownLong}
-              size={"sm"}
-              style={{ paddingLeft: "1em", paddingRight: "0.3em" }}
+              size={"xl"}
+              style={{
+                paddingRight: "0.8em",
+                paddingLeft: "0.4em",
+                color,
+              }}
             />
-            {prettyPrintBytes(downloadRate) + "/s"}
-          </span>
-          <span>
+          )}
+          {status === "Running" && progress >= 1 && (
             <FontAwesomeIcon
               icon={faUpLong}
-              size={"sm"}
-              style={{ paddingLeft: "0.5em", paddingRight: "0.3em" }}
+              size={"xl"}
+              style={{
+                paddingRight: "0.8em",
+                paddingLeft: "0.4em",
+                color,
+              }}
             />
-            {prettyPrintBytes(uploadRate) + "/s"}
-          </span>
-        </Text>
+          )}
+          {status === "Stopped" && (
+            <FontAwesomeIcon
+              icon={faPause}
+              size={"xl"}
+              style={{
+                paddingRight: "0.8em",
+                paddingLeft: "0.4em",
+                color,
+              }}
+            />
+          )}
+        </div>
+        <div className={styles.torrentInfo} key={infoHash}>
+          <Text className={styles.title} fontSize={"md"} noOfLines={1}>
+            {title}
+          </Text>
+          <Text className={styles.progress} fontSize={"xs"}>
+            {`${prettyPrintBytes(totalBytes * progress)} of ${prettyPrintBytes(
+              totalBytes
+            )} (${(progress * 100).toFixed(1)}%)`}
+          </Text>
+          <Progress
+            value={progress * 100}
+            colorScheme={color}
+            color={"#1a1a1a"}
+            height={"1em"}
+          />
+          <Text className={styles.progressDetails} fontSize={"xs"}>
+            <Tooltip label={`${seeders + leechers} peers`}>
+              <span>
+                <FontAwesomeIcon
+                  icon={faUserGroup}
+                  size={"sm"}
+                  style={{ paddingRight: "0.3em" }}
+                />
+                {`${seeders + leechers}`}
+              </span>
+            </Tooltip>
+            {` • `}
+            <Tooltip label={`${seeders} seeders`}>
+              <span>
+                <FontAwesomeIcon
+                  icon={faSeedling}
+                  size={"sm"}
+                  style={{ paddingRight: "0.3em" }}
+                />
+                {seeders}
+              </span>
+            </Tooltip>
+            <span>
+              <FontAwesomeIcon
+                icon={faDownLong}
+                size={"sm"}
+                style={{ paddingLeft: "1em", paddingRight: "0.3em" }}
+              />
+              {prettyPrintBytes(downloadRate) + "/s"}
+            </span>
+            <span>
+              <FontAwesomeIcon
+                icon={faUpLong}
+                size={"sm"}
+                style={{ paddingLeft: "0.5em", paddingRight: "0.3em" }}
+              />
+              {prettyPrintBytes(uploadRate) + "/s"}
+            </span>
+          </Text>
+        </div>
+      </div>
+      <div className={styles.torrentDivider}>
+        <Divider orientation="horizontal" />
       </div>
     </div>
   );

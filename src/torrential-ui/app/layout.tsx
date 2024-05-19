@@ -1,6 +1,5 @@
 "use client";
 
-import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Providers } from "./providers";
 import { config } from "@fortawesome/fontawesome-svg-core";
@@ -9,7 +8,6 @@ import { useEffect } from "react";
 import SignalRService from "./signalRService";
 import styles from "./layout.module.css";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { ColorModeScript, Divider, Text } from "@chakra-ui/react";
 config.autoAddCss = false;
 
@@ -37,7 +35,6 @@ export default function RootLayout({
   }, []);
 
   // const { colorMode, toggleColorMode } = useColorMode();
-  const router = useRouter();
 
   return (
     <html lang="en" style={{ height: "100%", margin: 0 }}>
@@ -52,7 +49,7 @@ export default function RootLayout({
         <ColorModeScript initialColorMode={"system"} />
         <Providers>
           <div className={styles.root}>
-            <SideBar/>
+            <SideBar />
             <div className={styles.divider}>
               <Divider orientation="vertical" />
             </div>
@@ -67,12 +64,28 @@ export default function RootLayout({
 }
 
 function SideBar() {
+
   return (
     <div id="sidebar" className={styles.sidebar}>
-      <Text className={styles.sidebarItem}>TORRENTS</Text>
-      <Text className={styles.sidebarItem}>PEERS</Text>
-      <Text className={styles.sidebarItem}>INTEGRATIONS</Text>
-      <Text className={styles.sidebarItem}>SETTINGS</Text>
+      <SideBarItem label="Torrents" linksTo="/" />
+      <SideBarItem label="Peers" linksTo="/" />
+      <SideBarItem label="Integrations" linksTo="/" />
+      <SideBarItem label="Settings" linksTo="/settings" />
+    </div>
+  );
+}
+
+interface SideBarItemProps {
+  label: string;
+  linksTo: string;
+}
+
+function SideBarItem({ label, linksTo }: SideBarItemProps) {
+  const router = useRouter();
+
+  return (
+    <div className={styles.sidebarItem} onClick={() => router.push(linksTo)}>
+      <Text fontSize={"md"}>{label}</Text>
     </div>
   );
 }
