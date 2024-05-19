@@ -19,9 +19,10 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3em;
+  gap: 2em;
   padding: 1.25em;
 }
+
 
 .divider {
   padding-top: 1em;
@@ -30,14 +31,15 @@ body {
 
 
 .sidebarItem {
-  font-weight: 400;
+  font-weight: 500;
   transition: transform 0.2s ease, background-color 0.2s ease;
   user-select: none;
+  padding: 1em
 }
 
 
 .sidebarItem:hover {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .main {
