@@ -29,14 +29,14 @@ public sealed class PeerWireClient : IAsyncDisposable
     public PeerInfo PeerInfo => _connection.PeerInfo;
 
 
-    private readonly Channel<PreparedPacket> OUTBOUND_MESSAGES = Channel.CreateBounded<PreparedPacket>(new BoundedChannelOptions(5)
+    private readonly Channel<PreparedPacket> OUTBOUND_MESSAGES = Channel.CreateBounded<PreparedPacket>(new BoundedChannelOptions(10)
     {
         FullMode = BoundedChannelFullMode.Wait,
         SingleReader = true,
         SingleWriter = false
     });
 
-    private readonly Channel<PooledBlock> INBOUND_BLOCK_CHANNEL = Channel.CreateBounded<PooledBlock>(new BoundedChannelOptions(5)
+    private readonly Channel<PooledBlock> INBOUND_BLOCK_CHANNEL = Channel.CreateBounded<PooledBlock>(new BoundedChannelOptions(10)
     {
         SingleReader = false,
         SingleWriter = true

@@ -1,6 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from './store';
-import { TorrentsState } from '@/features/torrentsSlice';
 import { TorrentSummary } from '@/types';
 
 export const torrentsWithPeersSelector = createSelector(

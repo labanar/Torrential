@@ -1,0 +1,47 @@
+.toastContainer {
+  display: flex;
+  flex-direction: row;
+  padding: 0.5em;
+  border-radius: 0.2em;
+}
+
+.success {
+  background: "#68D391";
+}
+
+.warning {
+  background: "#F6AD55";
+}
+
+.error {
+  background: "#FC8181";
+}
+
+.info {
+  background: "#63B3ED";
+}
+
+.icon {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding-right: 0.8em;
+  padding-left: 0.8em;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1em;
+}
+
+.title {
+}
+
+.description {
+}
+
+.close {
+  padding-left: 0.2em;
+}
