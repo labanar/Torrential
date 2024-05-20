@@ -27,6 +27,16 @@
 }
 
 
+.deleteModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deleteFilesCheckbox {
+  padding-top: 8px;
+}
+
 .torrent {
   /* background-color: #fff; */
   display: flex;

@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using Torrential.Files;
 using Torrential.Settings;
 using Torrential.Torrents;
+using Torrential.Utilities;
 
 namespace Torrential.Peers
 {
@@ -20,16 +21,20 @@ namespace Torrential.Peers
         ILogger<PeerSwarm> logger,
         ILoggerFactory loggerFactory)
     {
-
-
         private ConcurrentDictionary<InfoHash, CancellationTokenSource> _torrentCts = [];
         private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, CancellationTokenSource>> _peerCts = [];
-        private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> _peerSwarms = [];
+        private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> _peerClients = [];
         private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> _peerProcessTasks = [];
         private ConcurrentDictionary<InfoHash, ConcurrentDictionary<PeerId, Task>> _peerUploadDownloadTasks = [];
-        public IReadOnlyDictionary<InfoHash, ConcurrentDictionary<PeerId, PeerWireClient>> PeerClients => _peerSwarms;
 
-        public async Task MaintainSwarm(InfoHash infoHash, CancellationToken stoppingToken)
+
+        public async IAsyncEnumerable<InfoHash> TrackedTorrents()
+        {
+            foreach (var infoHash in _torrentCts.Keys)
+                yield return infoHash;
+        }
+
+        public async Task MaintainSwarm(InfoHash infoHash)
         {
             if (!metadataCache.TryGet(infoHash, out var metadata))
             {
@@ -37,14 +42,48 @@ namespace Torrential.Peers
                 return;
             }
 
-            _torrentCts.TryAdd(infoHash, CancellationTokenSource.CreateLinkedTokenSource(stoppingToken));
+            var cts = new CancellationTokenSource();
+            var stoppingToken = cts.Token;
+            _torrentCts[infoHash] = cts;
 
             var timer = new PeriodicTimer(TimeSpan.FromSeconds(60));
             while (!stoppingToken.IsCancellationRequested)
             {
-                await CleanupPeers(stoppingToken);
+                await CleanupPeers();
                 await timer.WaitForNextTickAsync(stoppingToken);
             }
+        }
+
+        public async Task BroadcastHaveMessage(InfoHash infoHash, int pieceIndex)
+        {
+            if (!_peerClients.TryGetValue(infoHash, out var peerClients))
+            {
+                logger.LogWarning("No peers found for {InfoHash}", infoHash);
+                return;
+            }
+
+            var tasks = new List<Task>();
+            try
+            {
+                foreach (var peer in peerClients.Values)
+                    tasks.Add(peer.SendHave(pieceIndex));
+
+                await Task.WhenAll(tasks);
+            }
+            finally
+            {
+                logger.LogDebug("Broadcasted have message for {PieceIndex} to {Count} peers", pieceIndex, tasks.Count);
+            }
+        }
+
+        public async Task RemoveSwarm(InfoHash infoHash)
+        {
+            await CleanupPeers(infoHash);
+            _torrentCts.TryRemove(infoHash, out _);
+            _peerClients.TryRemove(infoHash, out _);
+            _peerProcessTasks.TryRemove(infoHash, out _);
+            _peerUploadDownloadTasks.TryRemove(infoHash, out _);
+            _peerCts.TryRemove(infoHash, out _);
         }
 
         public async Task AddToSwarm(IPeerWireConnection connection)
@@ -57,7 +96,7 @@ namespace Torrential.Peers
 
             var torrentSettings = await settingsManager.GetDefaultTorrentSettings();
             var globalSettings = await settingsManager.GetGlobalTorrentSettings();
-            var peerConnections = _peerSwarms.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, PeerWireClient>());
+            var peerConnections = _peerClients.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, PeerWireClient>());
 
             if (await statusCache.GetStatus(connection.InfoHash) != TorrentStatus.Running)
             {
@@ -73,7 +112,7 @@ namespace Torrential.Peers
                 return;
             }
 
-            if (_peerSwarms.Values.Sum(x => x.Count) >= globalSettings.MaxConnections)
+            if (_peerClients.Values.Sum(x => x.Count) >= globalSettings.MaxConnections)
             {
                 logger.LogDebug("Global peer limit reached");
                 await connection.DisposeAsync();
@@ -118,8 +157,6 @@ namespace Torrential.Peers
             var processTasks = _peerProcessTasks.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, Task>());
             processTasks.TryAdd(connection.PeerId.Value, peerClient.ProcessMessages());
 
-
-
             logger.LogDebug("Sending our bitfield to peer");
             await peerClient.SendBitfield(verificationBitfield);
             logger.LogDebug("Waiting for peer to send bitfield");
@@ -162,9 +199,9 @@ namespace Torrential.Peers
             });
         }
 
-        private async Task CleanupPeers(CancellationToken stoppingToken)
+        private async Task CleanupPeers()
         {
-            foreach (var (infoHash, peerClients) in _peerSwarms)
+            foreach (var (infoHash, peerClients) in _peerClients)
             {
                 foreach (var (peerId, peerClient) in peerClients)
                 {
@@ -173,6 +210,7 @@ namespace Torrential.Peers
                     {
                         logger.LogInformation("Peer {PeerId} has not sent messages in the last 2 minutes", peerId.ToAsciiString());
                         await CleanupPeer(infoHash, peerId);
+                        continue;
                     }
 
                     //Is the peer's upload/download task still running?
@@ -180,16 +218,52 @@ namespace Torrential.Peers
                     {
                         if (uploadDownloadTasks.TryGetValue(peerId, out var task))
                         {
-                            if (task.IsCompleted || task.IsCanceled || task.IsFaulted)
+                            if (!task.InProgress())
                             {
                                 logger.LogInformation("Peer {PeerId} upload/download task is complete", peerId.ToAsciiString());
                                 await CleanupPeer(infoHash, peerId);
+                                continue;
+                            }
+                        }
+                    }
+
+                    //Is the peer's process task still running?
+                    if (_peerProcessTasks.TryGetValue(infoHash, out var processTasks))
+                    {
+                        if (processTasks.TryGetValue(peerId, out var task))
+                        {
+                            if (!task.InProgress())
+                            {
+                                logger.LogInformation("Peer {PeerId} process task is complete", peerId.ToAsciiString());
+                                await CleanupPeer(infoHash, peerId);
+                                continue;
                             }
                         }
                     }
                 }
             }
         }
+
+
+        public async Task CleanupPeers(InfoHash infoHash)
+        {
+            if (_torrentCts.TryRemove(infoHash, out var cts))
+                cts.Cancel();
+
+            var cleanupTasks = new List<Task>();
+            if (_peerClients.TryGetValue(infoHash, out var peerClients))
+            {
+                foreach (var (peerId, _) in peerClients)
+                {
+                    cleanupTasks.Add(CleanupPeer(infoHash, peerId));
+                }
+            }
+
+            await Task.WhenAll(cleanupTasks);
+
+            _peerClients.TryRemove(infoHash, out _);
+        }
+
         private async Task CleanupPeer(InfoHash infoHash, PeerId peerId)
         {
             //Get the peer cts
@@ -205,7 +279,7 @@ namespace Torrential.Peers
             //Remove the process task
             if (_peerProcessTasks.TryGetValue(infoHash, out var processTasks))
             {
-                if (processTasks.TryRemove(peerId, out var processTask))
+                if (processTasks.TryRemove(peerId, out _))
                 {
                     logger.LogInformation("Removing peer process task");
                 }
@@ -222,7 +296,7 @@ namespace Torrential.Peers
             }
 
             //Remove and dispose of the client
-            if (_peerSwarms.TryGetValue(infoHash, out var peerClients))
+            if (_peerClients.TryGetValue(infoHash, out var peerClients))
             {
                 if (peerClients.TryRemove(peerId, out var peerClient))
                 {
@@ -241,7 +315,7 @@ namespace Torrential.Peers
 
         public async Task<ICollection<PeerWireClient>> GetPeers(InfoHash infoHash)
         {
-            if (!_peerSwarms.TryGetValue(infoHash, out var peerConnections))
+            if (!_peerClients.TryGetValue(infoHash, out var peerConnections))
                 return Array.Empty<PeerWireClient>();
 
             return peerConnections.Values.ToArray();

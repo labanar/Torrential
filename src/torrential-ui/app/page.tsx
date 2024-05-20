@@ -2,16 +2,20 @@
 
 import {
   Button,
-  Card,
-  Container,
+  Checkbox,
   Divider,
   IconButton,
   Input,
-  Link,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
   Progress,
   Text,
   Tooltip,
-  useColorMode,
 } from "@chakra-ui/react";
 import styles from "./page.module.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -21,12 +25,11 @@ import {
   faPlay,
   faPlus,
   faSeedling,
-  faStop,
   faTrash,
   faUpLong,
   faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
-import { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FileUpload, FileUploadElement } from "@/components/FileUpload";
 import { useAppDispatch } from "./hooks";
 import { TorrentsState, setTorrents } from "@/features/torrentsSlice";
@@ -34,14 +37,24 @@ import { PeerSummary, TorrentSummary } from "@/types";
 import { PeerApiModel, TorrentApiModel } from "@/api/types";
 import { setPeers } from "@/features/peersSlice";
 import { useSelector } from "react-redux";
-import { torrentsWithPeersSelector } from "./selectors";
-import { useRouter } from "next/navigation";
+import {
+  selectTorrentsByInfoHashes,
+  torrentsWithPeersSelector,
+} from "./selectors";
 import classNames from "classnames";
 
 export default function Home() {
   const dispatch = useAppDispatch();
   const torrents = useSelector(torrentsWithPeersSelector);
   const [selectedTorrents, setSelectedTorrents] = useState<string[]>([]);
+
+  const memoActionRow = useMemo(() => {
+    return <ActionsRow selectedTorrents={selectedTorrents} setSelectedTorrents={setSelectedTorrents} />;
+  }, [selectedTorrents]);
+
+  useEffect(() => {
+    console.log("TORRENTS CHANGED");
+  }, [torrents]);
 
   const selectTorrent = (infoHash: string, event: React.MouseEvent) => {
     if (event.ctrlKey || event.metaKey) {
@@ -69,8 +82,6 @@ export default function Home() {
     return selectedTorrents.includes(infoHash);
   };
 
-
-  
   const fetchTorrents = async () => {
     try {
       const response = await fetch(`http://localhost:5142/torrents`);
@@ -139,7 +150,8 @@ export default function Home() {
   return (
     <>
       <div className={styles.root}>
-        <ActionsRow selectedTorrents={selectedTorrents} />
+        {memoActionRow}
+        {/* <ActionsRow selectedTorrents={selectedTorrents} /> */}
         <div className={styles.torrentDivider}>
           <Divider orientation="horizontal" />
         </div>
@@ -180,11 +192,13 @@ export default function Home() {
 
 interface ActionsRowProps {
   selectedTorrents: string[];
+  setSelectedTorrents: (infoHashes: string[]) => void;
 }
 
-const ActionsRow = ({ selectedTorrents }: ActionsRowProps) => {
+const ActionsRow = ({ selectedTorrents, setSelectedTorrents }: ActionsRowProps) => {
   const uploadRef = useRef<FileUploadElement | null>(null);
-  
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
   const onUpload = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -210,37 +224,69 @@ const ActionsRow = ({ selectedTorrents }: ActionsRowProps) => {
 
   const stopTorrent = async (infoHash: string) => {
     try {
-      const response = await fetch(`http://localhost:5142/torrents/${infoHash}/stop`, {method: 'POST'})
-    }
-    catch(e) {
+      const response = await fetch(
+        `http://localhost:5142/torrents/${infoHash}/stop`,
+        { method: "POST" }
+      );
+    } catch (e) {
       console.log(e);
-      console.log("Error stopping torrent")
+      console.log("Error stopping torrent");
     }
-  }
+  };
 
   const startTorrent = async (infoHash: string) => {
     try {
-      const response = await fetch(`http://localhost:5142/torrents/${infoHash}/start`, {method: 'POST'})
-    }
-    catch(e) {
+      const response = await fetch(
+        `http://localhost:5142/torrents/${infoHash}/start`,
+        { method: "POST" }
+      );
+    } catch (e) {
       console.log(e);
-      console.log("Error stopping torrent")
+      console.log("Error stopping torrent");
     }
-  }
+  };
 
+  const removeTorrent = async (infoHash: string, deleteFiles: boolean) => {
+    try {
+      let body = {
+        deleteFiles,
+      };
+
+      const response = await fetch(
+        `http://localhost:5142/torrents/${infoHash}/delete`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    } catch (e) {
+      console.log(e);
+      console.log("Error deleting torrent");
+    }
+  };
 
   const stopTorrents = async () => {
-    selectedTorrents.forEach( infoHash => {
-       stopTorrent(infoHash);
+    selectedTorrents.forEach((infoHash) => {
+      stopTorrent(infoHash);
     });
-  }
+  };
 
   const startTorrents = async () => {
-    selectedTorrents.forEach( infoHash => {
+    selectedTorrents.forEach((infoHash) => {
       startTorrent(infoHash);
-   }); 
-  }
+    });
+  };
 
+  const removeTorrents = async (deleteFiles: boolean) => {
+    selectedTorrents.forEach((infoHash) => {
+      removeTorrent(infoHash, deleteFiles);
+    });
+    setSelectedTorrents([]);
+
+  };
 
   const torrentActionsDisabled = useMemo(() => {
     return selectedTorrents.length === 0;
@@ -252,6 +298,13 @@ const ActionsRow = ({ selectedTorrents }: ActionsRowProps) => {
         accept=".torrent"
         ref={uploadRef}
         onFileChange={(f) => onUpload(f)}
+      />
+
+      <TorrentRemoveConfirmationModal
+        open={deleteModalOpen}
+        infoHashes={selectedTorrents}
+        onClose={() => setDeleteModalOpen(false)}
+        onRemove={(infoHashes, deleteFiles) => removeTorrents(deleteFiles)}
       />
 
       <div className={styles.actionSearch}>
@@ -285,6 +338,7 @@ const ActionsRow = ({ selectedTorrents }: ActionsRowProps) => {
 
         <Tooltip label="Delete">
           <IconButton
+            onClick={() => setDeleteModalOpen(true)}
             isDisabled={torrentActionsDisabled}
             colorScheme={"red"}
             aria-label="Remove"
@@ -337,7 +391,7 @@ function TorrentRow({
   onSelect,
 }: TorrentRowProps) {
   const color = useMemo(() => {
-    if (status === "Stopped") return "orange";
+    if (status === "Stopped" || status === "Idle") return "orange";
     if (status === "Running") return "green";
   }, [status]);
 
@@ -381,7 +435,7 @@ function TorrentRow({
               }}
             />
           )}
-          {status === "Stopped" && (
+          {(status === "Stopped" || status === "Idle") && (
             <FontAwesomeIcon
               icon={faPause}
               size={"xl"}
@@ -453,5 +507,72 @@ function TorrentRow({
         <Divider orientation="horizontal" />
       </div>
     </div>
+  );
+}
+
+interface TorrentRemoveConfirmationModalProps {
+  open: boolean;
+  infoHashes: string[];
+  onClose: () => void;
+  onRemove: (infoHashes: string[], deleteFiles: boolean) => void;
+}
+
+function TorrentRemoveConfirmationModal({
+  infoHashes,
+  onClose,
+  onRemove,
+  open,
+}: TorrentRemoveConfirmationModalProps) {
+  const title = useMemo(() => {
+    if (!infoHashes || infoHashes.length <= 1) {
+      return "Remove Torrent";
+    }
+
+    return "Remove Torrents";
+  }, [infoHashes]);
+
+  const [deleteFiles, setDeleteFiles] = useState(false);
+  const torrents = useSelector(selectTorrentsByInfoHashes(infoHashes));
+
+  return (
+    <Modal isOpen={open} onClose={onClose} size={"lg"}>
+      <ModalOverlay />
+      <ModalContent>
+        <ModalHeader>{title}</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody className={styles.deleteModalBody}>
+          <Text>{"Are you sure you want remove: "}</Text>
+          <ul style={{ paddingLeft: "2em" }}>
+            {infoHashes.map((hash) => {
+              return (
+                <li>
+                  <Text>{torrents[hash].name}</Text>
+                </li>
+              );
+            })}
+          </ul>
+          <Checkbox
+            className={styles.deleteFilesCheckbox}
+            defaultChecked={false}
+            onChange={(e) => setDeleteFiles(e.target.checked)}
+          >
+            Delete Files on Disk
+          </Checkbox>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            colorScheme="red"
+            mr={3}
+            onClick={() => {
+              onRemove(infoHashes, deleteFiles);
+              onClose();
+            }}
+          >
+            Remove
+          </Button>
+          <Button onClick={onClose}>Close</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 }

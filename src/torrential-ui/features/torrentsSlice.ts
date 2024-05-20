@@ -28,8 +28,15 @@ const torrentsSlice = createSlice({
       const { infoHash, update } = action.payload;
       state[infoHash] = { ...state[infoHash], ...update };
     },
+    removeTorrent(
+      state,
+      action: PayloadAction<{ infoHash: string }>
+    ) {
+      const { infoHash } = action.payload;
+      delete state[infoHash];
+    }
   },
 });
 
-export const { setTorrents, updateTorrent } = torrentsSlice.actions;
+export const { setTorrents, updateTorrent , removeTorrent} = torrentsSlice.actions;
 export default torrentsSlice.reducer;

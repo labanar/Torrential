@@ -36,3 +36,7 @@ export interface TorrentStartedEvent {
 export interface TorrentStoppedEvent {
     infoHash: string
 }
+
+export interface TorrentRemovedEvent {
+    infoHash: string
+}

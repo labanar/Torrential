@@ -1,6 +1,5 @@
 ﻿using MassTransit;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using Torrential.Peers;
 using Torrential.Torrents;
 
@@ -15,7 +14,6 @@ namespace Torrential.Files
         : IBlockSaveService
     {
         private static readonly int BLOCK_LENGTH = (int)Math.Pow(2, 14);
-        private static ConcurrentDictionary<InfoHash, AsyncBitfield> _blockBitfields = [];
 
         public async Task SaveBlock(PooledBlock block)
         {
@@ -35,16 +33,19 @@ namespace Torrential.Files
                 if (!bitfieldManager.TryGetDownloadBitfield(block.InfoHash, out var downloadBitfield))
                     return;
 
+
+                if (!bitfieldManager.TryGetBlockBitfield(block.InfoHash, out var blockBitfield) || blockBitfield == null)
+                {
+                    logger.LogError("Could not retrieve block bitfield");
+                    return;
+                }
+
                 if (verificationBitfield.HasPiece(block.PieceIndex))
                 {
                     logger.LogDebug("Already downloaded {Piece} - ignoring block data!", block.PieceIndex);
                     return;
                 }
 
-                var blockBitfield = _blockBitfields.GetOrAdd(block.InfoHash, (_) =>
-                {
-                    return new AsyncBitfield(meta.TotalNumberOfChunks);
-                });
 
                 var fileHandle = await fileHandleProvider.GetPartFileHandle(block.InfoHash);
                 var fileOffset = (block.PieceIndex * meta.PieceSize) + block.Offset;
@@ -52,12 +53,11 @@ namespace Torrential.Files
                 await bus.Publish(new TorrentBlockDownloaded { InfoHash = meta.InfoHash, Length = block.Buffer.Length });
 
                 var chunksPerFullPiece = (int)(meta.PieceSize / BLOCK_LENGTH);
-                var chunkOffset = block.PieceIndex * chunksPerFullPiece;
                 var pieceLength = (int)(block.PieceIndex == meta.NumberOfPieces - 1 ? meta.FinalPieceSize : meta.PieceSize);
                 var chunksInThisPiece = (int)Math.Ceiling((decimal)pieceLength / BLOCK_LENGTH);
                 var extra = block.Offset / BLOCK_LENGTH;
-                var chunkIndex = block.PieceIndex * chunksPerFullPiece + extra;
-                await blockBitfield.MarkHaveAsync(chunkIndex, CancellationToken.None);
+                var blockIndex = block.PieceIndex * chunksPerFullPiece + extra;
+                await blockBitfield.MarkHaveAsync(blockIndex, CancellationToken.None);
 
                 if (HasAllBlocksForPiece(blockBitfield, block.PieceIndex, chunksInThisPiece, chunksPerFullPiece))
                 {

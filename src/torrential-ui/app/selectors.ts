@@ -1,5 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from './store';
+import { TorrentsState } from '@/features/torrentsSlice';
+import { TorrentSummary } from '@/types';
 
 export const torrentsWithPeersSelector = createSelector(
   (state: RootState) => state.torrents,
@@ -9,3 +11,16 @@ export const torrentsWithPeersSelector = createSelector(
     peers: peers[infoHash] || []
   }))
 );
+
+
+export const selectTorrentsByInfoHashes = (infoHashes: string[]) =>
+  createSelector(
+    (state: RootState) => state.torrents,
+    (torrentsState) =>
+      infoHashes.reduce<{ [infoHash: string]: TorrentSummary }>((acc, infoHash) => {
+        if (torrentsState[infoHash]) {
+          acc[infoHash] = torrentsState[infoHash];
+        }
+        return acc;
+      }, {})
+  );

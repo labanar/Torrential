@@ -17,6 +17,7 @@ namespace Torrential.Trackers
         IEnumerable<ITrackerClient> trackerClients,
         SettingsManager settingsManager,
         PeerConnectionManager connectionManager,
+        TorrentStats stats,
         ILogger<AnnounceService> logger)
         : BackgroundService
     {
@@ -40,14 +41,12 @@ namespace Torrential.Trackers
                                 var socket = default(Socket);
                                 try
                                 {
-                                    //TODO - consider splitting the concerns of connecting the socket and performing the handshake
                                     var timeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                                     socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
                                     socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
                                     var endpoint = new IPEndPoint(peer.Ip, peer.Port);
                                     await socket.ConnectAsync(endpoint, timeoutToken.Token);
                                     conn = new PeerWireSocketConnection(socket, logger);
-
                                     await connectionManager.QueueOutboundConnection(conn, torrent.InfoHash);
                                 }
                                 catch
@@ -87,6 +86,7 @@ namespace Torrential.Trackers
             var downloadedBytes = (long)downloadedBytesF;
             var remainingBytes = totalBytes - downloadedBytes;
             var tcpSettings = await settingsManager.GetTcpListenerSettings();
+            var bytesUploaded = stats.GetTotalUploaded(meta.InfoHash);
 
             foreach (var tracker in trackerClients)
             {
@@ -97,7 +97,7 @@ namespace Torrential.Trackers
                     PeerId = peerService.Self.Id,
                     Url = meta.AnnounceList.First(),
                     NumWant = 50,
-                    BytesUploaded = 0,
+                    BytesUploaded = bytesUploaded,
                     BytesDownloaded = downloadedBytes,
                     BytesRemaining = remainingBytes,
                     Port = tcpSettings.Port
@@ -129,7 +129,8 @@ namespace Torrential.Trackers
 
     public sealed class AnnounceServiceEventHandler(AnnounceServiceState state, TorrentMetadataCache metaCache, ILogger<AnnounceServiceEventHandler> logger) :
         IConsumer<TorrentStartedEvent>,
-        IConsumer<TorrentStoppedEvent>
+        IConsumer<TorrentStoppedEvent>,
+        IConsumer<TorrentRemovedEvent>
     {
         public Task Consume(ConsumeContext<TorrentStartedEvent> context)
         {
@@ -145,6 +146,13 @@ namespace Torrential.Trackers
         }
 
         public Task Consume(ConsumeContext<TorrentStoppedEvent> context)
+        {
+            var @event = context.Message;
+            state.RemoveTorrent(@event.InfoHash);
+            return Task.CompletedTask;
+        }
+
+        public Task Consume(ConsumeContext<TorrentRemovedEvent> context)
         {
             var @event = context.Message;
             state.RemoveTorrent(@event.InfoHash);

@@ -32,20 +32,27 @@ public sealed class TcpPeerListenerBackgroundService(
                 tcpListener?.Dispose();
                 tcpListener = new TcpListener(IPAddress.Any, newPort);
                 tcpListener.Start();
-                logger.LogInformation("TCP Listener started on {Port}", port);
                 port = newPort;
+                logger.LogInformation("TCP Listener started on {Port}", port);
             }
 
-            var socket = await tcpListener!.AcceptSocketAsync();
-            if (socket == null) continue;
-            if (!socket.Connected)
+            try
             {
-                socket.Dispose();
-                continue;
-            }
+                var socket = await tcpListener!.AcceptSocketAsync();
+                if (socket == null) continue;
+                if (!socket.Connected)
+                {
+                    socket.Dispose();
+                    continue;
+                }
 
-            var connection = new PeerWireSocketConnection(socket, pwcLogger);
-            await connectionManager.QueueInboundConnection(connection);
+                var connection = new PeerWireSocketConnection(socket, pwcLogger);
+                await connectionManager.QueueInboundConnection(connection);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error accepting connection");
+            }
         }
     }
 

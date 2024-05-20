@@ -178,8 +178,11 @@ app.MapPost(
 
 app.MapPost(
     "torrents/{infoHash}/delete",
-    async (InfoHash infoHash, ICommandHandler<TorrentRemoveCommand, TorrentRemoveResponse> handler) =>
-        await handler.Execute(new() { InfoHash = infoHash }));
+    async (InfoHash infoHash, TorrentRemoveCommand cmd, ICommandHandler<TorrentRemoveCommand, TorrentRemoveResponse> handler) =>
+    {
+        cmd.InfoHash = infoHash;
+        await handler.Execute(cmd);
+    });
 
 
 app.MapGet("settings/file", async (SettingsManager mgr) =>
