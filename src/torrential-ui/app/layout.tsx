@@ -9,6 +9,7 @@ import SignalRService from "./signalRService";
 import styles from "./layout.module.css";
 import { useRouter } from "next/navigation";
 import { ColorModeScript, Divider, Text } from "@chakra-ui/react";
+import ToastNotifications from "@/components/ToastNotification";
 config.autoAddCss = false;
 
 const inter = Inter({ subsets: ["latin"] });
@@ -34,6 +35,8 @@ export default function RootLayout({
     };
   }, []);
 
+  
+
   // const { colorMode, toggleColorMode } = useColorMode();
 
   return (
@@ -48,6 +51,7 @@ export default function RootLayout({
       >
         <ColorModeScript initialColorMode={"system"} />
         <Providers>
+          <ToastNotifications/>
           <div className={styles.root}>
             <SideBar />
             <div className={styles.divider}>

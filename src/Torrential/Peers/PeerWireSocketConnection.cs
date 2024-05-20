@@ -44,6 +44,7 @@ public class PeerWireSocketConnection : IPeerWireConnection
         _egressFillTask = EgressFillSocketAsync(_socket, _egressPipe.Reader, _cts.Token);
         Writer = _egressPipe.Writer;
         PeerInfo = socket.GetPeerInfo();
+        ConnectionTimestamp = DateTimeOffset.UtcNow;
     }
 
     public void SetInfoHash(InfoHash infoHash)

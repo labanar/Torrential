@@ -206,9 +206,10 @@ namespace Torrential.Peers
                 foreach (var (peerId, peerClient) in peerClients)
                 {
                     //Has the peer sent us messages in the last 2 minutes?
-                    if (peerClient.LastMessageTimestamp < DateTimeOffset.UtcNow.AddMinutes(-2))
+                    var diff = Math.Abs(DateTimeOffset.UtcNow.Subtract(peerClient.LastMessageTimestamp).TotalMinutes);
+                    if (diff >= 5)
                     {
-                        logger.LogInformation("Peer {PeerId} has not sent messages in the last 2 minutes", peerId.ToAsciiString());
+                        logger.LogInformation("Peer {PeerId} has not sent messages in the last 5 minutes", peerId.ToAsciiString());
                         await CleanupPeer(infoHash, peerId);
                         continue;
                     }
