@@ -1,5 +1,4 @@
 ﻿using Microsoft.Win32.SafeHandles;
-using System.Text.Json;
 using Torrential.Torrents;
 
 namespace Torrential.Files
@@ -8,5 +7,6 @@ namespace Torrential.Files
     {
         public ValueTask<SafeFileHandle> GetPartFileHandle(InfoHash infoHash);
         public ValueTask<SafeFileHandle> GetCompletedFileHandle(InfoHash infoHash, TorrentMetadataFile fileName);
+        void RemovePartFileHandle(InfoHash hash);
     }
 }

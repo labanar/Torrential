@@ -12,6 +12,16 @@ public sealed class TorrentFileService(TorrentMetadataCache metaCache, SettingsM
     private ConcurrentDictionary<InfoHash, string> _downloadBitFieldPath = [];
     private ConcurrentDictionary<InfoHash, string> _verificationBitFieldPath = [];
 
+    public Task ClearData(InfoHash infoHash)
+    {
+        _downloadBitFieldPath.TryRemove(infoHash, out _);
+        _downloadPaths.TryRemove(infoHash, out _);
+        _metadataPaths.TryRemove(infoHash, out _);
+        _partPaths.TryRemove(infoHash, out _);
+        _verificationBitFieldPath.TryRemove(infoHash, out _);
+        return Task.CompletedTask;
+    }
+
     public async Task<string> GetMetadataFilePath(InfoHash infoHash)
     {
         if (!_downloadPaths.ContainsKey(infoHash))

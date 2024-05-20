@@ -26,6 +26,15 @@ namespace Torrential.Torrents
         private readonly ConcurrentDictionary<InfoHash, TorrentStatsCalculator> _ingressRates = [];
         private readonly ConcurrentDictionary<InfoHash, TorrentStatsCalculator> _egressRates = [];
 
+        public async Task ClearStats(InfoHash infoHash)
+        {
+            if (_ingressRates.TryRemove(infoHash, out var ingressCalc))
+                await ingressCalc.DisposeAsync();
+
+            if (_egressRates.TryRemove(infoHash, out var egressCalc))
+                await egressCalc.DisposeAsync();
+        }
+
         public async Task QueueDownloadRate(InfoHash infoHash, int dataSize)
         {
             var calculator = _ingressRates.GetOrAdd(infoHash, (_) => new TorrentStatsCalculator());
@@ -83,7 +92,7 @@ namespace Torrential.Torrents
             while (!stoppingToken.IsCancellationRequested)
             {
                 await timer.WaitForNextTickAsync(stoppingToken);
-                foreach (var infoHash in peerSwarm.PeerClients.Keys)
+                await foreach (var infoHash in peerSwarm.TrackedTorrents())
                 {
                     var ingressRate = rates.GetIngressRate(infoHash);
                     var egressRate = rates.GetEgressRate(infoHash);

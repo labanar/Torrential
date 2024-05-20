@@ -1,11 +1,16 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Torrential.Files;
+using Torrential.Peers;
 using Torrential.Torrents;
 
 namespace Torrential.Commands
 {
     public class TorrentRemoveCommand : ICommand<TorrentRemoveResponse>
     {
-        public required string InfoHash { get; init; }
+        public string InfoHash { get; set; }
+        public bool DeleteFiles { get; init; }
     }
 
     public class TorrentRemoveResponse
@@ -13,13 +18,39 @@ namespace Torrential.Commands
 
     }
 
-    public class TorrentRemoveCommandHandler(TorrentTaskManager mgr, TorrentialDb db)
+    public class TorrentRemoveCommandHandler(
+        BitfieldManager bitMgr,
+        TorrentMetadataCache metaCache,
+        TorrentTaskManager mgr,
+        TorrentialDb db,
+        IBus bus,
+        TorrentFileService fileService,
+        IFileHandleProvider fileHandleProvider,
+        TorrentStats stats,
+        ILogger<TorrentRemoveCommandHandler> logger)
         : ICommandHandler<TorrentRemoveCommand, TorrentRemoveResponse>
     {
         public async Task<TorrentRemoveResponse> Execute(TorrentRemoveCommand command)
         {
-            await mgr.Remove(command.InfoHash);
             await db.Torrents.Where(x => x.InfoHash == command.InfoHash).ExecuteDeleteAsync();
+            await mgr.Remove(command.InfoHash);
+            bitMgr.RemoveBitfields(command.InfoHash);
+            fileHandleProvider.RemovePartFileHandle(command.InfoHash);
+            await stats.ClearStats(command.InfoHash);
+
+            if (command.DeleteFiles)
+            {
+                var metadataFilePath = await fileService.GetMetadataFilePath(command.InfoHash);
+                var folder = Path.GetDirectoryName(metadataFilePath);
+                if (!string.IsNullOrEmpty(folder))
+                {
+                    logger.LogInformation("Deleting folder {Folder}", folder);
+                    Directory.Delete(folder, true);
+                }
+            }
+
+            //await fileService.ClearData(command.InfoHash);
+            await bus.Publish(new TorrentRemovedEvent { InfoHash = command.InfoHash });
             return new() { };
         }
     }

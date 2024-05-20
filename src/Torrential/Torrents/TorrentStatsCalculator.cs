@@ -70,6 +70,16 @@ namespace Torrential.Torrents
         {
             await _cts.CancelAsync();
 
+            try
+            {
+                await _processTask;
+            }
+            catch
+            {
+
+            }
+
+            updateChannel.Writer.Complete();
         }
     }
 

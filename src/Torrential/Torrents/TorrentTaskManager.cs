@@ -1,14 +1,14 @@
 ﻿using MassTransit;
 using System.Collections.Concurrent;
 using Torrential.Peers;
+using Torrential.Utilities;
 
 namespace Torrential.Torrents
 {
     public class TorrentTaskManager(TorrentMetadataCache metaCache, PeerSwarm swarms, IBus bus, BitfieldManager bitfieldManager)
     {
-        private static ConcurrentDictionary<InfoHash, string> Torrents = [];
-        private static ConcurrentDictionary<InfoHash, Task> TorrentTasks = [];
-        private static ConcurrentDictionary<InfoHash, CancellationTokenSource> TorrentTaskCancellationTokenSources = [];
+        private ConcurrentDictionary<InfoHash, string> Torrents = [];
+        private ConcurrentDictionary<InfoHash, Task> TorrentTasks = [];
 
         public async Task<TorrentManagerResponse> Add(TorrentMetadata torrentMetadata)
         {
@@ -23,7 +23,7 @@ namespace Torrential.Torrents
             }
 
             metaCache.Add(torrentMetadata);
-            await bitfieldManager.Initialize(torrentMetadata.InfoHash, torrentMetadata.NumberOfPieces);
+            await bitfieldManager.Initialize(torrentMetadata);
 
             await bus.Publish(new TorrentAddedEvent
             {
@@ -35,32 +35,12 @@ namespace Torrential.Torrents
                 PieceSize = torrentMetadata.PieceSize
             });
             Torrents[torrentMetadata.InfoHash] = "Idle";
-
             return new() { InfoHash = torrentMetadata.InfoHash, Success = true };
         }
 
-        public async Task<TorrentManagerResponse> Remove(InfoHash infoHash)
-        {
-            if (!Torrents.TryGetValue(infoHash, out var status))
-            {
-                return new()
-                {
-                    InfoHash = infoHash,
-                    Error = TorrentManagerErrorCode.TORRENT_NOT_FOUND,
-                    Success = false
-                };
-            }
-
-            await Stop(infoHash);
-            Torrents.Remove(infoHash, out _);
-            await bus.Publish(new TorrentRemovedEvent { InfoHash = infoHash });
-            return new() { InfoHash = infoHash, Success = true };
-        }
-
-
         public async Task<TorrentManagerResponse> Start(InfoHash infoHash)
         {
-            if (!Torrents.TryGetValue(infoHash, out var status))
+            if (!Torrents.TryGetValue(infoHash, out _))
             {
                 return new()
                 {
@@ -70,7 +50,7 @@ namespace Torrential.Torrents
                 };
             }
 
-            if (TorrentTasks.TryGetValue(infoHash, out var torrentTask) && !torrentTask.IsCompleted)
+            if (TorrentTasks.TryGetValue(infoHash, out var torrentTask) && torrentTask.InProgress())
             {
                 return new()
                 {
@@ -80,9 +60,7 @@ namespace Torrential.Torrents
                 };
             }
 
-            var cts = new CancellationTokenSource();
-            TorrentTaskCancellationTokenSources[infoHash] = cts;
-            TorrentTasks[infoHash] = swarms.MaintainSwarm(infoHash, cts.Token);
+            TorrentTasks[infoHash] = swarms.MaintainSwarm(infoHash);
             await bus.Publish(new TorrentStartedEvent { InfoHash = infoHash });
             return new()
             {
@@ -91,10 +69,9 @@ namespace Torrential.Torrents
             };
         }
 
-
         public async Task<TorrentManagerResponse> Stop(InfoHash infoHash)
         {
-            if (!Torrents.TryGetValue(infoHash, out var status))
+            if (!Torrents.TryGetValue(infoHash, out _))
             {
                 return new()
                 {
@@ -104,27 +81,20 @@ namespace Torrential.Torrents
                 };
             }
 
-            if (!TorrentTaskCancellationTokenSources.ContainsKey(infoHash))
+            if (!TorrentTasks.TryRemove(infoHash, out var torrentTask))
             {
                 return new()
                 {
                     InfoHash = infoHash,
-                    Error = TorrentManagerErrorCode.TORRENT_ALREADY_STOPPED,
+                    Error = TorrentManagerErrorCode.TORRENT_NOT_FOUND,
                     Success = false
                 };
             }
 
-            var cts = TorrentTaskCancellationTokenSources[infoHash];
-            cts.Cancel();
+            await swarms.RemoveSwarm(infoHash);
+            while (torrentTask.InProgress())
+                await Task.Delay(500);
 
-            while (!TorrentTasks[infoHash].IsCompleted)
-            {
-                await Task.Delay(50);
-            }
-
-
-            TorrentTasks.Remove(infoHash, out _);
-            TorrentTaskCancellationTokenSources.Remove(infoHash, out _);
             await bus.Publish(new TorrentStoppedEvent { InfoHash = infoHash });
 
             return new()
@@ -132,6 +102,36 @@ namespace Torrential.Torrents
                 InfoHash = infoHash,
                 Success = true
             };
+        }
+
+        public async Task<TorrentManagerResponse> Remove(InfoHash infoHash)
+        {
+            if (!Torrents.TryRemove(infoHash, out _))
+            {
+                return new()
+                {
+                    InfoHash = infoHash,
+                    Error = TorrentManagerErrorCode.TORRENT_NOT_FOUND,
+                    Success = false
+                };
+            }
+
+            if (!TorrentTasks.TryRemove(infoHash, out var torrentTask))
+            {
+                return new()
+                {
+                    InfoHash = infoHash,
+                    Error = TorrentManagerErrorCode.TORRENT_NOT_FOUND,
+                    Success = false
+                };
+            }
+
+            await swarms.RemoveSwarm(infoHash);
+            while (torrentTask.InProgress())
+                await Task.Delay(500);
+
+            await bus.Publish(new TorrentRemovedEvent { InfoHash = infoHash });
+            return new() { InfoHash = infoHash, Success = true };
         }
     }
 
@@ -148,7 +148,6 @@ namespace Torrential.Torrents
         TORRENT_ALREADY_EXISTS = 1000,
         TORRENT_ALREADY_STARTED = 1002,
         TORRENT_ALREADY_STOPPED = 1003,
-
         TORRENT_NOT_FOUND = 1004,
     }
 

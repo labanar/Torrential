@@ -1,20 +1,11 @@
-﻿using System.Collections.Concurrent;
-using Torrential.Torrents;
-
-namespace Torrential.Peers
+﻿namespace Torrential.Peers
 {
-    public class PieceReservationService(TorrentMetadataCache metaCache)
+    public class PieceReservationService(BitfieldManager bitfieldManager)
     {
-        private ConcurrentDictionary<InfoHash, AsyncBitfield> _bitfields = [];
         public async Task<bool> TryReservePiece(InfoHash infoHash, int pieceIndex, float reservationLengthSeconds = 10)
         {
-            if (!metaCache.TryGet(infoHash, out var meta))
+            if (!bitfieldManager.TryGetPieceReservationBitfield(infoHash, out var bitfield))
                 return false;
-
-            var bitfield = _bitfields.GetOrAdd(infoHash, (_) =>
-            {
-                return new AsyncBitfield(meta.NumberOfPieces);
-            });
 
             if (bitfield.HasPiece(pieceIndex)) return false;
             await bitfield.MarkHaveAsync(pieceIndex, CancellationToken.None);

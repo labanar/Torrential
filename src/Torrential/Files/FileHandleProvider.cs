@@ -13,6 +13,15 @@ internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileSer
     public ConcurrentDictionary<InfoHash, SafeFileHandle> _partFiles = new ConcurrentDictionary<InfoHash, SafeFileHandle>();
     public SemaphoreSlim _creationSemaphore = new SemaphoreSlim(1, 1);
 
+    public void RemovePartFileHandle(InfoHash hash)
+    {
+        if (!_partFiles.TryRemove(hash, out SafeFileHandle? handle))
+            return;
+
+        handle?.Close();
+        return;
+    }
+
     public async ValueTask<SafeFileHandle> GetPartFileHandle(InfoHash hash)
     {
         if (_partFiles.TryGetValue(hash, out SafeFileHandle? handle) && handle != null)

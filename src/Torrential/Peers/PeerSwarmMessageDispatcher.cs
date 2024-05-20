@@ -22,25 +22,26 @@ namespace Torrential.Peers
             await DispatchHave(request.InfoHash, request.PieceIndex);
         }
 
-        public async Task DispatchHave(InfoHash infoHash, int pieceIndex)
-        {
-            if (!peerSwarm.PeerClients.TryGetValue(infoHash, out var peerClients))
-            {
-                logger.LogWarning("No peers found for {InfoHash}", infoHash);
-                return;
-            }
+        public async Task DispatchHave(InfoHash infoHash, int pieceIndex) =>
+            await peerSwarm.BroadcastHaveMessage(infoHash, pieceIndex);
+        //{
+        //    if (!peerSwarm.PeerClients.TryGetValue(infoHash, out var peerClients))
+        //    {
+        //        logger.LogWarning("No peers found for {InfoHash}", infoHash);
+        //        return;
+        //    }
 
-            var tasks = new List<Task>();
-            try
-            {
-                foreach (var peer in peerClients.Values)
-                    tasks.Add(peer.SendHave(pieceIndex));
+        //    var tasks = new List<Task>();
+        //    try
+        //    {
+        //        foreach (var peer in peerClients.Values)
+        //            tasks.Add(peer.SendHave(pieceIndex));
 
-                await Task.WhenAll(tasks);
-            }
-            finally
-            {
-            }
-        }
+        //        await Task.WhenAll(tasks);
+        //    }
+        //    finally
+        //    {
+        //    }
+        //}
     }
 }
