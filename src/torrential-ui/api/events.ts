@@ -40,3 +40,20 @@ export interface TorrentStoppedEvent {
 export interface TorrentRemovedEvent {
     infoHash: string
 }
+
+export interface TorrentAddedEvent {
+    infoHash: string;
+    totalSize: number;
+    name: string;
+}
+
+
+/*
+                InfoHash = torrentMetadata.InfoHash,
+                AnnounceList = torrentMetadata.AnnounceList,
+                TotalSize = torrentMetadata.TotalSize,
+                Files = torrentMetadata.Files,
+                Name = torrentMetadata.Name,
+                NumberOfPieces = torrentMetadata.NumberOfPieces,
+                PieceSize = torrentMetadata.PieceSize
+                */

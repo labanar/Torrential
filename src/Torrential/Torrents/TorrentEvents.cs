@@ -28,6 +28,7 @@ namespace Torrential.Torrents
         public required string Name { get; init; }
         public required long PieceSize { get; set; }
         public required int NumberOfPieces { get; set; }
+        public required long TotalSize { get; set; }
         public required ICollection<string> AnnounceList { get; set; } = Array.Empty<string>();
         public required ICollection<TorrentMetadataFile> Files { get; set; } = Array.Empty<TorrentMetadataFile>();
     }

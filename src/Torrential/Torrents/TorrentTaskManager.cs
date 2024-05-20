@@ -29,6 +29,7 @@ namespace Torrential.Torrents
             {
                 InfoHash = torrentMetadata.InfoHash,
                 AnnounceList = torrentMetadata.AnnounceList,
+                TotalSize = torrentMetadata.TotalSize,
                 Files = torrentMetadata.Files,
                 Name = torrentMetadata.Name,
                 NumberOfPieces = torrentMetadata.NumberOfPieces,

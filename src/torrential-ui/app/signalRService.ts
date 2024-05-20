@@ -1,7 +1,7 @@
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import store from '../app/store';
 import { addPeer, removePeer, updatePeer } from '../features/peersSlice';
-import { PeerBitfieldReceivedEvent, PeerConnectedEvent, PeerDisconnectedEvent, PieceVerifiedEvent, TorrentRemovedEvent, TorrentStartedEvent, TorrentStatsEvent, TorrentStoppedEvent } from '@/api/events';
+import { PeerBitfieldReceivedEvent, PeerConnectedEvent, PeerDisconnectedEvent, PieceVerifiedEvent, TorrentAddedEvent, TorrentRemovedEvent, TorrentStartedEvent, TorrentStatsEvent, TorrentStoppedEvent } from '@/api/events';
 import { PeerSummary } from '@/types';
 import { removeTorrent, updateTorrent } from '@/features/torrentsSlice';
 
@@ -62,7 +62,7 @@ export class SignalRService {
             const { infoHash } = event;
             const payload = {
                 infoHash,
-                update: { status: "Stopped" }
+                update: { status: "Stopped", downloadRate: 0, uploadRate: 0 }
             }
             store.dispatch(updateTorrent(payload));
         })
@@ -76,13 +76,24 @@ export class SignalRService {
         })
 
         this.connection.on('TorrentStatsUpdated', (event: TorrentStatsEvent) => {
-            const {infoHash, uploadRate, downloadRate} = event;
+            const { infoHash, uploadRate, downloadRate } = event;
             const payload = {
                 infoHash,
-                update: {uploadRate, downloadRate}
+                update: { uploadRate, downloadRate }
             }
             store.dispatch(updateTorrent(payload));
         });
+
+        this.connection.on('TorrentAdded', (event: TorrentAddedEvent) => {
+            const { infoHash, name, totalSize } = event;
+
+            const payload = {
+                infoHash,
+                update: { infoHash, name, sizeInBytes: totalSize, progress: 0, status: "Idle", bytesDownloaded: 0, bytesUploaded: 0, downloadRate: 0, uploadRate: 0 }
+            }
+
+            store.dispatch(updateTorrent(payload));
+        })
     }
 
     public async startConnection(): Promise<void> {
