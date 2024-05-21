@@ -67,6 +67,7 @@ function GeneralSettings() {
       <Checkbox
         alignSelf={"flex-start"}
         defaultChecked={allowInbound}
+        pl={"2em"}
         onChange={(e) => setAllowInbound(e.target.checked)}
       >
         Allow inbound connections
