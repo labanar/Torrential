@@ -7,7 +7,6 @@
   display: flex;
   flex-direction: column;
   flex-grow: 1;
-
 }
 
 .torrentContainer {
@@ -23,9 +22,7 @@
 
 .torrentContainerSelected {
   box-shadow: inset 0 0 100px 100px rgba(0, 255, 0, 0.05);
- 
 }
-
 
 .deleteModalBody {
   display: flex;
@@ -45,7 +42,6 @@
   padding-left: 1.25em;
   padding-right: 1.25em;
 }
-
 
 .torrentDivider {
   padding-left: 1.25em;
@@ -77,8 +73,7 @@
   padding-top: 0.6em;
 }
 
-
-.actionBar{
+.actionBar {
   min-height: 6em;
   display: flex;
   flex-direction: row;
@@ -88,15 +83,13 @@
   padding-left: 2em;
 }
 
-.actionButtons
-{
+.actionButtons {
   flex-grow: 1;
   display: flex;
   flex-direction: row;
   gap: 2em;
 }
 
-.actionSearch
-{
+.actionSearch {
   flex-grow: 1;
 }

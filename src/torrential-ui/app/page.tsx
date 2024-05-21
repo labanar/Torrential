@@ -49,7 +49,12 @@ export default function Home() {
   const [selectedTorrents, setSelectedTorrents] = useState<string[]>([]);
 
   const memoActionRow = useMemo(() => {
-    return <ActionsRow selectedTorrents={selectedTorrents} setSelectedTorrents={setSelectedTorrents} />;
+    return (
+      <ActionsRow
+        selectedTorrents={selectedTorrents}
+        setSelectedTorrents={setSelectedTorrents}
+      />
+    );
   }, [selectedTorrents]);
 
   useEffect(() => {
@@ -195,7 +200,10 @@ interface ActionsRowProps {
   setSelectedTorrents: (infoHashes: string[]) => void;
 }
 
-const ActionsRow = ({ selectedTorrents, setSelectedTorrents }: ActionsRowProps) => {
+const ActionsRow = ({
+  selectedTorrents,
+  setSelectedTorrents,
+}: ActionsRowProps) => {
   const uploadRef = useRef<FileUploadElement | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
@@ -285,7 +293,6 @@ const ActionsRow = ({ selectedTorrents, setSelectedTorrents }: ActionsRowProps) 
       removeTorrent(infoHash, deleteFiles);
     });
     setSelectedTorrents([]);
-
   };
 
   const torrentActionsDisabled = useMemo(() => {
@@ -309,7 +316,6 @@ const ActionsRow = ({ selectedTorrents, setSelectedTorrents }: ActionsRowProps) 
 
       <div className={styles.actionSearch}>
         <Input
-          variant={"filed"}
           placeholder="Filter"
           style={{ maxWidth: "200px", justifySelf: "start" }}
         />
