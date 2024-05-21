@@ -26,7 +26,7 @@ export default function RootLayout({
 }>) {
   useEffect(() => {
     const signalRService = new SignalRService(
-      "http://localhost:5142/torrents/hub"
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/hub`
     );
     signalRService.startConnection();
 
@@ -34,8 +34,6 @@ export default function RootLayout({
       signalRService.stopConnection();
     };
   }, []);
-
-  
 
   // const { colorMode, toggleColorMode } = useColorMode();
 
@@ -51,7 +49,7 @@ export default function RootLayout({
       >
         <ColorModeScript initialColorMode={"system"} />
         <Providers>
-          <ToastNotifications/>
+          <ToastNotifications />
           <div className={styles.root}>
             <SideBar />
             <div className={styles.divider}>
@@ -68,7 +66,6 @@ export default function RootLayout({
 }
 
 function SideBar() {
-
   return (
     <div id="sidebar" className={styles.sidebar}>
       <SideBarItem label="Torrents" linksTo="/" />
