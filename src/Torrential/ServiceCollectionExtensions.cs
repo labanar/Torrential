@@ -16,7 +16,10 @@ public static class ServiceCollectionExtensions
 {
     public static void AddTorrential(this IServiceCollection services)
     {
-        services.AddDbContext<TorrentialDb>(config => config.UseSqlite("Data Source=torrential.db"));
+        var appDataPath = Environment.GetEnvironmentVariable("APP_DATA_PATH");
+        var dbPath = Path.Combine(appDataPath ?? "", "torrential.db");
+
+        services.AddDbContext<TorrentialDb>(config => config.UseSqlite($"Data Source={dbPath}"));
         services.AddSingleton<IPeerService, PeerService>();
         services.AddHttpClient<HttpTrackerClient>();
         services.AddSingleton<ITrackerClient>(sp => sp.GetRequiredService<HttpTrackerClient>());

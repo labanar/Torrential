@@ -1,7 +1,6 @@
 using MassTransit;
 using MassTransit.Initializers;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using OpenTelemetry.Metrics;
 using Serilog;
 using Serilog.Core;
@@ -58,7 +57,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
 });
-builder.Services.AddHostedService<InitializationService>();
+builder.Services.AddSingleton<InitializationService>();
 
 var app = builder.Build();
 app.UseOpenTelemetryPrometheusScrapingEndpoint();
@@ -229,6 +228,9 @@ app.MapPost("settings/torrent/global", async (GlobalTorrentSettingsUpdateRequest
     return ActionResponse.SuccessResponse;
 });
 
+var initService = app.Services.GetRequiredService<InitializationService>();
+await initService.Initialize(CancellationToken.None);
+
 await app.RunAsync();
 
 
@@ -251,11 +253,18 @@ static Logger BuildLogger(IConfiguration configuration)
     return config.CreateLogger();
 }
 
-internal class InitializationService(IServiceProvider serviceProvider, IMemoryCache cache, TorrentTaskManager taskManager, IMetadataFileService metaFileService, TorrentStatusCache statusCache, IServiceScopeFactory scopeFactory, TorrentMetadataCache metadataCache) : BackgroundService
+internal class InitializationService(
+    IServiceProvider serviceProvider,
+    TorrentTaskManager taskManager,
+    IMetadataFileService metaFileService,
+    TorrentStatusCache statusCache,
+    IServiceScopeFactory scopeFactory,
+    ILogger<InitializationService> logger)
 {
-    protected async override Task ExecuteAsync(CancellationToken stoppingToken)
+    public async Task Initialize(CancellationToken stoppingToken)
     {
         await MigrateDatabase();
+        logger.LogInformation("Migrated database");
         await LoadTorrents();
     }
 
