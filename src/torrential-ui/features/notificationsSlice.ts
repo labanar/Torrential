@@ -23,18 +23,18 @@ const initialState: NotificationsState = {
 };
 
 const notificationsSlice = createSlice({
-  name: "notifications",
-  initialState,
-  reducers: {
-    queueNotification(state, action: PayloadAction<ToastNotification>) {
-        state.toastQueue = [...state.toastQueue, action.payload];
-        state.currentToast = action.payload;
+    name: "notifications",
+    initialState,
+    reducers: {
+        queueNotification(state, action: PayloadAction<ToastNotification>) {
+            state.toastQueue = [...state.toastQueue, action.payload];
+            state.currentToast = action.payload;
+        },
+        dequeueNext(state) {
+            state.currentToast = state.toastQueue.shift();
+        }
     },
-    dequeueNext(state) {
-        state.currentToast = state.toastQueue.shift();
-    }
-  },
 });
 
-export const { queueNotification, dequeueNext} = notificationsSlice.actions;
+export const { queueNotification, dequeueNext } = notificationsSlice.actions;
 export default notificationsSlice.reducer;

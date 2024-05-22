@@ -51,7 +51,6 @@ export default function RootLayout({
       >
         <ColorModeScript initialColorMode={"system"} />
         <Providers>
-          <ToastNotifications />
           <div className={styles.root}>
             <SideBar />
             <ToastNotifications />
