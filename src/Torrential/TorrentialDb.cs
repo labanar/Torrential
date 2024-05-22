@@ -87,12 +87,20 @@ namespace Torrential
     {
         public static string CacheKey => "settings.file";
 
-        private static string AppPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        public static FileSettings Default => new()
+        public static FileSettings Default => MakeDefault();
+
+        private static FileSettings MakeDefault()
         {
-            DownloadPath = Path.Combine(AppPath, "torrential\\downloads"),
-            CompletedPath = Path.Combine(AppPath, "torrential\\completed")
-        };
+            var appDataPath = Environment.GetEnvironmentVariable("APP_DATA_PATH") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "torrential");
+            var downloadPath = Environment.GetEnvironmentVariable("DOWNLOAD_PATH") ?? Path.Combine(appDataPath, "download");
+            var completedPath = Environment.GetEnvironmentVariable("COMPLETED_PATH") ?? Path.Combine(appDataPath, "completed");
+
+            return new FileSettings
+            {
+                DownloadPath = downloadPath,
+                CompletedPath = completedPath
+            };
+        }
 
         public static bool Validate(FileSettings settings)
         {

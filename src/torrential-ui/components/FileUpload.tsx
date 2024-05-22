@@ -44,3 +44,5 @@ export const FileUpload = forwardRef<FileUploadElement, FileUploadProps>(
     );
   }
 );
+
+FileUpload.displayName = "FileUpload";

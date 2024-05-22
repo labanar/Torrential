@@ -29,7 +29,7 @@ import {
   faUpLong,
   faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileUpload, FileUploadElement } from "@/components/FileUpload";
 import { useAppDispatch } from "./hooks";
 import { TorrentsState, setTorrents } from "@/features/torrentsSlice";
@@ -87,9 +87,11 @@ export default function Home() {
     return selectedTorrents.includes(infoHash);
   };
 
-  const fetchTorrents = async () => {
+  const fetchTorrents = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:5142/torrents`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents`
+      );
 
       if (!response.ok) {
         console.log("Error fetching torrents");
@@ -146,11 +148,11 @@ export default function Home() {
     } catch (error) {
       console.log("error fetching torrents");
     }
-  };
+  }, [dispatch]);
 
   useEffect(() => {
     fetchTorrents();
-  }, []);
+  }, [fetchTorrents]);
 
   return (
     <>
@@ -212,10 +214,13 @@ const ActionsRow = ({
     formData.append("file", file);
 
     try {
-      const response = await fetch(`http://localhost:5142/torrents/add`, {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/add`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
       if (!response.ok) {
         throw new Error("File upload failed");
@@ -233,7 +238,7 @@ const ActionsRow = ({
   const stopTorrent = async (infoHash: string) => {
     try {
       const response = await fetch(
-        `http://localhost:5142/torrents/${infoHash}/stop`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/${infoHash}/stop`,
         { method: "POST" }
       );
     } catch (e) {
@@ -245,7 +250,7 @@ const ActionsRow = ({
   const startTorrent = async (infoHash: string) => {
     try {
       const response = await fetch(
-        `http://localhost:5142/torrents/${infoHash}/start`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/${infoHash}/start`,
         { method: "POST" }
       );
     } catch (e) {
@@ -261,7 +266,7 @@ const ActionsRow = ({
       };
 
       const response = await fetch(
-        `http://localhost:5142/torrents/${infoHash}/delete`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/${infoHash}/delete`,
         {
           method: "POST",
           headers: {
@@ -551,7 +556,7 @@ function TorrentRemoveConfirmationModal({
           <ul style={{ paddingLeft: "2em" }}>
             {infoHashes.map((hash) => {
               return (
-                <li>
+                <li key={hash}>
                   <Text>{torrents[hash].name}</Text>
                 </li>
               );
