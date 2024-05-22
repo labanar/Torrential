@@ -321,7 +321,6 @@ const ActionsRow = ({
 
       <div className={styles.actionSearch}>
         <Input
-          variant={"filed"}
           placeholder="Filter"
           style={{ maxWidth: "200px", justifySelf: "start" }}
         />

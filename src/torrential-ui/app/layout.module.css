@@ -1,42 +1,35 @@
-/* html, body {
-  height: 100%;
-  margin: 0;
-}
-
-body {
-  display: flex;
-  flex-direction: column;
-} */
-
 .root {
+  font-family: "Courier New", Courier, monospace;
   display: flex;
   flex-grow: 1;
   height: 100%;
 }
 
 .sidebar {
-  width: 200px; /* Adjust as needed */
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 2em;
   padding: 1.25em;
 }
-
 
 .divider {
   padding-top: 1em;
   padding-bottom: 1em;
 }
 
-
 .sidebarItem {
+  font-family: "Courier New", Courier, monospace;
   font-weight: 500;
   transition: transform 0.2s ease, background-color 0.2s ease;
   user-select: none;
-  padding: 1em
+  padding: 1em;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 24px;
+  letter-spacing: 0.08em;
 }
-
 
 .sidebarItem:hover {
   font-weight: 700;
@@ -45,4 +38,11 @@ body {
 .main {
   flex-grow: 1;
   overflow-y: auto; /* Ensure scrolling if content is long */
+}
+
+.sidebarTitle {
+  font-family: "Courier New", Courier, monospace;
+  align-self: center;
+  letter-spacing: 0.2em;
+  padding-bottom: 2em;
 }

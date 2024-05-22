@@ -1,4 +1,5 @@
 .toastContainer {
+  font-family: "Courier New", Courier, monospace;
   display: flex;
   flex-direction: row;
   padding: 0.5em;
