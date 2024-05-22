@@ -28,7 +28,9 @@ public sealed class HandshakeService(IPeerService peerService, TorrentMetadataCa
             return new HandshakeResponse(HandshakeError.INVALID_HASH);
         }
 
+        logger.LogInformation("Handshake received");
         await SendHandshake(writer, response.InfoHash);
+        logger.LogInformation("Handshake sent");
         return response;
     }
 
@@ -128,7 +130,7 @@ public sealed class HandshakeService(IPeerService peerService, TorrentMetadataCa
 
         if (firstByte != 19)
         {
-            logger.LogDebug("Handshake failed - First byte did not match");
+            logger.LogInformation("Handshake failed - First byte did not match");
             return new HandshakeResponse(HandshakeError.INVALID_FIRST_BYTE);
         }
 

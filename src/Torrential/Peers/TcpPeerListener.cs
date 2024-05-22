@@ -31,6 +31,7 @@ public sealed class TcpPeerListenerBackgroundService(
                 tcpListener?.Stop();
                 tcpListener?.Dispose();
                 tcpListener = new TcpListener(IPAddress.Any, newPort);
+                tcpListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 tcpListener.Start();
                 port = newPort;
                 logger.LogInformation("TCP Listener started on {Port}", port);
@@ -40,6 +41,7 @@ public sealed class TcpPeerListenerBackgroundService(
             {
                 var socket = await tcpListener!.AcceptSocketAsync();
                 if (socket == null) continue;
+                socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
                 if (!socket.Connected)
                 {
                     socket.Dispose();
