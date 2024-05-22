@@ -60,6 +60,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddSingleton<InitializationService>();
 
 var app = builder.Build();
+app.UseStaticFiles();
+app.MapFallbackToFile("index.html");
 app.UseOpenTelemetryPrometheusScrapingEndpoint();
 app.UseSwagger();
 app.UseSwaggerUI();
