@@ -26,6 +26,12 @@ COPY . .
 WORKDIR "/src/Torrential.Web"
 RUN dotnet build "./Torrential.Web.csproj" -a $TARGETARCH -c $BUILD_CONFIGURATION -o /app/build
 
+FROM node:latest as nextjs-build
+WORKDIR /app
+COPY ["torrential-ui/package.json", "torrential-ui/package-lock.json*", "./"]
+RUN npm install
+COPY torrential-ui/ .
+RUN npm run build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
@@ -35,6 +41,7 @@ RUN dotnet publish "./Torrential.Web.csproj" -c $BUILD_CONFIGURATION -a $TARGETA
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+COPY --from=nextjs-build /app/out ./wwwroot
 ENV APP_DATA_PATH="/app/data"
 ENV DOTNET_gcServer="0"
 ENTRYPOINT ["dotnet", "Torrential.Web.dll"]
