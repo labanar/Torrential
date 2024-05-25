@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.Sockets;
 using Torrential.Settings;
+using Torrential.Utilities;
 
 namespace Torrential.Peers;
 
@@ -40,6 +41,14 @@ public sealed class TcpPeerListenerBackgroundService(
             try
             {
                 var socket = await tcpListener!.AcceptSocketAsync();
+
+                if (await connectionManager.IsBlockedConnection(socket.GetPeerInfo().Ip))
+                {
+                    logger.LogInformation("Disposing blocked connection");
+                    socket.Dispose();
+                    continue;
+                }
+
                 if (socket == null) continue;
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
                 if (!socket.Connected)

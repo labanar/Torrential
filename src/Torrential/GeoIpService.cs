@@ -1,6 +1,7 @@
 ﻿using MaxMind.Db;
 using MaxMind.GeoIP2;
 using Microsoft.Extensions.Logging;
+using System.Net;
 
 namespace Torrential
 {
@@ -8,7 +9,7 @@ namespace Torrential
     {
         private readonly DatabaseReader _countryDbReader = new(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GeoLite2-Country.mmdb"), FileAccessMode.Memory);
 
-        public ValueTask<string> GetCountryCodeAsync(string ip)
+        public ValueTask<string> GetCountryCodeAsync(IPAddress ip)
         {
             try
             {

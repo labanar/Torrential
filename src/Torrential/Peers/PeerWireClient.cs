@@ -241,7 +241,10 @@ public sealed class PeerWireClient : IAsyncDisposable
     {
         //Discard keep alive messages
         if (messageId == 0 && messageSize == 0)
+        {
+            LastMessageTimestamp = DateTimeOffset.UtcNow;
             return true;
+        }
 
 
         //Certain messages can be processed immediately, so we'll handle those upfront

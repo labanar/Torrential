@@ -1,6 +1,9 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using System.Net;
 using System.Threading.Channels;
+using Torrential.Trackers;
 
 namespace Torrential.Peers;
 
@@ -91,6 +94,10 @@ public sealed class HalfOpenConnectionShakerService(PeerConnectionManager connec
 
             if (!response.Success)
             {
+                //You go on a short block list if your handshake fails
+
+                connectionManager.AddToBlockList(connection.PeerInfo);
+                logger.LogInformation("Inbound handshake failed - {Ip}", connection.PeerInfo.Ip);
                 await connection.DisposeAsync();
                 return;
             }
@@ -122,11 +129,30 @@ public sealed class PeerConnectionManager(GeoIpService geoService, ILogger<PeerC
         SingleWriter = false
     });
 
+    private ConcurrentDictionary<IPAddress, IPAddress> _blockedIps = [];
 
-    private async Task<bool> IsBlockedConnection(IPeerWireConnection connection)
+    public void AddToBlockList(PeerInfo peerInfo)
     {
-        var countryCode = await geoService.GetCountryCodeAsync(connection.PeerInfo.Ip.ToString());
-        return countryCode == "CN";
+        _blockedIps.TryAdd(peerInfo.Ip, peerInfo.Ip);
+    }
+
+    public async ValueTask<bool> IsBlockedConnection(IPAddress ip)
+    {
+        if (_blockedIps.ContainsKey(ip))
+        {
+            logger.LogInformation("Blocking by connection by {IP}", ip);
+            return true;
+
+        }
+
+        var countryCode = await geoService.GetCountryCodeAsync(ip);
+        var blocked = countryCode == "CN" || countryCode == "RU";
+        if (blocked)
+        {
+            logger.LogInformation("Blocking by connection by {CountryCode}", countryCode);
+        }
+
+        return blocked;
     }
 
     public async Task QueueInboundConnection(IPeerWireConnection connection)
@@ -135,7 +161,7 @@ public sealed class PeerConnectionManager(GeoIpService geoService, ILogger<PeerC
 
 
         //Get the IP address of the connection
-        if (await IsBlockedConnection(connection))
+        if (await IsBlockedConnection(connection.PeerInfo.Ip))
         {
             logger.LogInformation("Blocked connection from {0}", connection.PeerInfo.Ip);
             await connection.DisposeAsync();
@@ -160,7 +186,7 @@ public sealed class PeerConnectionManager(GeoIpService geoService, ILogger<PeerC
     {
         PeerMetrics.HALF_OPEN_CONNECTIONS_COUNT.Add(1);
 
-        if (await IsBlockedConnection(connection))
+        if (await IsBlockedConnection(connection.PeerInfo.Ip))
         {
             logger.LogInformation("Blocked connection from {0}", connection.PeerInfo.Ip);
             await connection.DisposeAsync();
@@ -182,7 +208,7 @@ public sealed class PeerConnectionManager(GeoIpService geoService, ILogger<PeerC
 
 
 
-public class HalfOpenConnection : IAsyncDisposable
+public class HalfOpenConnection
 {
     public IPeerWireConnection Connection { get; }
     public bool IsOutbound { get; }
@@ -200,9 +226,4 @@ public class HalfOpenConnection : IAsyncDisposable
 
     public static HalfOpenConnection Outbound(IPeerWireConnection connection, InfoHash infoHash) =>
          new HalfOpenConnection(connection, true, infoHash);
-
-    public async ValueTask DisposeAsync()
-    {
-        await Connection.DisposeAsync();
-    }
 }

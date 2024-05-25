@@ -4,13 +4,25 @@
     {
         public static bool InProgress(this Task? task)
         {
-            return task != null
-                && !task.IsCompleted
-                && !task.IsFaulted
-                && !task.IsCanceled
-                && task.Status != TaskStatus.WaitingForActivation
-                && task.Status != TaskStatus.WaitingToRun
-                && task.Status != TaskStatus.WaitingForChildrenToComplete;
+            return !task.IsCompleted();
+        }
+
+
+        public static bool IsCompleted(this Task? task)
+        {
+            if (task == null)
+                return true;
+
+            if (task.IsCompleted)
+                return true;
+
+            if (task.IsFaulted)
+                return true;
+
+            if (task.IsCanceled)
+                return true;
+
+            return false;
         }
     }
 }
