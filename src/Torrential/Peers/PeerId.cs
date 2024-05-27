@@ -5,7 +5,7 @@ namespace Torrential;
 public readonly record struct PeerId(long P1, long P2, int P3)
 {
     private static readonly ushort TorrentialImplementation = CreateImplementationShort('T', 'O');
-    public static PeerId None => new(long.MaxValue, long.MaxValue, int.MaxValue);
+    public static PeerId None { get; } = new(long.MaxValue, long.MaxValue, int.MaxValue);
 
     public static implicit operator string(PeerId value) => value.ToAsciiString();
 

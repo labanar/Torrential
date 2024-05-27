@@ -2,7 +2,7 @@
 
 public readonly record struct PeerExtensions(byte B1, byte B2, byte B3, byte B4, byte B5, byte B6, byte B7, byte B8)
 {
-    public static PeerExtensions None => new(0, 0, 0, 0, 0, 0, 0, 0);
+    public static PeerExtensions None { get; } = new(0, 0, 0, 0, 0, 0, 0, 0);
 
     public static PeerExtensions FromLong(long extensions)
     {

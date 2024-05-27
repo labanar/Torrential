@@ -16,7 +16,7 @@ namespace Torrential.Web.Api.Responses
         }
 
         public static ActionResponse ErrorResponse(ErrorCode errorCode) => new(ActionData.Failure, new() { Code = errorCode });
-        public static ActionResponse SuccessResponse => new(ActionData.Successful, null);
+        public static ActionResponse SuccessResponse { get; } = new(ActionData.Successful, null);
 
     }
 
@@ -25,8 +25,8 @@ namespace Torrential.Web.Api.Responses
     {
         public required bool Success { get; init; }
 
-        public static ActionData Successful => new() { Success = true };
-        public static ActionData Failure => new() { Success = false };
+        public static ActionData Successful { get; } = new() { Success = true };
+        public static ActionData Failure { get; } = new() { Success = false };
     }
 }
 

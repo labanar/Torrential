@@ -113,7 +113,7 @@ namespace Torrential
     public record TcpListenerSettings : ISettingsSection<TcpListenerSettings>
     {
         public static string CacheKey => "settings.tcpListener";
-        public static TcpListenerSettings Default => new()
+        public static TcpListenerSettings Default { get; } = new()
         {
             Enabled = true,
             Port = 53123
@@ -134,7 +134,7 @@ namespace Torrential
 
     public record ConnectionSettings : ISettingsSection<ConnectionSettings>
     {
-        public static ConnectionSettings Default => new()
+        public static ConnectionSettings Default { get; } = new()
         {
             MaxConnectionsPerTorrent = 50,
             MaxConnectionsGlobal = 200,
