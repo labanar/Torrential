@@ -24,6 +24,10 @@
   box-shadow: inset 0 0 100px 100px rgba(0, 255, 0, 0.05);
 }
 
+.deleteModal {
+  font-family: "Courier New", Courier, monospace;
+}
+
 .deleteModalBody {
   display: flex;
   flex-direction: column;

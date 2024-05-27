@@ -208,27 +208,23 @@ app.MapPost("settings/tcp", async (TcpListenerSettingsUpdateRequest request, Set
     return ActionResponse.SuccessResponse;
 });
 
-app.MapGet("settings/torrent/default", async (SettingsManager mgr) =>
+app.MapGet("settings/connection", async (SettingsManager mgr) =>
 {
-    var settings = await mgr.GetDefaultTorrentSettings();
-    return new DefaultTorrentSettingsGetResponse(settings);
+    var settings = await mgr.GetConnectionSettings();
+    return new ConnectionSettingsGetResponse(settings);
 });
-app.MapPost("settings/torrent/default", async (DefaultTorrentSettingsUpdateRequest request, SettingsManager mgr) =>
+
+app.MapPost("settings/connection", async (ConnectionSettingsUpdateRequest request, SettingsManager mgr) =>
 {
-    await mgr.SaveDefaultTorrentSettings(new() { MaxConnections = request.MaxConnections });
+    await mgr.SaveConnectionSettings(new()
+    {
+        MaxConnectionsPerTorrent = request.MaxConnectionsPerTorrent,
+        MaxConnectionsGlobal = request.MaxConnectionsGlobal,
+        MaxHalfOpenConnections = request.MaxHalfOpenConnections
+    });
     return ActionResponse.SuccessResponse;
 });
 
-app.MapGet("settings/torrent/global", async (SettingsManager mgr) =>
-{
-    var settings = await mgr.GetGlobalTorrentSettings();
-    return new GlobalTorrentSettingsGetResponse(settings);
-});
-app.MapPost("settings/torrent/global", async (GlobalTorrentSettingsUpdateRequest request, SettingsManager mgr) =>
-{
-    await mgr.SaveGlobalTorrentSettings(new() { MaxConnections = request.MaxConnections });
-    return ActionResponse.SuccessResponse;
-});
 
 var initService = app.Services.GetRequiredService<InitializationService>();
 await initService.Initialize(CancellationToken.None);

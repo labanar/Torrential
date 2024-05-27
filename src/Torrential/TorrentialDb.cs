@@ -30,10 +30,7 @@ namespace Torrential
                 .ComplexProperty(p => p.TcpListenerSettings);
 
             modelBuilder.Entity<TorrentialSettings>()
-                .ComplexProperty(p => p.DefaultTorrentSettings);
-
-            modelBuilder.Entity<TorrentialSettings>()
-                .ComplexProperty(p => p.GlobalTorrentSettings);
+                .ComplexProperty(p => p.ConnectionSettings);
         }
     }
 
@@ -71,8 +68,7 @@ namespace Torrential
         public Guid Id { get; set; } = DefaultId;
         public FileSettings FileSettings { get; set; } = FileSettings.Default;
         public TcpListenerSettings TcpListenerSettings { get; set; } = TcpListenerSettings.Default;
-        public DefaultTorrentSettings DefaultTorrentSettings { get; set; } = DefaultTorrentSettings.Default;
-        public GlobalTorrentSettings GlobalTorrentSettings { get; set; } = GlobalTorrentSettings.Default;
+        public ConnectionSettings ConnectionSettings { get; set; } = ConnectionSettings.Default;
     }
 
     public interface ISettingsSection<T>
@@ -83,7 +79,7 @@ namespace Torrential
         static abstract bool Validate(T settings);
     }
 
-    public class FileSettings : ISettingsSection<FileSettings>
+    public record FileSettings : ISettingsSection<FileSettings>
     {
         public static string CacheKey => "settings.file";
 
@@ -114,7 +110,7 @@ namespace Torrential
         public required string CompletedPath { get; set; }
     }
 
-    public class TcpListenerSettings : ISettingsSection<TcpListenerSettings>
+    public record TcpListenerSettings : ISettingsSection<TcpListenerSettings>
     {
         public static string CacheKey => "settings.tcpListener";
         public static TcpListenerSettings Default => new()
@@ -135,42 +131,34 @@ namespace Torrential
         public required int Port { get; set; }
     }
 
-    public class DefaultTorrentSettings : ISettingsSection<DefaultTorrentSettings>
+
+    public record ConnectionSettings : ISettingsSection<ConnectionSettings>
     {
-        public static string CacheKey => "settings.torrent.default";
-        public static DefaultTorrentSettings Default => new()
+        public static ConnectionSettings Default => new()
         {
-            MaxConnections = 50
+            MaxConnectionsPerTorrent = 50,
+            MaxConnectionsGlobal = 200,
+            MaxHalfOpenConnections = 50
         };
 
-        public static bool Validate(DefaultTorrentSettings settings)
+        public static string CacheKey => "settings.connections";
+
+        public required int MaxConnectionsPerTorrent { get; set; }
+        public required int MaxConnectionsGlobal { get; set; }
+        public required int MaxHalfOpenConnections { get; set; }
+
+        public static bool Validate(ConnectionSettings settings)
         {
-            if (settings.MaxConnections < 1)
+            if (settings.MaxConnectionsGlobal < 1)
+                return false;
+
+            if (settings.MaxConnectionsPerTorrent < 1)
+                return false;
+
+            if (settings.MaxHalfOpenConnections < 1)
                 return false;
 
             return true;
         }
-
-        public required int MaxConnections { get; set; }
     }
-
-    public class GlobalTorrentSettings : ISettingsSection<GlobalTorrentSettings>
-    {
-        public static string CacheKey => "settings.torrent.global";
-        public static GlobalTorrentSettings Default => new()
-        {
-            MaxConnections = 500
-        };
-
-        public static bool Validate(GlobalTorrentSettings settings)
-        {
-            if (settings.MaxConnections < 1)
-                return false;
-
-            return true;
-        }
-
-        public required int MaxConnections { get; set; }
-    }
-
 }

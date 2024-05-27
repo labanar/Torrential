@@ -12,11 +12,8 @@ namespace Torrential.Settings
         public async ValueTask<TcpListenerSettings> GetTcpListenerSettings() => await GetSettingsSection(f => f.TcpListenerSettings);
         public async ValueTask SaveTcpListenerSettings(TcpListenerSettings settings) => await SaveSettingsSection(f => f.TcpListenerSettings, settings);
 
-        public async ValueTask<DefaultTorrentSettings> GetDefaultTorrentSettings() => await GetSettingsSection(f => f.DefaultTorrentSettings);
-        public async ValueTask SaveDefaultTorrentSettings(DefaultTorrentSettings settings) => await SaveSettingsSection(f => f.DefaultTorrentSettings, settings);
-
-        public async ValueTask<GlobalTorrentSettings> GetGlobalTorrentSettings() => await GetSettingsSection(f => f.GlobalTorrentSettings);
-        public async ValueTask SaveGlobalTorrentSettings(GlobalTorrentSettings settings) => await SaveSettingsSection(f => f.GlobalTorrentSettings, settings);
+        public async ValueTask<ConnectionSettings> GetConnectionSettings() => await GetSettingsSection(f => f.ConnectionSettings);
+        public async ValueTask SaveConnectionSettings(ConnectionSettings settings) => await SaveSettingsSection(f => f.ConnectionSettings, settings);
 
 
         internal async ValueTask<T> GetSettingsSection<T>(Func<TorrentialSettings, T> selector)
@@ -53,7 +50,7 @@ namespace Torrential.Settings
             if (persistedSettings != null)
             {
                 section = selector(persistedSettings);
-                section = value;
+                UpdateSection(section, value);
                 cache.Set(T.CacheKey, section);
                 await lease.Context.SaveChangesAsync();
                 return;
@@ -65,6 +62,17 @@ namespace Torrential.Settings
             cache.Set(T.CacheKey, section);
             await lease.Context.Settings.AddAsync(persistedSettings);
             await lease.Context.SaveChangesAsync();
+        }
+
+        private void UpdateSection<T>(T section, T value) where T : ISettingsSection<T>
+        {
+            foreach (var property in typeof(T).GetProperties())
+            {
+                if (property.CanWrite)
+                {
+                    property.SetValue(section, property.GetValue(value));
+                }
+            }
         }
     }
 

@@ -94,8 +94,7 @@ namespace Torrential.Peers
                 return;
             }
 
-            var torrentSettings = await settingsManager.GetDefaultTorrentSettings();
-            var globalSettings = await settingsManager.GetGlobalTorrentSettings();
+            var connectionSettings = await settingsManager.GetConnectionSettings();
             var peerConnections = _peerClients.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, PeerWireClient>());
 
             if (await statusCache.GetStatus(connection.InfoHash) != TorrentStatus.Running)
@@ -105,14 +104,14 @@ namespace Torrential.Peers
                 return;
             }
 
-            if (peerConnections.Count >= torrentSettings.MaxConnections)
+            if (peerConnections.Count >= connectionSettings.MaxConnectionsPerTorrent)
             {
                 logger.LogDebug("Peer limit reached for {InfoHash}", metadata.InfoHash);
                 await connection.DisposeAsync();
                 return;
             }
 
-            if (_peerClients.Values.Sum(x => x.Count) >= globalSettings.MaxConnections)
+            if (_peerClients.Values.Sum(x => x.Count) >= connectionSettings.MaxConnectionsGlobal)
             {
                 logger.LogDebug("Global peer limit reached");
                 await connection.DisposeAsync();

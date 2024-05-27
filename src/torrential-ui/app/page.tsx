@@ -548,7 +548,7 @@ function TorrentRemoveConfirmationModal({
   return (
     <Modal isOpen={open} onClose={onClose} size={"lg"}>
       <ModalOverlay />
-      <ModalContent>
+      <ModalContent className={styles.deleteModal}>
         <ModalHeader>{title}</ModalHeader>
         <ModalCloseButton />
         <ModalBody className={styles.deleteModalBody}>
