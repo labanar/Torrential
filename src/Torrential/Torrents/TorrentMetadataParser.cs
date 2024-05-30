@@ -60,7 +60,7 @@ public static class TorrentMetadataParser
             urlList = bObject switch
             {
                 BList bUrlList => bUrlList?.Select(x => x?.ToString() ?? "")?.Where(x => !string.IsNullOrEmpty(x))?.ToArray() ?? Array.Empty<string>(),
-                BString bUrlString when !string.IsNullOrEmpty(bUrlString?.ToString()) => new string[1] { bUrlString.ToString() },
+                BString bUrlString when !string.IsNullOrEmpty(bUrlString?.ToString()) => [bUrlString.ToString()],
                 _ => Array.Empty<string>()
             };
         }

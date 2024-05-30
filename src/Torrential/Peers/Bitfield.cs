@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace Torrential.Peers
 {
-    public sealed class Bitfield : IBitfield
+    public sealed class Bitfield : IBitfield, IDisposable 
     {
         private readonly int _numOfPieces;
         private readonly int _sizeInBytes;
@@ -11,7 +11,9 @@ namespace Torrential.Peers
 
         public int NumberOfPieces => _numOfPieces;
 
-        public byte[] Bytes => _bitfield;
+        //public byte[] Bytes => _bitfield;
+
+        public ReadOnlySpan<byte> Bytes => _bitfield.AsSpan().Slice(0, _sizeInBytes);   
 
         public float CompletionRatio
         {
@@ -27,14 +29,15 @@ namespace Torrential.Peers
         {
             _numOfPieces = numOfPieces;
             _sizeInBytes = (numOfPieces + 7) / 8;  // Calculates the total bytes needed
-            _bitfield = new byte[_sizeInBytes];
+            //_bitfield = new byte[_sizeInBytes];
+            _bitfield = ArrayPool<byte>.Shared.Rent(_sizeInBytes);
         }
 
         public Bitfield(Span<byte> data)
         {
             _sizeInBytes = data.Length;
             _numOfPieces = _sizeInBytes * 8;
-            _bitfield = new byte[_sizeInBytes];
+            _bitfield = ArrayPool<byte>.Shared.Rent(_sizeInBytes);
             data.CopyTo(_bitfield);
         }
 
@@ -53,6 +56,10 @@ namespace Torrential.Peers
 
         public bool HasAll()
         {
+            if (_bitfield[0] != 255)
+                return false;
+
+
             var piecesHave = _bitfield.Sum(b => BitOperations.PopCount(b));
             return piecesHave == _numOfPieces;
         }
@@ -114,10 +121,16 @@ namespace Torrential.Peers
 
             return new PieceSuggestionResult(random, !hasAll);
         }
+
+        public void Dispose()
+        {
+            if(_bitfield != null)
+                ArrayPool<byte>.Shared.Return(_bitfield, true);
+        }
     }
 
     public readonly record struct PieceSuggestionResult(int? Index, bool MorePiecesAvailable)
     {
-        public static PieceSuggestionResult NoMorePieces => new PieceSuggestionResult(null, false);
+        public static PieceSuggestionResult NoMorePieces { get; } = new PieceSuggestionResult(null, false);
     }
 }

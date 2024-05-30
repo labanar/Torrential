@@ -11,7 +11,7 @@ public sealed class AsyncBitfield : IBitfield
 
     public int NumberOfPieces => _numOfPieces;
 
-    public byte[] Bytes => _bitfield;
+    public ReadOnlySpan<byte> Bytes => _bitfield;
 
     public float CompletionRatio
     {

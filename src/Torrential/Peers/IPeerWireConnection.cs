@@ -37,5 +37,5 @@ public readonly struct PeerConnectionResult
     }
 
     internal static PeerConnectionResult FromHandshake(HandshakeResponse handshake) => !handshake.Success ? Failure : new PeerConnectionResult(handshake.PeerId, handshake.Extensions);
-    public static PeerConnectionResult Failure => new PeerConnectionResult(false);
+    public static PeerConnectionResult Failure { get; } = new PeerConnectionResult(false);
 }

@@ -4,7 +4,7 @@
     {
         int NumberOfPieces { get; }
 
-        byte[] Bytes { get; }
+        ReadOnlySpan<byte> Bytes { get; }
 
         float CompletionRatio { get; }
 
