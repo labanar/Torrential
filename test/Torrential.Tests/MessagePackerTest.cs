@@ -68,7 +68,7 @@ public class MessagePackerTest
         var span = pak.AsSpan();
         Assert.Equal(5 + bitfield.Bytes.Length, span.Length);
         Assert.Equal(PeerWireMessageType.Bitfield, span[4]);
-        Assert.Equal(bitfield.Bytes, span.Slice(5).ToArray());
+        Assert.True(bitfield.Bytes.SequenceEqual(span.Slice(5)));
     }
 
 
@@ -91,11 +91,11 @@ public class MessagePackerTest
     public void Pack_Bitfield_Sequence()
     {
         var bitfield = new Bitfield(20);
-        using var pak = MessagePacker.PackBitfield(new ReadOnlySequence<byte>(bitfield.Bytes));
+        using var pak = MessagePacker.PackBitfield(bitfield.Bytes);
         var span = pak.AsSpan();
 
         Assert.Equal(8, span.Length);
         Assert.Equal(PeerWireMessageType.Bitfield, span[4]);
-        Assert.Equal(bitfield.Bytes, span.Slice(5).ToArray());
+        Assert.True(bitfield.Bytes.SequenceEqual(span.Slice(5)));
     }
 }

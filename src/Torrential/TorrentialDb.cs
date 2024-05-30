@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Torrential.Files;
 
 namespace Torrential
 {
@@ -87,9 +88,8 @@ namespace Torrential
 
         private static FileSettings MakeDefault()
         {
-            var appDataPath = Environment.GetEnvironmentVariable("APP_DATA_PATH") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "torrential");
-            var downloadPath = Environment.GetEnvironmentVariable("DOWNLOAD_PATH") ?? Path.Combine(appDataPath, "download");
-            var completedPath = Environment.GetEnvironmentVariable("COMPLETED_PATH") ?? Path.Combine(appDataPath, "completed");
+            var downloadPath = Environment.GetEnvironmentVariable("DOWNLOAD_PATH") ?? Path.Combine(FileUtilities.AppDataPath, "download");
+            var completedPath = Environment.GetEnvironmentVariable("COMPLETED_PATH") ?? Path.Combine(FileUtilities.AppDataPath, "completed");
 
             return new FileSettings
             {

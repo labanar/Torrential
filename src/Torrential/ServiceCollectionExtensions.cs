@@ -16,8 +16,7 @@ public static class ServiceCollectionExtensions
 {
     public static void AddTorrential(this IServiceCollection services)
     {
-        var appDataPath = Environment.GetEnvironmentVariable("APP_DATA_PATH");
-        var dbPath = Path.Combine(appDataPath ?? "", "torrential.db");
+        var dbPath = Path.Combine(FileUtilities.AppDataPath, "torrential.db");
 
         services.AddDbContext<TorrentialDb>(config => config.UseSqlite($"Data Source={dbPath}"));
         services.AddSingleton<IPeerService, PeerService>();

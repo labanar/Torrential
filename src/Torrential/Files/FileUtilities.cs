@@ -30,5 +30,7 @@ namespace Torrential.Files
             }
             return fileName.ToString();
         }
+        
+        internal static string AppDataPath { get; } = Environment.GetEnvironmentVariable("APP_DATA_PATH") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "torrential");
     }
 }

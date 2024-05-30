@@ -82,6 +82,17 @@ public static class MessagePacker
         return pak;
     }
 
+    public static PreparedPacket PackBitfield(ReadOnlySpan<byte> bitfieldData)
+    {
+        var bitfieldLength = (int)bitfieldData.Length;
+        var pak = new PreparedPacket(5 + bitfieldLength);
+        var buffer = pak.AsSpan();
+        buffer.TryWriteBigEndian(bitfieldLength + 1);
+        buffer[4] = PeerWireMessageType.Bitfield;
+        bitfieldData.CopyTo(buffer[5..]);
+        return pak;
+    }
+
     public static PreparedPacket Pack(IBitfield bitfield)
     {
         var pak = new PreparedPacket(bitfield.Bytes.Length + 5);
