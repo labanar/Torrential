@@ -4,21 +4,42 @@ import { Inter } from "next/font/google";
 import { Providers } from "./providers";
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import SignalRService from "./signalRService";
 import styles from "./layout.module.css";
 import { useRouter } from "next/navigation";
-import { Box, ColorModeScript, Divider, Text } from "@chakra-ui/react";
+import {
+  Box,
+  ColorModeScript,
+  Divider,
+  Input,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+  SlideFade,
+  Text,
+  useDisclosure,
+} from "@chakra-ui/react";
 import ToastNotifications from "@/components/ToastNotification";
 import {
   IconDefinition,
   faGear,
+  faL,
+  faPeopleGroup,
   faPlug,
   faUmbrella,
   faUpDown,
   faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
+import next from "next";
+import classNames from "classnames";
+import Alfred from "@/components/Alfred";
 config.autoAddCss = false;
 
 export default function RootLayout({
@@ -37,7 +58,40 @@ export default function RootLayout({
     };
   }, []);
 
-  // const { colorMode, toggleColorMode } = useColorMode();
+  const { toggleScope, enableScope, disableScope } = useHotkeysContext();
+  const [isOpen, setSearchOpen] = useState(false);
+
+  const onToggle = () => {
+    if (isOpen) {
+      // disableScope("search");
+      setSearchOpen(false);
+    } else {
+      // enableScope("search");
+      setSearchOpen(true);
+    }
+  };
+
+  useHotkeys(
+    "mod+ ",
+    onToggle,
+    {
+      scopes: ["global"],
+      enableOnFormTags: ["input", "textarea", "select"],
+    },
+    [onToggle]
+  );
+
+  useHotkeys(
+    "esc",
+    () => {
+      setSearchOpen(false);
+    },
+    {
+      scopes: ["global"],
+      enableOnFormTags: ["input", "textarea", "select"],
+    },
+    [setSearchOpen]
+  );
 
   return (
     <html lang="en" style={{ height: "100%", margin: 0 }}>
@@ -54,6 +108,7 @@ export default function RootLayout({
           <div className={styles.root}>
             <SideBar />
             <ToastNotifications />
+            <Alfred isOpen={isOpen} close={() => setSearchOpen(false)} />
             <div className={styles.divider}>
               <Divider orientation="vertical" />
             </div>

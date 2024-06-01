@@ -42,7 +42,7 @@ builder.Services.AddCors(options =>
             .AllowCredentials()
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .WithOrigins("http://localhost:3000", "http://localhost:5142"));
+            .WithOrigins("http://localhost:3000", "http://localhost:5142", "http://192.168.10.49:5142"));
 });
 
 builder.Services.AddMassTransit(x =>
