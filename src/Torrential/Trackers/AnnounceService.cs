@@ -31,6 +31,7 @@ namespace Torrential.Trackers
                 foreach (var torrent in state.ActiveTorrents)
                 {
                     processedAny = true;
+                    logger.LogInformation("Announcing {InfoHash}", torrent.InfoHash);
                     await foreach (var announceResponse in Announce(torrent))
                     {
                         foreach (var peer in announceResponse.Peers)

@@ -1,5 +1,9 @@
 ﻿# Torrential
 
+## TODOS
+[] When torrent completes, multiple torrent completed events fire off (race condition during end game piece validation
+
+
 ## Torrent Manager
 ### Responsibilities
 1. Add/Remove torrents from the task queue
