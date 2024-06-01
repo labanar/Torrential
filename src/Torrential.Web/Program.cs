@@ -12,6 +12,7 @@ using Torrential.Files;
 using Torrential.Peers;
 using Torrential.Settings;
 using Torrential.Torrents;
+using Torrential.Trackers;
 using Torrential.Web.Api.Models;
 using Torrential.Web.Api.Requests.Settings;
 using Torrential.Web.Api.Responses;
@@ -257,6 +258,7 @@ internal class InitializationService(
     IMetadataFileService metaFileService,
     TorrentStatusCache statusCache,
     IServiceScopeFactory scopeFactory,
+    AnnounceServiceState announceServiceState,
     ILogger<InitializationService> logger)
 {
     public async Task Initialize(CancellationToken stoppingToken)
@@ -284,7 +286,10 @@ internal class InitializationService(
                 statusCache.UpdateStatus(torrentMeta.InfoHash, config.Status);
 
             if (config?.Status == TorrentStatus.Running)
+            {
+                announceServiceState.AddTorrent(torrentMeta);
                 await taskManager.Start(torrentMeta.InfoHash);
+            }
         }
     }
 
