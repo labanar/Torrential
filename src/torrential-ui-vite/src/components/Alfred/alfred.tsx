@@ -16,16 +16,13 @@ import {
   faUpDown,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import classNames from "classnames";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
-import styles from "./Aldred.module.css";
-import { AlfredContext } from "@/features/alfredSlice";
-import { AppDispatch } from "@/app/store";
-import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import { useAppDispatch } from "@/app/hooks";
-import { stringify } from "querystring";
+import styles from "./alfred.module.css";
+import { NavigateFunction, useNavigate } from "react-router-dom";
+import { AppDispatch, useAppDispatch } from "../../store";
+import { AlfredContext } from "../../store/slices/alfredSlice";
+import classNames from "classnames";
 
 interface AlfredProps {
   isOpen: boolean;
@@ -35,12 +32,14 @@ interface AlfredProps {
 export default function Alfred({ isOpen, close }: AlfredProps) {
   const { enableScope, disableScope, enabledScopes } = useHotkeysContext();
 
-  const router = useRouter();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
   const [selectedId, setSelectedId] = useState(-1);
   const [suggestions, setSuggestions] = useState(globalSuggestions);
-  const [scopesToEnableOnClose, setScopesToEnableOnClose] = useState([]);
+  const [scopesToEnableOnClose, setScopesToEnableOnClose] = useState<string[]>(
+    []
+  );
 
   useEffect(() => {
     setSelectedId(-1);
@@ -93,8 +92,8 @@ export default function Alfred({ isOpen, close }: AlfredProps) {
     "enter",
     () => {
       if (selectedId >= 0 && suggestions.length > selectedId) {
-        const suggestion = suggestions.at(selectedId);
-        suggestion.action({ dispatch, router });
+        const suggestion = suggestions[selectedId];
+        suggestion.action({ dispatch, navigate });
         close();
       }
     },
@@ -152,7 +151,7 @@ function SearchSuggestion({ selected, icon, title }: SearchSuggestionProps) {
           [styles.selected]: selected,
         })}
       >
-        <FontAwesomeIcon icon={icon} size="xl" width={"28px"} />
+        <FontAwesomeIcon icon={icon!} size="xl" width={"28px"} />
         <Text fontSize={14}>{title}</Text>
       </div>
     </>
@@ -168,7 +167,7 @@ interface SearchSuggestion {
 
 interface SearchSuggestionActionProps {
   dispatch: AppDispatch;
-  router: AppRouterInstance;
+  navigate: NavigateFunction;
 }
 
 const globalSuggestions: SearchSuggestion[] = [
@@ -176,24 +175,24 @@ const globalSuggestions: SearchSuggestion[] = [
     context: AlfredContext.Global,
     icon: faUpDown,
     title: "Torrents",
-    action: ({ router }) => router.push("/"),
+    action: ({ navigate }) => navigate("/"),
   },
   {
     context: AlfredContext.Global,
     icon: faPeopleGroup,
     title: "Peers",
-    action: ({ router }) => router.push("/peers"),
+    action: ({ navigate }) => navigate("/peers"),
   },
   {
     context: AlfredContext.Global,
     icon: faPlug,
     title: "Integrations",
-    action: ({ router }) => router.push("/integrations"),
+    action: ({ navigate }) => navigate("/integrations"),
   },
   {
     context: AlfredContext.Global,
     icon: faGear,
     title: "Settings",
-    action: ({ router }) => router.push("/settings"),
+    action: ({ navigate }) => navigate("/settings"),
   },
 ];

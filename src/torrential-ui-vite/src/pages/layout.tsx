@@ -1,14 +1,8 @@
-"use client";
-
-import { Providers } from "./providers";
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
 import { useEffect, useState } from "react";
-import SignalRService from "./signalRService";
 import styles from "./layout.module.css";
-import { useRouter } from "next/navigation";
-import { Box, ColorModeScript, Divider, Text } from "@chakra-ui/react";
-import ToastNotifications from "@/components/ToastNotification";
+import { Box, Divider, Text } from "@chakra-ui/react";
 import {
   IconDefinition,
   faGear,
@@ -18,8 +12,10 @@ import {
   faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
-import Alfred from "@/components/Alfred";
+import { useHotkeys } from "react-hotkeys-hook";
+import { useNavigate } from "react-router-dom";
+import Alfred from "../components/Alfred/alfred";
+import SignalRService from "../services/signalR";
 config.autoAddCss = false;
 
 export default function RootLayout({
@@ -29,7 +25,7 @@ export default function RootLayout({
 }>) {
   useEffect(() => {
     const signalRService = new SignalRService(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/hub`
+      `${import.meta.env.VITE_API_BASE_URL}/torrents/hub`
     );
     signalRService.startConnection();
 
@@ -38,15 +34,12 @@ export default function RootLayout({
     };
   }, []);
 
-  const { toggleScope, enableScope, disableScope } = useHotkeysContext();
   const [isOpen, setSearchOpen] = useState(false);
 
   const onToggle = () => {
     if (isOpen) {
-      // disableScope("search");
       setSearchOpen(false);
     } else {
-      // enableScope("search");
       setSearchOpen(true);
     }
   };
@@ -83,20 +76,16 @@ export default function RootLayout({
           flexDirection: "column",
         }}
       >
-        <ColorModeScript initialColorMode={"system"} />
-        <Providers>
-          <div className={styles.root}>
-            <SideBar />
-            <ToastNotifications />
-            <Alfred isOpen={isOpen} close={() => setSearchOpen(false)} />
-            <div className={styles.divider}>
-              <Divider orientation="vertical" />
-            </div>
-            <div id="main" className={styles.main}>
-              {children}
-            </div>
+        <div className={styles.root}>
+          <SideBar />
+          <Alfred isOpen={isOpen} close={() => setSearchOpen(false)} />
+          <div className={styles.divider}>
+            <Divider orientation="vertical" />
           </div>
-        </Providers>
+          <div id="main" className={styles.main}>
+            {children}
+          </div>
+        </div>
       </body>
     </html>
   );
@@ -132,10 +121,10 @@ interface SideBarItemProps {
 }
 
 function SideBarItem({ label, linksTo, icon }: SideBarItemProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
-    <div className={styles.sidebarItem} onClick={() => router.push(linksTo)}>
+    <div className={styles.sidebarItem} onClick={() => navigate(linksTo)}>
       <Box width="24px" textAlign="center">
         <FontAwesomeIcon icon={icon} size={"lg"} />
       </Box>

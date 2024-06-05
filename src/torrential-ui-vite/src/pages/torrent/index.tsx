@@ -17,7 +17,7 @@ import {
   Text,
   Tooltip,
 } from "@chakra-ui/react";
-import styles from "./page.module.css";
+import styles from "./torrent.module.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCircleArrowDown,
@@ -33,21 +33,33 @@ import {
   faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FileUpload, FileUploadElement } from "@/components/FileUpload";
-import { useAppDispatch } from "./hooks";
-import { TorrentsState, setTorrents } from "@/features/torrentsSlice";
-import { PeerSummary, TorrentSummary } from "@/types";
-import { PeerApiModel, TorrentApiModel } from "@/api/types";
-import { setPeers } from "@/features/peersSlice";
 import { useSelector } from "react-redux";
+import classNames from "classnames";
+import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
 import {
   selectTorrentsByInfoHashes,
   torrentsWithPeersSelector,
-} from "./selectors";
-import classNames from "classnames";
-import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
+  useAppDispatch,
+} from "../../store";
+import { TorrentsState, setTorrents } from "../../store/slices/torrentsSlice";
+import { PeerApiModel, TorrentApiModel } from "../../services/api";
+import { PeerSummary, TorrentSummary } from "../../types";
+import { setPeers } from "../../store/slices/peersSlice";
+import {
+  FileUpload,
+  FileUploadElement,
+} from "../../components/FileUpload/file-upload";
+import Layout from "../layout";
 
-export default function Home() {
+export default function TorrentPage() {
+  return (
+    <Layout>
+      <Page />
+    </Layout>
+  );
+}
+
+function Page() {
   const dispatch = useAppDispatch();
   const torrents = useSelector(torrentsWithPeersSelector);
   const [selectedTorrents, setSelectedTorrents] = useState<string[]>([]);
@@ -94,7 +106,7 @@ export default function Home() {
   const fetchTorrents = useCallback(async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents`
+        `${import.meta.env.VITE_API_BASE_URL}/torrents`
       );
 
       if (!response.ok) {
@@ -127,7 +139,7 @@ export default function Home() {
         );
         dispatch(setTorrents(mappedTorrents));
 
-        data.forEach((torrent) => {
+        data.forEach((torrent: TorrentApiModel) => {
           const torrentPeers: PeerSummary[] = torrent.peers.reduce(
             (tpv: PeerSummary[], p: PeerApiModel) => {
               let summary: PeerSummary = {
@@ -270,7 +282,7 @@ const ActionsRow = ({
 
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/add`,
+        `${import.meta.env.VITE_API_BASE_URL}/torrents/add`,
         {
           method: "POST",
           body: formData,
@@ -293,7 +305,7 @@ const ActionsRow = ({
   const stopTorrent = async (infoHash: string) => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/${infoHash}/stop`,
+        `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/stop`,
         { method: "POST" }
       );
     } catch (e) {
@@ -305,7 +317,7 @@ const ActionsRow = ({
   const startTorrent = async (infoHash: string) => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/${infoHash}/start`,
+        `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/start`,
         { method: "POST" }
       );
     } catch (e) {
@@ -321,7 +333,7 @@ const ActionsRow = ({
       };
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/${infoHash}/delete`,
+        `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/delete`,
         {
           method: "POST",
           headers: {
