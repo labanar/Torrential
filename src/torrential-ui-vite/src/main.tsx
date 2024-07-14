@@ -2,7 +2,7 @@ import * as React from "react";
 import * as ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "./index.css";
-import { ChakraProvider, ColorModeScript, extendTheme } from "@chakra-ui/react";
+import { ChakraProvider, extendTheme } from "@chakra-ui/react";
 import TorrentPage from "./pages/torrent";
 import { Provider } from "react-redux";
 import store from "./store";
@@ -38,14 +38,13 @@ const theme = extendTheme({
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ColorModeScript initialColorMode={theme.config.initialColorMode} />
-    <Provider store={store}>
-      <ChakraProvider theme={theme}>
+    <ChakraProvider theme={theme}>
+      <Provider store={store}>
         <HotkeysProvider initiallyActiveScopes={["global"]}>
           <ToastNotification />
           <RouterProvider router={router} />
         </HotkeysProvider>
-      </ChakraProvider>
-    </Provider>
+      </Provider>
+    </ChakraProvider>
   </React.StrictMode>
 );

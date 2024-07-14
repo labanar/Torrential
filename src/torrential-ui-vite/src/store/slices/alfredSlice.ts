@@ -11,6 +11,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export enum AlfredContext {
   Global,
+  TorrentList,
 }
 
 export interface AlfredState {
@@ -38,5 +39,5 @@ const alfredSlice = createSlice({
   },
 });
 
-export const {} = alfredSlice.actions;
+export const { setContext } = alfredSlice.actions;
 export default alfredSlice.reducer;

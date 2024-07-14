@@ -1,12 +1,14 @@
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styles from "./layout.module.css";
-import { Box, Divider, Text } from "@chakra-ui/react";
+import { Box, Divider, IconButton, Text, useColorMode } from "@chakra-ui/react";
 import {
   IconDefinition,
   faGear,
+  faMoon,
   faPlug,
+  faSun,
   faUmbrella,
   faUpDown,
   faUsers,
@@ -34,37 +36,7 @@ export default function RootLayout({
     };
   }, []);
 
-  const [isOpen, setSearchOpen] = useState(false);
-
-  const onToggle = () => {
-    if (isOpen) {
-      setSearchOpen(false);
-    } else {
-      setSearchOpen(true);
-    }
-  };
-
-  useHotkeys(
-    "mod+ ",
-    onToggle,
-    {
-      scopes: ["global"],
-      enableOnFormTags: ["input", "textarea", "select"],
-    },
-    [onToggle]
-  );
-
-  useHotkeys(
-    "esc",
-    () => {
-      setSearchOpen(false);
-    },
-    {
-      scopes: ["global"],
-      enableOnFormTags: ["input", "textarea", "select"],
-    },
-    [setSearchOpen]
-  );
+  const alfred = useMemo(() => <Alfred />, []);
 
   return (
     <html lang="en" style={{ height: "100%", margin: 0 }}>
@@ -78,7 +50,7 @@ export default function RootLayout({
       >
         <div className={styles.root}>
           <SideBar />
-          <Alfred isOpen={isOpen} close={() => setSearchOpen(false)} />
+          {alfred}
           <div className={styles.divider}>
             <Divider orientation="vertical" />
           </div>
@@ -92,6 +64,8 @@ export default function RootLayout({
 }
 
 function SideBar() {
+  const { colorMode, toggleColorMode } = useColorMode();
+
   return (
     <div id="sidebar" className={styles.sidebar}>
       <FontAwesomeIcon
@@ -110,6 +84,27 @@ function SideBar() {
       <SideBarItem label="PEERS" linksTo="/peers" icon={faUsers} />
       <SideBarItem label="INTEGRATIONS" linksTo="/integrations" icon={faPlug} />
       <SideBarItem label="SETTINGS" linksTo="/settings" icon={faGear} />
+
+      <div
+        style={{
+          flex: 1,
+          alignContent: "flex-end",
+        }}
+      >
+        <IconButton
+          icon={
+            <Box width={"24px"} height={"24px"}>
+              <FontAwesomeIcon
+                icon={colorMode === "dark" ? faSun : faMoon}
+                fontSize={24}
+              />
+            </Box>
+          }
+          onClick={toggleColorMode}
+          aria-label={""}
+          variant={"ghost"}
+        />
+      </div>
     </div>
   );
 }

@@ -24,38 +24,58 @@ import { AppDispatch, useAppDispatch } from "../../store";
 import { AlfredContext } from "../../store/slices/alfredSlice";
 import classNames from "classnames";
 
-interface AlfredProps {
-  isOpen: boolean;
-  close: () => void;
-}
-
-export default function Alfred({ isOpen, close }: AlfredProps) {
+export default function Alfred() {
   const { enableScope, disableScope, enabledScopes } = useHotkeysContext();
 
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
-  const [selectedId, setSelectedId] = useState(-1);
+  const [isOpen, setSearchOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState(0);
   const [suggestions, setSuggestions] = useState(globalSuggestions);
   const [scopesToEnableOnClose, setScopesToEnableOnClose] = useState<string[]>(
     []
   );
 
   useEffect(() => {
-    setSelectedId(-1);
+    setSelectedId(0);
   }, [suggestions]);
+
+  const onToggle = () => {
+    if (isOpen) {
+      setSearchOpen(false);
+    } else {
+      setSearchOpen(true);
+    }
+  };
+
+  useHotkeys(
+    "mod+ ",
+    () => {
+      console.log("alfred open/close");
+      onToggle();
+    },
+    {
+      scopes: ["global"],
+      enableOnFormTags: ["input", "textarea", "select"],
+    },
+    [onToggle]
+  );
 
   useEffect(() => {
     if (isOpen) {
       setScopesToEnableOnClose(enabledScopes);
       enabledScopes.forEach((s) => disableScope(s));
+      console.log("search open");
       enableScope("search");
     } else {
+      console.log("search closed");
       disableScope("search");
       scopesToEnableOnClose.forEach((s) => {
         enableScope(s);
       });
-      setSelectedId(-1);
+      enableScope("global");
+      setSelectedId(0);
     }
     return () => disableScope("search"); // Clean up on unmount
   }, [isOpen]);
@@ -94,8 +114,19 @@ export default function Alfred({ isOpen, close }: AlfredProps) {
       if (selectedId >= 0 && suggestions.length > selectedId) {
         const suggestion = suggestions[selectedId];
         suggestion.action({ dispatch, navigate });
-        close();
+        setSearchOpen(false);
       }
+    },
+    {
+      scopes: ["search"],
+      enableOnFormTags: ["input", "textarea", "select"],
+    }
+  );
+
+  useHotkeys(
+    "esc",
+    () => {
+      setSearchOpen(false);
     },
     {
       scopes: ["search"],

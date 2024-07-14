@@ -50,6 +50,7 @@ import {
   FileUploadElement,
 } from "../../components/FileUpload/file-upload";
 import Layout from "../layout";
+import { AlfredContext, setContext } from "../../store/slices/alfredSlice";
 
 export default function TorrentPage() {
   return (
@@ -63,6 +64,7 @@ function Page() {
   const dispatch = useAppDispatch();
   const torrents = useSelector(torrentsWithPeersSelector);
   const [selectedTorrents, setSelectedTorrents] = useState<string[]>([]);
+  const [currentPosition, setCurrentPosition] = useState(0);
 
   const memoActionRow = useMemo(() => {
     return (
@@ -74,28 +76,25 @@ function Page() {
   }, [selectedTorrents]);
 
   useEffect(() => {
+    dispatch(setContext(AlfredContext.TorrentList));
+  }, [dispatch]);
+
+  const { enableScope } = useHotkeysContext();
+  useEffect(() => {
+    enableScope("torrents");
+  }, [enableScope]);
+
+  useEffect(() => {
     console.log("TORRENTS CHANGED");
   }, [torrents]);
 
-  const selectTorrent = (infoHash: string, event: React.MouseEvent) => {
-    if (event.ctrlKey || event.metaKey) {
-      // Multi-select with Ctrl or Cmd key
-      if (selectedTorrents.includes(infoHash)) {
-        // If item is already selected, deselect it
-        setSelectedTorrents(
-          selectedTorrents.filter((item) => item !== infoHash)
-        );
-      } else {
-        // Add the item to the selected items
-        setSelectedTorrents([...selectedTorrents, infoHash]);
-      }
+  const selectTorrent = (infoHash: string) => {
+    if (selectedTorrents.includes(infoHash)) {
+      // If item is already selected, deselect it
+      setSelectedTorrents(selectedTorrents.filter((item) => item !== infoHash));
     } else {
-      // Single select or deselect if already selected
-      if (selectedTorrents.includes(infoHash)) {
-        setSelectedTorrents([]);
-      } else {
-        setSelectedTorrents([infoHash]);
-      }
+      // Add the item to the selected items
+      setSelectedTorrents([...selectedTorrents, infoHash]);
     }
   };
 
@@ -170,20 +169,14 @@ function Page() {
     fetchTorrents();
   }, [fetchTorrents]);
 
-  const { enableScope } = useHotkeysContext();
-  useEffect(() => {
-    console.log("mounted");
-    enableScope("torrents");
-  }, [enableScope]);
-
   useHotkeys(
     "up",
     () => {
-      // let nextId = selectedId - 1;
-      // if (nextId < 0) nextId = suggestions.length - 1;
-      // setSelectedId(nextId);
-      // console.log(nextId);
-      console.log("up from torrents");
+      let nextId = currentPosition - 1;
+      if (nextId < 0) nextId = torrents.length - 1;
+      setCurrentPosition(nextId);
+      console.log(nextId);
+      console.log("up from torrents " + nextId);
     },
     {
       scopes: ["torrents"],
@@ -194,11 +187,11 @@ function Page() {
   useHotkeys(
     "down",
     () => {
-      // let nextId = selectedId - 1;
-      // if (nextId < 0) nextId = suggestions.length - 1;
-      // setSelectedId(nextId);
-      // console.log(nextId);
-      console.log("down from torrents");
+      let nextId = currentPosition + 1;
+      if (nextId >= torrents.length) nextId = 0;
+      setCurrentPosition(nextId);
+      console.log(nextId);
+      console.log("down from torrents " + nextId);
     },
     {
       scopes: ["torrents"],
@@ -213,6 +206,8 @@ function Page() {
       // if (nextId < 0) nextId = suggestions.length - 1;
       // setSelectedId(nextId);
       // console.log(nextId);
+
+      selectTorrent(torrents[currentPosition].infoHash);
       console.log("space from torrents");
     },
     {
@@ -230,10 +225,12 @@ function Page() {
           <Divider orientation="horizontal" />
         </div>
         <div className={styles.torrentList}>
-          {torrents.map((t) => (
+          {torrents.map((t, i) => (
             <>
               <TorrentRow
-                onSelect={selectTorrent}
+                toggleSelect={selectTorrent}
+                toggleFocus={() => setCurrentPosition(i)}
+                isFocused={currentPosition === i}
                 isSelected={isSelected(t.infoHash)}
                 uploadRate={t.uploadRate}
                 downloadRate={t.downloadRate}
@@ -451,8 +448,10 @@ interface TorrentRowProps {
   status: string;
   uploadRate: number;
   downloadRate: number;
+  isFocused: boolean;
   isSelected: boolean;
-  onSelect: (innfoHash: string, e: React.MouseEvent) => void;
+  toggleSelect: (infoHash: string) => void;
+  toggleFocus: () => void;
 }
 
 function TorrentRow({
@@ -465,8 +464,10 @@ function TorrentRow({
   status,
   uploadRate,
   downloadRate,
+  isFocused,
   isSelected,
-  onSelect,
+  toggleSelect,
+  toggleFocus,
 }: TorrentRowProps) {
   const color = useMemo(() => {
     if (status === "Stopped" || status === "Idle") return "orange";
@@ -482,16 +483,19 @@ function TorrentRow({
   }
 
   const className = useMemo(() => {
-    if (!isSelected) return classNames(styles.torrentContainer);
+    if (!isFocused) return classNames(styles.torrentContainer);
 
     return classNames(styles.torrentContainer, styles.torrentContainerSelected);
-  }, [isSelected]);
+  }, [isFocused]);
 
   return (
-    <div className={className} onClick={(e) => onSelect(infoHash, e)}>
+    <div className={className} onClick={() => toggleFocus()}>
       <div className={styles.torrent}>
         <div className={styles.torrentCheckbox}>
-          <Checkbox isChecked={isSelected}></Checkbox>
+          <Checkbox
+            isChecked={isSelected}
+            onChange={(e) => toggleSelect(infoHash)}
+          ></Checkbox>
         </div>
         <div className={styles.torrentInfo} key={infoHash}>
           <div className={styles.torrentInfoTitleRow}>
