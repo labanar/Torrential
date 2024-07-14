@@ -17,7 +17,7 @@ import {
   Text,
   Tooltip,
 } from "@chakra-ui/react";
-import styles from "./page.module.css";
+import styles from "./torrent.module.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCircleArrowDown,
@@ -33,24 +33,38 @@ import {
   faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FileUpload, FileUploadElement } from "@/components/FileUpload";
-import { useAppDispatch } from "./hooks";
-import { TorrentsState, setTorrents } from "@/features/torrentsSlice";
-import { PeerSummary, TorrentSummary } from "@/types";
-import { PeerApiModel, TorrentApiModel } from "@/api/types";
-import { setPeers } from "@/features/peersSlice";
 import { useSelector } from "react-redux";
+import classNames from "classnames";
+import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
 import {
   selectTorrentsByInfoHashes,
   torrentsWithPeersSelector,
-} from "./selectors";
-import classNames from "classnames";
-import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
+  useAppDispatch,
+} from "../../store";
+import { TorrentsState, setTorrents } from "../../store/slices/torrentsSlice";
+import { PeerApiModel, TorrentApiModel } from "../../services/api";
+import { PeerSummary, TorrentSummary } from "../../types";
+import { setPeers } from "../../store/slices/peersSlice";
+import {
+  FileUpload,
+  FileUploadElement,
+} from "../../components/FileUpload/file-upload";
+import Layout from "../layout";
+import { AlfredContext, setContext } from "../../store/slices/alfredSlice";
 
-export default function Home() {
+export default function TorrentPage() {
+  return (
+    <Layout>
+      <Page />
+    </Layout>
+  );
+}
+
+function Page() {
   const dispatch = useAppDispatch();
   const torrents = useSelector(torrentsWithPeersSelector);
   const [selectedTorrents, setSelectedTorrents] = useState<string[]>([]);
+  const [currentPosition, setCurrentPosition] = useState(0);
 
   const memoActionRow = useMemo(() => {
     return (
@@ -62,28 +76,25 @@ export default function Home() {
   }, [selectedTorrents]);
 
   useEffect(() => {
+    dispatch(setContext(AlfredContext.TorrentList));
+  }, [dispatch]);
+
+  const { enableScope } = useHotkeysContext();
+  useEffect(() => {
+    enableScope("torrents");
+  }, [enableScope]);
+
+  useEffect(() => {
     console.log("TORRENTS CHANGED");
   }, [torrents]);
 
-  const selectTorrent = (infoHash: string, event: React.MouseEvent) => {
-    if (event.ctrlKey || event.metaKey) {
-      // Multi-select with Ctrl or Cmd key
-      if (selectedTorrents.includes(infoHash)) {
-        // If item is already selected, deselect it
-        setSelectedTorrents(
-          selectedTorrents.filter((item) => item !== infoHash)
-        );
-      } else {
-        // Add the item to the selected items
-        setSelectedTorrents([...selectedTorrents, infoHash]);
-      }
+  const selectTorrent = (infoHash: string) => {
+    if (selectedTorrents.includes(infoHash)) {
+      // If item is already selected, deselect it
+      setSelectedTorrents(selectedTorrents.filter((item) => item !== infoHash));
     } else {
-      // Single select or deselect if already selected
-      if (selectedTorrents.includes(infoHash)) {
-        setSelectedTorrents([]);
-      } else {
-        setSelectedTorrents([infoHash]);
-      }
+      // Add the item to the selected items
+      setSelectedTorrents([...selectedTorrents, infoHash]);
     }
   };
 
@@ -94,7 +105,7 @@ export default function Home() {
   const fetchTorrents = useCallback(async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents`
+        `${import.meta.env.VITE_API_BASE_URL}/torrents`
       );
 
       if (!response.ok) {
@@ -127,7 +138,7 @@ export default function Home() {
         );
         dispatch(setTorrents(mappedTorrents));
 
-        data.forEach((torrent) => {
+        data.forEach((torrent: TorrentApiModel) => {
           const torrentPeers: PeerSummary[] = torrent.peers.reduce(
             (tpv: PeerSummary[], p: PeerApiModel) => {
               let summary: PeerSummary = {
@@ -158,20 +169,14 @@ export default function Home() {
     fetchTorrents();
   }, [fetchTorrents]);
 
-  const { enableScope } = useHotkeysContext();
-  useEffect(() => {
-    console.log("mounted");
-    enableScope("torrents");
-  }, [enableScope]);
-
   useHotkeys(
     "up",
     () => {
-      // let nextId = selectedId - 1;
-      // if (nextId < 0) nextId = suggestions.length - 1;
-      // setSelectedId(nextId);
-      // console.log(nextId);
-      console.log("up from torrents");
+      let nextId = currentPosition - 1;
+      if (nextId < 0) nextId = torrents.length - 1;
+      setCurrentPosition(nextId);
+      console.log(nextId);
+      console.log("up from torrents " + nextId);
     },
     {
       scopes: ["torrents"],
@@ -182,11 +187,11 @@ export default function Home() {
   useHotkeys(
     "down",
     () => {
-      // let nextId = selectedId - 1;
-      // if (nextId < 0) nextId = suggestions.length - 1;
-      // setSelectedId(nextId);
-      // console.log(nextId);
-      console.log("down from torrents");
+      let nextId = currentPosition + 1;
+      if (nextId >= torrents.length) nextId = 0;
+      setCurrentPosition(nextId);
+      console.log(nextId);
+      console.log("down from torrents " + nextId);
     },
     {
       scopes: ["torrents"],
@@ -201,6 +206,8 @@ export default function Home() {
       // if (nextId < 0) nextId = suggestions.length - 1;
       // setSelectedId(nextId);
       // console.log(nextId);
+
+      selectTorrent(torrents[currentPosition].infoHash);
       console.log("space from torrents");
     },
     {
@@ -218,10 +225,12 @@ export default function Home() {
           <Divider orientation="horizontal" />
         </div>
         <div className={styles.torrentList}>
-          {torrents.map((t) => (
+          {torrents.map((t, i) => (
             <>
               <TorrentRow
-                onSelect={selectTorrent}
+                toggleSelect={selectTorrent}
+                toggleFocus={() => setCurrentPosition(i)}
+                isFocused={currentPosition === i}
                 isSelected={isSelected(t.infoHash)}
                 uploadRate={t.uploadRate}
                 downloadRate={t.downloadRate}
@@ -270,7 +279,7 @@ const ActionsRow = ({
 
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/add`,
+        `${import.meta.env.VITE_API_BASE_URL}/torrents/add`,
         {
           method: "POST",
           body: formData,
@@ -292,8 +301,8 @@ const ActionsRow = ({
 
   const stopTorrent = async (infoHash: string) => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/${infoHash}/stop`,
+      await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/stop`,
         { method: "POST" }
       );
     } catch (e) {
@@ -304,8 +313,8 @@ const ActionsRow = ({
 
   const startTorrent = async (infoHash: string) => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/${infoHash}/start`,
+      await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/start`,
         { method: "POST" }
       );
     } catch (e) {
@@ -320,8 +329,8 @@ const ActionsRow = ({
         deleteFiles,
       };
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/${infoHash}/delete`,
+      await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/delete`,
         {
           method: "POST",
           headers: {
@@ -371,7 +380,7 @@ const ActionsRow = ({
         open={deleteModalOpen}
         infoHashes={selectedTorrents}
         onClose={() => setDeleteModalOpen(false)}
-        onRemove={(infoHashes, deleteFiles) => removeTorrents(deleteFiles)}
+        onRemove={(_, deleteFiles) => removeTorrents(deleteFiles)}
       />
 
       <div className={styles.actionSearch}>
@@ -439,8 +448,10 @@ interface TorrentRowProps {
   status: string;
   uploadRate: number;
   downloadRate: number;
+  isFocused: boolean;
   isSelected: boolean;
-  onSelect: (innfoHash: string, e: React.MouseEvent) => void;
+  toggleSelect: (infoHash: string) => void;
+  toggleFocus: () => void;
 }
 
 function TorrentRow({
@@ -453,8 +464,10 @@ function TorrentRow({
   status,
   uploadRate,
   downloadRate,
+  isFocused,
   isSelected,
-  onSelect,
+  toggleSelect,
+  toggleFocus,
 }: TorrentRowProps) {
   const color = useMemo(() => {
     if (status === "Stopped" || status === "Idle") return "orange";
@@ -470,16 +483,19 @@ function TorrentRow({
   }
 
   const className = useMemo(() => {
-    if (!isSelected) return classNames(styles.torrentContainer);
+    if (!isFocused) return classNames(styles.torrentContainer);
 
     return classNames(styles.torrentContainer, styles.torrentContainerSelected);
-  }, [isSelected]);
+  }, [isFocused]);
 
   return (
-    <div className={className} onClick={(e) => onSelect(infoHash, e)}>
+    <div className={className} onClick={() => toggleFocus()}>
       <div className={styles.torrent}>
         <div className={styles.torrentCheckbox}>
-          <Checkbox isChecked={isSelected}></Checkbox>
+          <Checkbox
+            isChecked={isSelected}
+            onChange={(_) => toggleSelect(infoHash)}
+          ></Checkbox>
         </div>
         <div className={styles.torrentInfo} key={infoHash}>
           <div className={styles.torrentInfoTitleRow}>

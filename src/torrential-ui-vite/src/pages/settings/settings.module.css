@@ -1,0 +1,12 @@
+.portInput {
+    width: 10em;
+}
+
+.tcpInboundCheckbox {
+    padding-left: 2em;
+    align-self: flex-start;
+}
+
+.connectionNumericInput {
+    width: 10em
+}

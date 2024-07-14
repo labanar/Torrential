@@ -1,0 +1,117 @@
+.root {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .torrentList {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+  }
+  
+  .torrentContainer {
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    margin-top: -1px;
+  }
+  
+  /* .torrentContainer:hover {
+    box-shadow: inset 0 0 100px 100px rgba(255, 255, 255, 0.1);
+  } */
+  
+  .torrentContainerSelected {
+    box-shadow: inset 0 0 100px 100px rgba(255, 255, 255, 0.1);
+  }
+  
+  .deleteModal {
+    font-family: "Courier New", Courier, monospace;
+  }
+  
+  .deleteModalBody {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .deleteFilesCheckbox {
+    padding-top: 8px;
+  }
+  
+  .torrent {
+    /* background-color: #fff; */
+    display: flex;
+    flex-direction: row;
+    padding: 1em;
+    padding-left: 1.25em;
+    padding-right: 1.25em;
+    gap: 24px;
+  }
+  
+  .torrentDivider {
+    padding-left: 1.25em;
+    padding-right: 1.25em;
+  }
+  
+  .torrentIcon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+    width:24px;
+  }
+  
+  .torrentCheckbox {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .torrentInfo {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+  
+  .torrentInfoTitleRow {
+    align-items: "center";
+    display: flex;
+    flex-direction: row;
+    gap: 10;
+  }
+  
+  .progress {
+    padding-top: 0.2em;
+  }
+  
+  .title {
+    font-weight: 500;
+  }
+  
+  .progressDetails {
+    padding-top: 0.6em;
+  }
+  
+  .actionBar {
+    min-height: 6em;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 2em;
+    padding-left: 2em;
+  }
+  
+  .actionButtons {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: row;
+    gap: 2em;
+  }
+  
+  .actionSearch {
+    flex-grow: 1;
+  }
+  

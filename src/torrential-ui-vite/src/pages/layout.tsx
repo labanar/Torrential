@@ -1,25 +1,22 @@
-"use client";
-
-import { Providers } from "./providers";
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
-import { useEffect, useState } from "react";
-import SignalRService from "./signalRService";
+import { useEffect, useMemo } from "react";
 import styles from "./layout.module.css";
-import { useRouter } from "next/navigation";
-import { Box, ColorModeScript, Divider, Text } from "@chakra-ui/react";
-import ToastNotifications from "@/components/ToastNotification";
+import { Box, Divider, IconButton, Text, useColorMode } from "@chakra-ui/react";
 import {
   IconDefinition,
   faGear,
+  faMoon,
   faPlug,
+  faSun,
   faUmbrella,
   faUpDown,
   faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
-import Alfred from "@/components/Alfred";
+import { useNavigate } from "react-router-dom";
+import Alfred from "../components/Alfred/alfred";
+import SignalRService from "../services/signalR";
 config.autoAddCss = false;
 
 export default function RootLayout({
@@ -29,7 +26,7 @@ export default function RootLayout({
 }>) {
   useEffect(() => {
     const signalRService = new SignalRService(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/torrents/hub`
+      `${import.meta.env.VITE_API_BASE_URL}/torrents/hub`
     );
     signalRService.startConnection();
 
@@ -38,40 +35,7 @@ export default function RootLayout({
     };
   }, []);
 
-  const { toggleScope, enableScope, disableScope } = useHotkeysContext();
-  const [isOpen, setSearchOpen] = useState(false);
-
-  const onToggle = () => {
-    if (isOpen) {
-      // disableScope("search");
-      setSearchOpen(false);
-    } else {
-      // enableScope("search");
-      setSearchOpen(true);
-    }
-  };
-
-  useHotkeys(
-    "mod+ ",
-    onToggle,
-    {
-      scopes: ["global"],
-      enableOnFormTags: ["input", "textarea", "select"],
-    },
-    [onToggle]
-  );
-
-  useHotkeys(
-    "esc",
-    () => {
-      setSearchOpen(false);
-    },
-    {
-      scopes: ["global"],
-      enableOnFormTags: ["input", "textarea", "select"],
-    },
-    [setSearchOpen]
-  );
+  const alfred = useMemo(() => <Alfred />, []);
 
   return (
     <html lang="en" style={{ height: "100%", margin: 0 }}>
@@ -83,26 +47,24 @@ export default function RootLayout({
           flexDirection: "column",
         }}
       >
-        <ColorModeScript initialColorMode={"system"} />
-        <Providers>
-          <div className={styles.root}>
-            <SideBar />
-            <ToastNotifications />
-            <Alfred isOpen={isOpen} close={() => setSearchOpen(false)} />
-            <div className={styles.divider}>
-              <Divider orientation="vertical" />
-            </div>
-            <div id="main" className={styles.main}>
-              {children}
-            </div>
+        <div className={styles.root}>
+          <SideBar />
+          {alfred}
+          <div className={styles.divider}>
+            <Divider orientation="vertical" />
           </div>
-        </Providers>
+          <div id="main" className={styles.main}>
+            {children}
+          </div>
+        </div>
       </body>
     </html>
   );
 }
 
 function SideBar() {
+  const { colorMode, toggleColorMode } = useColorMode();
+
   return (
     <div id="sidebar" className={styles.sidebar}>
       <FontAwesomeIcon
@@ -121,6 +83,27 @@ function SideBar() {
       <SideBarItem label="PEERS" linksTo="/peers" icon={faUsers} />
       <SideBarItem label="INTEGRATIONS" linksTo="/integrations" icon={faPlug} />
       <SideBarItem label="SETTINGS" linksTo="/settings" icon={faGear} />
+
+      <div
+        style={{
+          flex: 1,
+          alignContent: "flex-end",
+        }}
+      >
+        <IconButton
+          icon={
+            <Box width={"24px"} height={"24px"}>
+              <FontAwesomeIcon
+                icon={colorMode === "dark" ? faSun : faMoon}
+                fontSize={24}
+              />
+            </Box>
+          }
+          onClick={toggleColorMode}
+          aria-label={""}
+          variant={"ghost"}
+        />
+      </div>
     </div>
   );
 }
@@ -132,10 +115,10 @@ interface SideBarItemProps {
 }
 
 function SideBarItem({ label, linksTo, icon }: SideBarItemProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
-    <div className={styles.sidebarItem} onClick={() => router.push(linksTo)}>
+    <div className={styles.sidebarItem} onClick={() => navigate(linksTo)}>
       <Box width="24px" textAlign="center">
         <FontAwesomeIcon icon={icon} size={"lg"} />
       </Box>

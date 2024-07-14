@@ -7,7 +7,7 @@
         "DOTNET_gcServer": "0"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "http://localhost:5142"
+      "applicationUrl": "http://0.0.0.0:5142"
     },
     "IIS Express": {
       "commandName": "IISExpress",
