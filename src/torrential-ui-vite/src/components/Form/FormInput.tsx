@@ -7,11 +7,7 @@ interface FormInputProps {
   control: Control<any, any>;
 }
 
-export const FormInput: React.FC<FormInputProps> = ({
-  className,
-  fieldName,
-  control,
-}) => {
+export const FormInput: React.FC<FormInputProps> = ({ fieldName, control }) => {
   return (
     <Controller
       name={fieldName}

@@ -301,7 +301,7 @@ const ActionsRow = ({
 
   const stopTorrent = async (infoHash: string) => {
     try {
-      const response = await fetch(
+      await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/stop`,
         { method: "POST" }
       );
@@ -313,7 +313,7 @@ const ActionsRow = ({
 
   const startTorrent = async (infoHash: string) => {
     try {
-      const response = await fetch(
+      await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/start`,
         { method: "POST" }
       );
@@ -329,7 +329,7 @@ const ActionsRow = ({
         deleteFiles,
       };
 
-      const response = await fetch(
+      await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/delete`,
         {
           method: "POST",
@@ -380,7 +380,7 @@ const ActionsRow = ({
         open={deleteModalOpen}
         infoHashes={selectedTorrents}
         onClose={() => setDeleteModalOpen(false)}
-        onRemove={(infoHashes, deleteFiles) => removeTorrents(deleteFiles)}
+        onRemove={(_, deleteFiles) => removeTorrents(deleteFiles)}
       />
 
       <div className={styles.actionSearch}>
@@ -494,7 +494,7 @@ function TorrentRow({
         <div className={styles.torrentCheckbox}>
           <Checkbox
             isChecked={isSelected}
-            onChange={(e) => toggleSelect(infoHash)}
+            onChange={(_) => toggleSelect(infoHash)}
           ></Checkbox>
         </div>
         <div className={styles.torrentInfo} key={infoHash}>

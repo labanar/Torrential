@@ -9,7 +9,6 @@ import {
 } from "@chakra-ui/react";
 import {
   IconDefinition,
-  faArrowsUpDown,
   faGear,
   faPeopleGroup,
   faPlug,

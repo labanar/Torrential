@@ -44,16 +44,13 @@ function GeneralSettings() {
   }, [resetFileSettings]);
   const saveFileSettings = useCallback(async (values: any) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/settings/file`,
-        {
-          method: "POST",
-          body: JSON.stringify(values),
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/file`, {
+        method: "POST",
+        body: JSON.stringify(values),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
     } catch {}
   }, []);
 
@@ -92,16 +89,13 @@ function GeneralSettings() {
   }, [resetConnectionSettings]);
   const saveConnectionSettings = useCallback(async (values: any) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/settings/connection`,
-        {
-          method: "POST",
-          body: JSON.stringify(values),
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/connection`, {
+        method: "POST",
+        body: JSON.stringify(values),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
     } catch {}
   }, []);
 
@@ -134,16 +128,13 @@ function GeneralSettings() {
   }, [resetTcpListenerSettings]);
   const saveTcpSettings = useCallback(async (values: any) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/settings/tcp`,
-        {
-          method: "POST",
-          body: JSON.stringify(values),
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/tcp`, {
+        method: "POST",
+        body: JSON.stringify(values),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
     } catch {}
   }, []);
 

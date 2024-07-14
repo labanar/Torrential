@@ -1,6 +1,6 @@
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import styles from "./layout.module.css";
 import { Box, Divider, IconButton, Text, useColorMode } from "@chakra-ui/react";
 import {
@@ -14,7 +14,6 @@ import {
   faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useHotkeys } from "react-hotkeys-hook";
 import { useNavigate } from "react-router-dom";
 import Alfred from "../components/Alfred/alfred";
 import SignalRService from "../services/signalR";
