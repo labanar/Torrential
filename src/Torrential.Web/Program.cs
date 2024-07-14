@@ -43,7 +43,7 @@ builder.Services.AddCors(options =>
             .AllowCredentials()
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .WithOrigins("http://localhost:3000", "http://localhost:5142", "http://192.168.10.49:5142", "http://localhost:5174"));
+            .WithOrigins("http://localhost:3000", "http://localhost:5142", "http://192.168.10.49:5142", "http://localhost:5173"));
 });
 
 builder.Services.AddMassTransit(x =>
@@ -104,7 +104,7 @@ app.MapGet(
                 Progress = x.State?.PeerBitfield?.CompletionRatio ?? 0
             });
 
-            if (!bitfieldManager.TryGetDownloadBitfield(torrent.InfoHash, out var downloadBitfield))
+            if (!bitfieldManager.TryGetVerificationBitfield(torrent.InfoHash, out var bitfield))
                 continue;
 
             var status = await statusCache.GetStatus(torrent.InfoHash);
@@ -113,7 +113,7 @@ app.MapGet(
                 Name = meta.Name,
                 InfoHash = meta.InfoHash,
                 Status = status.ToString(),
-                Progress = downloadBitfield.CompletionRatio,
+                Progress = bitfield.CompletionRatio,
                 TotalSizeBytes = meta.PieceSize * meta.NumberOfPieces,
                 DownloadRate = rates.GetIngressRate(torrent.InfoHash),
                 UploadRate = rates.GetEgressRate(torrent.InfoHash),
