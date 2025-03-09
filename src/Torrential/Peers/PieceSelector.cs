@@ -4,10 +4,15 @@ namespace Torrential.Peers
 {
     public class PieceSelector(BitfieldManager bitfieldManager, PieceReservationService pieceReservationService, ILogger<PieceSelector> logger)
     {
+        private const int RESERVATION_LENGTH_SECONDS = 30;
         public async Task<PieceSuggestionResult> SuggestNextPieceAsync(InfoHash infohash, Bitfield peerBitfield)
         {
             if (!bitfieldManager.TryGetVerificationBitfield(infohash, out var myBitfield))
                 return PieceSuggestionResult.NoMorePieces;
+
+
+            //Jitter
+            await Task.Delay(Random.Shared.Next(0, 250));
 
             var suggestedPiece = myBitfield.SuggestPieceToDownload(peerBitfield);
             if (!suggestedPiece.Index.HasValue)
@@ -19,9 +24,9 @@ namespace Torrential.Peers
             //As we approach 100% completion, we can be more aggressive in our piece selection
             //meaning we can reduce the reservation length
             //This is a simple linear function that reduces the reservation length as we approach 100%
-            var reservationLengthSeconds = 10;
+            var reservationLengthSeconds = RESERVATION_LENGTH_SECONDS;
             if (myBitfield.CompletionRatio > 0.80)
-                reservationLengthSeconds = (int)(10 - (9 * myBitfield.CompletionRatio));
+                reservationLengthSeconds = (int)(RESERVATION_LENGTH_SECONDS - ((RESERVATION_LENGTH_SECONDS - 1) * myBitfield.CompletionRatio));
 
             var reserved = await pieceReservationService.TryReservePiece(infohash, suggestedIndex, reservationLengthSeconds);
             if (!reserved)

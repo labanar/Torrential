@@ -79,6 +79,7 @@ public sealed class PeerWireClient : IAsyncDisposable
         _blockSaveService = blockSaveService;
         _logger = logger;
         _infoHash = connection.InfoHash;
+        _state.PeerBitfield = new Bitfield(_meta.NumberOfPieces);
     }
 
 
@@ -295,7 +296,7 @@ public sealed class PeerWireClient : IAsyncDisposable
         }
 
         //If the peer bitfield is null, then we can assume that the peer has an empty bitfield
-        _state.PeerBitfield ??= new Bitfield(_meta.NumberOfPieces);
+        //_state.PeerBitfield ??= new Bitfield(_meta.NumberOfPieces);
         LastMessageTimestamp = DateTimeOffset.UtcNow;
         return handled;
     }
