@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
             options.UseSqlite($"Data Source={dbPath}"));
 
         services.AddSingleton<ITorrentManager, TorrentManager>();
+        services.AddSingleton<ISettingsService, SettingsService>();
         services.AddHostedService<TorrentStoreInitializer>();
         services.AddSingleton<IInboundConnectionHandler, InboundConnectionHandler>();
         services.AddHostedService<TcpListenerService>();
