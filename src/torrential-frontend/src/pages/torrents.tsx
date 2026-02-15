@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Plus,
   Play,
@@ -6,9 +6,7 @@ import {
   Trash2,
   ArrowDownCircle,
   PauseCircle,
-  CheckCircle2,
-  PlusCircle,
-  AlertCircle,
+  Circle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -22,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { listTorrents, startTorrent, stopTorrent, removeTorrent } from '@/lib/api'
+import { listTorrents, addTorrent, startTorrent, stopTorrent, removeTorrent } from '@/lib/api'
 import type { TorrentState } from '@/lib/api'
 
 function formatBytes(bytes: number): string {
@@ -34,11 +32,9 @@ function formatBytes(bytes: number): string {
 }
 
 const statusConfig = {
-  Downloading: { icon: ArrowDownCircle, badgeClass: 'bg-green-600 text-white', label: 'Downloading' },
+  Running: { icon: ArrowDownCircle, badgeClass: 'bg-green-600 text-white', label: 'Running' },
   Stopped: { icon: PauseCircle, badgeClass: 'bg-yellow-600 text-white', label: 'Stopped' },
-  Completed: { icon: CheckCircle2, badgeClass: 'bg-blue-600 text-white', label: 'Completed' },
-  Added: { icon: PlusCircle, badgeClass: 'bg-gray-500 text-white', label: 'Added' },
-  Error: { icon: AlertCircle, badgeClass: 'bg-red-600 text-white', label: 'Error' },
+  Idle: { icon: Circle, badgeClass: 'bg-gray-500 text-white', label: 'Idle' },
 } as const
 
 export function TorrentsPage() {
@@ -46,6 +42,7 @@ export function TorrentsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteFiles, setDeleteFiles] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchTorrents = useCallback(async () => {
     try {
@@ -94,6 +91,18 @@ export function TorrentsPage() {
     fetchTorrents()
   }
 
+  const handleAddTorrent = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      await addTorrent(file)
+      fetchTorrents()
+    } catch (err) {
+      console.error('Failed to add torrent', err)
+    }
+    e.target.value = ''
+  }
+
   const selectedTorrentNames = torrents
     .filter((t) => selected.has(t.infoHash))
     .map((t) => t.name)
@@ -102,7 +111,8 @@ export function TorrentsPage() {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
         <p className="text-muted-foreground text-lg">No torrents added yet</p>
-        <Button onClick={() => console.log('Add torrent clicked')}>
+        <input ref={fileInputRef} type="file" accept=".torrent" className="hidden" onChange={handleAddTorrent} />
+        <Button onClick={() => fileInputRef.current?.click()}>
           <Plus />
           Add Torrent
         </Button>
@@ -112,12 +122,14 @@ export function TorrentsPage() {
 
   return (
     <div className="flex flex-1 flex-col p-6 gap-4">
+      <input ref={fileInputRef} type="file" accept=".torrent" className="hidden" onChange={handleAddTorrent} />
+
       {/* Action toolbar */}
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
           size="icon"
-          onClick={() => console.log('Add torrent clicked')}
+          onClick={() => fileInputRef.current?.click()}
         >
           <Plus />
         </Button>
@@ -152,10 +164,8 @@ export function TorrentsPage() {
         {torrents.map((t) => {
           const config = statusConfig[t.status]
           const StatusIcon = config.icon
-          // The API doesn't return progress/downloaded bytes yet, so we show totalSize
-          // Once the API adds progress, this can be updated
-          const progressPercent = 0
-          const downloadedBytes = 0
+          const progressPercent = t.progress * 100
+          const downloadedBytes = t.bytesDownloaded
 
           return (
             <div
@@ -174,7 +184,7 @@ export function TorrentsPage() {
                 </div>
                 <Progress value={progressPercent} className="h-2" />
                 <span className="text-muted-foreground text-xs">
-                  {formatBytes(downloadedBytes)} of {formatBytes(t.totalSize)} ({progressPercent.toFixed(1)}%)
+                  {formatBytes(downloadedBytes)} of {formatBytes(t.totalSizeBytes)} ({progressPercent.toFixed(1)}%)
                 </span>
               </div>
             </div>

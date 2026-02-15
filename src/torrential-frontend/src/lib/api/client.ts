@@ -1,25 +1,28 @@
-import type { TorrentState, AddTorrentRequest } from './types';
+import type { TorrentState } from './types';
 
 const BASE = '/api';
 
 export async function listTorrents(): Promise<TorrentState[]> {
   const res = await fetch(`${BASE}/torrents`);
   if (!res.ok) throw new Error('Failed to fetch torrents');
-  return res.json();
+  const body = await res.json();
+  return body.data ?? [];
 }
 
 export async function getTorrent(infoHash: string): Promise<TorrentState | null> {
   const res = await fetch(`${BASE}/torrents/${infoHash}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error('Failed to fetch torrent');
-  return res.json();
+  const body = await res.json();
+  return body.data ?? null;
 }
 
-export async function addTorrent(request: AddTorrentRequest): Promise<void> {
-  const res = await fetch(`${BASE}/torrents`, {
+export async function addTorrent(file: File): Promise<void> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${BASE}/torrents/add`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
+    body: formData,
   });
   if (!res.ok) throw new Error('Failed to add torrent');
 }
@@ -34,7 +37,11 @@ export async function stopTorrent(infoHash: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to stop torrent');
 }
 
-export async function removeTorrent(infoHash: string, deleteData = false): Promise<void> {
-  const res = await fetch(`${BASE}/torrents/${infoHash}?deleteData=${deleteData}`, { method: 'DELETE' });
+export async function removeTorrent(infoHash: string, deleteFiles = false): Promise<void> {
+  const res = await fetch(`${BASE}/torrents/${infoHash}/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deleteFiles }),
+  });
   if (!res.ok) throw new Error('Failed to remove torrent');
 }
