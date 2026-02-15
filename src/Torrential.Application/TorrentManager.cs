@@ -197,6 +197,20 @@ public class TorrentManager(ILogger<TorrentManager> logger, IServiceScopeFactory
         return TorrentManagerResult.Ok();
     }
 
+    public TorrentMetaInfo? GetMetaInfo(InfoHash infoHash)
+    {
+        _metaInfos.TryGetValue(infoHash, out var metaInfo);
+        return metaInfo;
+    }
+
+    public IReadOnlyList<InfoHash> GetTorrentsByStatus(TorrentStatus status)
+    {
+        return _torrents
+            .Where(kvp => kvp.Value.Status == status)
+            .Select(kvp => kvp.Key)
+            .ToList();
+    }
+
     internal void LoadFromEntities(IReadOnlyList<TorrentEntity> entities)
     {
         foreach (var entity in entities)

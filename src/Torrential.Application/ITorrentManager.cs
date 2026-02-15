@@ -39,4 +39,14 @@ public interface ITorrentManager
     /// Updates which files are selected for download on the given torrent.
     /// </summary>
     TorrentManagerResult UpdateFileSelections(InfoHash infoHash, IReadOnlyList<TorrentFileSelection> fileSelections);
+
+    /// <summary>
+    /// Gets the TorrentMetaInfo for a torrent, or null if not found.
+    /// </summary>
+    TorrentMetaInfo? GetMetaInfo(InfoHash infoHash);
+
+    /// <summary>
+    /// Gets all torrent InfoHashes that are currently in the specified status.
+    /// </summary>
+    IReadOnlyList<InfoHash> GetTorrentsByStatus(TorrentStatus status);
 }

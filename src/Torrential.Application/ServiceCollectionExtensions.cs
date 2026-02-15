@@ -22,6 +22,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IInboundConnectionHandler, InboundConnectionHandler>();
         services.AddHostedService<TcpListenerService>();
         services.AddSingleton<IAnnounceService, AnnounceService>();
+        services.AddSingleton<IPeerPool, PeerPool>();
+        services.AddHostedService<TrackerAnnounceService>();
         return services;
     }
 }
