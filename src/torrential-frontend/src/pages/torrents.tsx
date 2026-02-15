@@ -28,14 +28,7 @@ import {
 import { TorrentInfoPane } from '@/components/torrent-info-pane'
 import { listTorrents, parseTorrent, addTorrentWithSelections, startTorrent, stopTorrent, removeTorrent } from '@/lib/api'
 import type { TorrentState, ParsedTorrent } from '@/lib/api'
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  if (i === 0) return bytes + ' B'
-  return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i]
-}
+import { formatBytes } from '@/lib/format'
 
 const statusConfig = {
   Running: { icon: ArrowDownCircle, badgeClass: 'bg-green-600 text-white', label: 'Running' },
