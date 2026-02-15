@@ -8,6 +8,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<ITorrentManager, TorrentManager>();
         services.AddHostedService<TcpListenerService>();
+        services.AddSingleton<IAnnounceService, AnnounceService>();
         return services;
     }
 }
