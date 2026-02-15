@@ -13,6 +13,11 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from '@/components/ui/resizable'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -20,16 +25,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { TorrentInfoPane } from '@/components/torrent-info-pane'
 import { listTorrents, parseTorrent, addTorrentWithSelections, startTorrent, stopTorrent, removeTorrent } from '@/lib/api'
 import type { TorrentState, ParsedTorrent } from '@/lib/api'
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  if (i === 0) return bytes + ' B'
-  return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i]
-}
+import { formatBytes } from '@/lib/format'
 
 const statusConfig = {
   Running: { icon: ArrowDownCircle, badgeClass: 'bg-green-600 text-white', label: 'Running' },
@@ -40,6 +39,7 @@ const statusConfig = {
 export function TorrentsPage() {
   const [torrents, setTorrents] = useState<TorrentState[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [activeTorrent, setActiveTorrent] = useState<string | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteFiles, setDeleteFiles] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -233,76 +233,96 @@ export function TorrentsPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col p-6 gap-4">
+    <div className="flex flex-1 flex-col overflow-hidden">
       <input ref={fileInputRef} type="file" accept=".torrent" className="hidden" onChange={handleFileSelected} />
 
-      {/* Action toolbar */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Plus />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          disabled={!hasSelection}
-          onClick={handleStart}
-        >
-          <Play />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          disabled={!hasSelection}
-          onClick={handleStop}
-        >
-          <Pause />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          disabled={!hasSelection}
-          onClick={() => setDeleteDialogOpen(true)}
-        >
-          <Trash2 />
-        </Button>
-      </div>
-
-      {/* Torrent list */}
-      <div className="flex flex-col gap-2">
-        {torrents.map((t) => {
-          const config = statusConfig[t.status] ?? statusConfig.Idle
-          const StatusIcon = config.icon
-          const progressPercent = t.progress * 100
-          const downloadedBytes = t.bytesDownloaded
-
-          return (
-            <div
-              key={t.infoHash}
-              className="flex items-center gap-3 rounded-lg border p-3"
-            >
-              <Checkbox
-                checked={selected.has(t.infoHash)}
-                onCheckedChange={() => toggleSelect(t.infoHash)}
-              />
-              <StatusIcon className="size-5 shrink-0 text-muted-foreground" />
-              <div className="flex flex-1 flex-col gap-1.5 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-medium text-sm">{t.name}</span>
-                  <Badge className={config.badgeClass}>{config.label}</Badge>
-                </div>
-                <Progress value={progressPercent} className="h-2" />
-                <span className="text-muted-foreground text-xs">
-                  {formatBytes(downloadedBytes)} of {formatBytes(t.totalSizeBytes)} ({progressPercent.toFixed(1)}%)
-                </span>
-              </div>
+      <ResizablePanelGroup orientation="vertical" className="flex-1">
+        <ResizablePanel defaultSize={activeTorrent ? 60 : 100} minSize={30}>
+          <div className="flex flex-col gap-4 p-6 h-full overflow-auto">
+            {/* Action toolbar */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Plus />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!hasSelection}
+                onClick={handleStart}
+              >
+                <Play />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!hasSelection}
+                onClick={handleStop}
+              >
+                <Pause />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!hasSelection}
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <Trash2 />
+              </Button>
             </div>
-          )
-        })}
-      </div>
+
+            {/* Torrent list */}
+            <div className="flex flex-col gap-2">
+              {torrents.map((t) => {
+                const config = statusConfig[t.status] ?? statusConfig.Idle
+                const StatusIcon = config.icon
+                const progressPercent = t.progress * 100
+                const downloadedBytes = t.bytesDownloaded
+                const isActive = activeTorrent === t.infoHash
+
+                return (
+                  <div
+                    key={t.infoHash}
+                    onClick={() => setActiveTorrent(isActive ? null : t.infoHash)}
+                    className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      isActive ? 'bg-accent border-accent-foreground/20 border-l-4 border-l-primary' : 'hover:bg-muted/50'
+                    }`}
+                  >
+                    <Checkbox
+                      checked={selected.has(t.infoHash)}
+                      onCheckedChange={() => toggleSelect(t.infoHash)}
+                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                    />
+                    <StatusIcon className="size-5 shrink-0 text-muted-foreground" />
+                    <div className="flex flex-1 flex-col gap-1.5 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate font-medium text-sm">{t.name}</span>
+                        <Badge className={config.badgeClass}>{config.label}</Badge>
+                      </div>
+                      <Progress value={progressPercent} className="h-2" />
+                      <span className="text-muted-foreground text-xs">
+                        {formatBytes(downloadedBytes)} of {formatBytes(t.totalSizeBytes)} ({progressPercent.toFixed(1)}%)
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </ResizablePanel>
+
+        {activeTorrent && (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={40} minSize={20}>
+              <TorrentInfoPane infoHash={activeTorrent} />
+            </ResizablePanel>
+          </>
+        )}
+      </ResizablePanelGroup>
 
       {/* Delete confirmation dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

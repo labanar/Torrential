@@ -7,7 +7,7 @@ export function AppLayout() {
     <div className="flex h-screen">
       <Sidebar />
       <Separator orientation="vertical" />
-      <main className="flex-1 overflow-auto">
+      <main className="flex flex-1 flex-col overflow-hidden">
         <Outlet />
       </main>
     </div>

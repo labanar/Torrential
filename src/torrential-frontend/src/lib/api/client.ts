@@ -1,4 +1,4 @@
-import type { TorrentState, ParsedTorrent } from './types';
+import type { TorrentState, ParsedTorrent, TorrentDetails } from './types';
 
 const BASE = '/api';
 
@@ -67,4 +67,23 @@ export async function removeTorrent(infoHash: string, deleteFiles = false): Prom
     method: 'DELETE',
   });
   if (!res.ok) throw new Error('Failed to remove torrent');
+}
+
+export async function getTorrentDetails(infoHash: string): Promise<TorrentDetails | null> {
+  const res = await fetch(`${BASE}/torrents/${infoHash}/details`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('Failed to fetch torrent details');
+  return res.json();
+}
+
+export async function updateFileSelections(
+  infoHash: string,
+  fileSelections: { fileIndex: number; selected: boolean }[]
+): Promise<void> {
+  const res = await fetch(`${BASE}/torrents/${infoHash}/files`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileSelections }),
+  });
+  if (!res.ok) throw new Error('Failed to update file selections');
 }

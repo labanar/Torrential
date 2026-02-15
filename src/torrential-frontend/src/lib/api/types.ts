@@ -37,3 +37,34 @@ export interface ParsedTorrent {
   announceUrls: string[];
   pieceHashes: string;
 }
+
+export interface TorrentDetails {
+  infoHash: string;
+  name: string;
+  totalSizeBytes: number;
+  pieceSize: number;
+  numberOfPieces: number;
+  status: 'Running' | 'Stopped' | 'Idle';
+  dateAdded: string;
+  pieces: boolean[];
+  files: TorrentFileDetail[];
+  peers: PeerDetail[];
+}
+
+export interface TorrentFileDetail {
+  fileIndex: number;
+  fileName: string;
+  fileSize: number;
+  selected: boolean;
+}
+
+export interface PeerDetail {
+  peerId: string;
+  ipAddress: string;
+  port: number;
+  bytesDownloaded: number;
+  bytesUploaded: number;
+  isSeed: boolean;
+  progress: number;
+  pieces: boolean[];
+}
