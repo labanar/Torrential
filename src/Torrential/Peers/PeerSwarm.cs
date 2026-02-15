@@ -16,6 +16,7 @@ namespace Torrential.Peers
         SettingsManager settingsManager,
         TorrentStatusCache statusCache,
         BitfieldManager bitfieldManager,
+        PieceReservationService pieceReservationService,
         IBus bus,
         IBlockSaveService blockSaveService,
         ILogger<PeerSwarm> logger,
@@ -304,6 +305,9 @@ namespace Torrential.Peers
                     await peerClient.DisposeAsync();
                 }
             }
+
+            //Release all piece reservations held by this peer
+            pieceReservationService.ReleaseAllForPeer(infoHash, peerId);
 
             //Notify that the peer has been removed
             await bus.Publish(new PeerDisconnectedEvent

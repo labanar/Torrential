@@ -5,7 +5,7 @@ using Torrential.Utilities;
 
 namespace Torrential.Torrents
 {
-    public class TorrentTaskManager(TorrentMetadataCache metaCache, PeerSwarm swarms, IBus bus, BitfieldManager bitfieldManager)
+    public class TorrentTaskManager(TorrentMetadataCache metaCache, PeerSwarm swarms, IBus bus, BitfieldManager bitfieldManager, PieceBufferManager pieceBufferManager)
     {
         private ConcurrentDictionary<InfoHash, string> Torrents = [];
         private ConcurrentDictionary<InfoHash, Task> TorrentTasks = [];
@@ -96,6 +96,7 @@ namespace Torrential.Torrents
             while (torrentTask.InProgress())
                 await Task.Delay(500);
 
+            pieceBufferManager.RemoveAllForTorrent(infoHash);
             await bus.Publish(new TorrentStoppedEvent { InfoHash = infoHash });
 
             return new()
@@ -131,6 +132,7 @@ namespace Torrential.Torrents
             while (torrentTask.InProgress())
                 await Task.Delay(500);
 
+            pieceBufferManager.RemoveAllForTorrent(infoHash);
             await bus.Publish(new TorrentRemovedEvent { InfoHash = infoHash });
             return new() { InfoHash = infoHash, Success = true };
         }

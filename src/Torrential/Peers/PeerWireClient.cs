@@ -354,7 +354,7 @@ public sealed class PeerWireClient : IAsyncDisposable
 
     private async ValueTask<bool> HandlePieceAsync(ReadOnlySequence<byte> payload, int chunkSize)
     {
-        var block = PooledBlock.FromReadOnlySequence(payload, chunkSize, _infoHash);
+        var block = PooledBlock.FromReadOnlySequence(payload, chunkSize, _infoHash, PeerId);
         await INBOUND_BLOCK_CHANNEL.Writer.WriteAsync(block, _cts.Token);
         BytesDownloaded += block.Buffer.Length;
         return true;

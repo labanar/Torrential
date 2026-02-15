@@ -73,7 +73,7 @@ namespace Torrential.Torrents
             while (!peer.State.AmChoked && !stoppingToken.IsCancellationRequested && hasMorePieces)
             {
                 //Start asking for pieces, wait for us to get a piece back then ask for the next piece
-                var suggestion = await pieceSelector.SuggestNextPieceAsync(meta.InfoHash, peer.State.PeerBitfield);
+                var suggestion = await pieceSelector.SuggestNextPieceAsync(meta.InfoHash, peer.State.PeerBitfield, peer.PeerId);
                 if (!suggestion.Index.HasValue)
                 {
                     hasMorePieces = suggestion.MorePiecesAvailable;

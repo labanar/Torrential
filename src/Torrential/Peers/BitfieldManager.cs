@@ -11,7 +11,6 @@ namespace Torrential.Peers
         private ConcurrentDictionary<InfoHash, AsyncBitfield> _downloadBitfields = [];
         private ConcurrentDictionary<InfoHash, AsyncBitfield> _verificationBitfields = [];
         private ConcurrentDictionary<InfoHash, AsyncBitfield> _blockBitfields = [];
-        private ConcurrentDictionary<InfoHash, AsyncBitfield> _pieceReservationBitfields = [];
 
         public ICollection<(InfoHash, AsyncBitfield)> DownloadBitfields => _downloadBitfields.Select(Bitfield => (Bitfield.Key, Bitfield.Value)).ToArray();
         public ICollection<(InfoHash, AsyncBitfield)> VerificationBitfields => _verificationBitfields.Select(Bitfield => (Bitfield.Key, Bitfield.Value)).ToArray();
@@ -21,7 +20,6 @@ namespace Torrential.Peers
             _downloadBitfields.TryRemove(infoHash, out _);
             _verificationBitfields.TryRemove(infoHash, out _);
             _blockBitfields.TryRemove(infoHash, out _);
-            _pieceReservationBitfields.TryRemove(infoHash, out _);
         }
 
         public async Task Initialize(TorrentMetadata meta)
@@ -40,8 +38,6 @@ namespace Torrential.Peers
             if (!verificationBitfield.HasAll())
             {
                 var blockBitfield = new AsyncBitfield(meta.TotalNumberOfChunks);
-                var pieceReservationBitfield = new AsyncBitfield(numPieces);
-                _pieceReservationBitfields[infoHash] = pieceReservationBitfield;
                 _blockBitfields[infoHash] = blockBitfield;
             }
 
@@ -70,12 +66,6 @@ namespace Torrential.Peers
         {
             return _verificationBitfields.TryGetValue(infoHash, out bitfield);
         }
-
-        public bool TryGetPieceReservationBitfield(InfoHash infoHash, out AsyncBitfield bitfield)
-        {
-            return _pieceReservationBitfields.TryGetValue(infoHash, out bitfield);
-        }
-
 
         private async ValueTask LoadDownloadBitfieldData(InfoHash infoHash, AsyncBitfield bitField)
         {

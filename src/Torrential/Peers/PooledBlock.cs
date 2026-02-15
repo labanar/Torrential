@@ -12,8 +12,9 @@ public sealed class PooledBlock : IDisposable
     public InfoHash InfoHash { get; private set; }
     public int PieceIndex { get; private set; }
     public int Offset { get; private set; }
+    public PeerId SenderPeerId { get; private set; }
 
-    public static PooledBlock FromReadOnlySequence(ReadOnlySequence<byte> sequence, int chunkSize, InfoHash infoHash)
+    public static PooledBlock FromReadOnlySequence(ReadOnlySequence<byte> sequence, int chunkSize, InfoHash infoHash, PeerId senderPeerId)
     {
         var reader = new SequenceReader<byte>(sequence);
 
@@ -25,6 +26,7 @@ public sealed class PooledBlock : IDisposable
             throw new ArgumentException("Error reading piece block data");
 
         var block = new PooledBlock((int)blockSequence.Length, ArrayPool<byte>.Shared, infoHash, pieceIndex, pieceOffset);
+        block.SenderPeerId = senderPeerId;
         blockSequence.CopyTo(block._buffer);
         return block;
     }
