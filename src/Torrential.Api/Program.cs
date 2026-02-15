@@ -96,16 +96,16 @@ torrents.MapDelete("/{infoHash}", (InfoHash infoHash, bool? deleteData, ITorrent
     return ToHttpResult(result);
 });
 
-torrents.MapGet("/", (ITorrentManager manager, IPeerPool peerPool) =>
-    Results.Ok(manager.GetAll().Select(s => ToDto(s, peerPool)).ToList()));
+torrents.MapGet("/", (ITorrentManager manager, IPeerConnectionManager peerConnectionManager) =>
+    Results.Ok(manager.GetAll().Select(s => ToDto(s, peerConnectionManager)).ToList()));
 
-torrents.MapGet("/{infoHash}", (InfoHash infoHash, ITorrentManager manager, IPeerPool peerPool) =>
+torrents.MapGet("/{infoHash}", (InfoHash infoHash, ITorrentManager manager, IPeerConnectionManager peerConnectionManager) =>
 {
     var state = manager.GetState(infoHash);
-    return state is not null ? Results.Ok(ToDto(state, peerPool)) : Results.NotFound();
+    return state is not null ? Results.Ok(ToDto(state, peerConnectionManager)) : Results.NotFound();
 });
 
-torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manager, IPeerPool peerPool) =>
+torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manager, IPeerPool peerPool, IPeerConnectionManager peerConnectionManager) =>
 {
     var state = manager.GetState(infoHash);
     if (state is null) return Results.NotFound();
@@ -117,15 +117,17 @@ torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manag
         _ => "Idle"
     };
 
-    var peerDtos = peerPool.GetPeers(infoHash).Select(p => new PeerDetailDto(
-        "",
+    var peerDtos = peerConnectionManager.GetConnectedPeers(infoHash).Select(p => new PeerDetailDto(
+        p.PeerId.ToAsciiString(),
         p.PeerInfo.Ip.ToString(),
         p.PeerInfo.Port,
-        0,
-        0,
-        false,
-        0,
-        []
+        p.BytesDownloaded,
+        p.BytesUploaded,
+        p.Bitfield?.HasAll() ?? false,
+        p.Bitfield?.CompletionRatio ?? 0,
+        p.Bitfield is not null
+            ? Enumerable.Range(0, state.NumberOfPieces).Select(i => p.Bitfield.HasPiece(i)).ToArray()
+            : []
     )).ToList();
 
     var details = new TorrentDetailsDto(
@@ -138,7 +140,8 @@ torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manag
         state.DateAdded,
         new bool[state.NumberOfPieces],
         state.Files.Select(f => new TorrentFileDto(f.FileIndex, f.FileName, f.FileSize, state.SelectedFileIndices.Contains(f.FileIndex))).ToList(),
-        peerDtos
+        peerDtos,
+        peerPool.GetPeerCount(infoHash)
     );
 
     return Results.Ok(details);
@@ -185,7 +188,7 @@ static IResult ToHttpResult(TorrentManagerResult result)
     };
 }
 
-static TorrentDto ToDto(TorrentState state, IPeerPool peerPool)
+static TorrentDto ToDto(TorrentState state, IPeerConnectionManager peerConnectionManager)
 {
     var status = state.Status switch
     {
@@ -194,7 +197,7 @@ static TorrentDto ToDto(TorrentState state, IPeerPool peerPool)
         _ => "Idle"
     };
 
-    var peerCount = peerPool.GetPeerCount(state.InfoHash);
+    var peerCount = peerConnectionManager.GetConnectedPeerCount(state.InfoHash);
 
     return new TorrentDto(
         state.InfoHash.AsString(),
@@ -256,7 +259,8 @@ public record TorrentDetailsDto(
     DateTimeOffset DateAdded,
     bool[] Pieces,
     List<TorrentFileDto> Files,
-    List<PeerDetailDto> Peers);
+    List<PeerDetailDto> Peers,
+    int DiscoveredPeerCount);
 
 public record TorrentFileDto(int FileIndex, string FileName, long FileSize, bool Selected);
 

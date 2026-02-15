@@ -1,5 +1,8 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Torrential.Application;
+using Torrential.Application.Persistence;
 using Torrential.Core;
 using Xunit;
 
@@ -26,7 +29,15 @@ public class TorrentManagerTests
         PieceHashes = new byte[80]
     };
 
-    private static TorrentManager CreateManager() => new(NullLogger<TorrentManager>.Instance);
+    private static TorrentManager CreateManager()
+    {
+        var services = new ServiceCollection();
+        services.AddDbContext<TorrentDbContext>(options =>
+            options.UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()));
+        var serviceProvider = services.BuildServiceProvider();
+        var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
+        return new TorrentManager(NullLogger<TorrentManager>.Instance, scopeFactory);
+    }
 
     // Add Tests
 

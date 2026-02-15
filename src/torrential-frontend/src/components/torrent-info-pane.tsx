@@ -73,7 +73,7 @@ export function TorrentInfoPane({ infoHash }: TorrentInfoPaneProps) {
               activeTab === tab ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            {tab}{tab === 'peers' ? ` (${details.peers.length})` : ''}
+            {tab}{tab === 'peers' ? ` (${details.peers.length} / ${details.discoveredPeerCount} discovered)` : ''}
           </button>
         ))}
       </div>
