@@ -87,7 +87,9 @@ This loop replaces manual browser testing. Do not skip it for UI work.
 
 Screenshots are gitignored — they are ephemeral build artifacts, not checked in.
 
-## Project Structure
+## Project Structure (Active Projects)
+
+**All new features and changes go in these projects.**
 
 ```
 src/
@@ -96,8 +98,25 @@ src/
   Torrential.Core/         — Domain layer (torrents, trackers, protocols)
   torrential-frontend/     — React + Vite + Tailwind SPA
 test/
-  Torrential.E2E/          — Playwright screenshot tests (Docker-based)
+  Torrential.E2E/              — Playwright screenshot tests (Docker-based)
+  Torrential.Core.Tests/       — Unit tests for Torrential.Core
+  Torrential.Application.Tests/ — Unit tests for Torrential.Application
 ```
+
+## Legacy Projects — Do Not Modify
+
+**Do NOT modify any of the following legacy projects. They exist in the repo for historical reasons and must not be changed.**
+
+- `src/Torrential/` — Original .NET torrent library (legacy)
+- `src/Torrential.Web/` — Original ASP.NET web host (legacy)
+- `src/Torrential.Harness/` — Test harness (legacy)
+- `src/Torrential.Extensions.SignalR/` — SignalR hub extension (legacy)
+- `src/torrential-ui/` — Legacy Next.js frontend
+- `src/torrential-ui-vite/` — Legacy Vite frontend
+- `src/torrential-remix-ui/` — Legacy Remix frontend
+- `src/torrential-expo-ui/` — Legacy Expo frontend
+
+`test/Torrential.Tests/` is also a legacy test project and should not be modified.
 
 ## Dev Proxy
 
