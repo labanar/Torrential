@@ -124,3 +124,9 @@ public class TorrentFileCopyCompletedEvent : ITorrentEvent
     public required InfoHash InfoHash { get; init; }
     public required string FileName { get; init; }
 }
+
+public class PieceValidationRequest
+{
+    public required InfoHash InfoHash { get; init; }
+    public required int PieceIndex { get; init; }
+}

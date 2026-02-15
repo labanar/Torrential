@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Torrential.Application.Events;
+using Torrential.Application.Peers;
 
 namespace Torrential.Application.Torrents;
 
@@ -67,23 +68,7 @@ public class TorrentStats
 }
 
 
-public class TorrentStatsMaintainer(TorrentStats rates) :
-    IEventHandler<TorrentBlockDownloaded>,
-    IEventHandler<TorrentBlockUploadedEvent>
-{
-    public async Task HandleAsync(TorrentBlockDownloaded @event, CancellationToken cancellationToken = default)
-    {
-        await rates.QueueDownloadRate(@event.InfoHash, @event.Length);
-    }
-
-    public async Task HandleAsync(TorrentBlockUploadedEvent @event, CancellationToken cancellationToken = default)
-    {
-        await rates.QueueUploadRate(@event.InfoHash, @event.Length);
-    }
-}
-
-
-public class TorrentThroughputRatesNotifier(IEventBus eventBus, TorrentStats rates, ILogger<TorrentThroughputRatesNotifier> logger) : BackgroundService
+public class TorrentThroughputRatesNotifier(IEventBus eventBus, IPeerSwarm peerSwarm, TorrentStats rates, ILogger<TorrentThroughputRatesNotifier> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -92,8 +77,23 @@ public class TorrentThroughputRatesNotifier(IEventBus eventBus, TorrentStats rat
         while (!stoppingToken.IsCancellationRequested)
         {
             await timer.WaitForNextTickAsync(stoppingToken);
-            // Note: TrackedTorrents iteration will need to be provided by a different mechanism
-            // since PeerSwarm is not part of Torrential.Application
+            await foreach (var infoHash in peerSwarm.TrackedTorrents())
+            {
+                var ingressRate = rates.GetIngressRate(infoHash);
+                var egressRate = rates.GetEgressRate(infoHash);
+                var totalDownloaded = rates.GetTotalDownloaded(infoHash);
+                var totalUploaded = rates.GetTotalUploaded(infoHash);
+
+                logger.LogDebug("Publishing throughput rates for {InfoHash} - Ingress: {IngressRate} Egress: {EgressRate}", infoHash.AsString(), ingressRate, egressRate);
+                await eventBus.PublishAsync(new TorrentStatsEvent
+                {
+                    InfoHash = infoHash,
+                    DownloadRate = ingressRate,
+                    UploadRate = egressRate,
+                    TotalDownloaded = totalDownloaded,
+                    TotalUploaded = totalUploaded
+                });
+            }
         }
     }
 }
