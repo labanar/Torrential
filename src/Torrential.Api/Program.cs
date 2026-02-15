@@ -43,6 +43,23 @@ torrents.MapPost("/", (AddTorrentRequest request, ITorrentManager manager) =>
     return ToHttpResult(result);
 });
 
+torrents.MapPost("/parse", async (IFormFile file) =>
+{
+    using var stream = file.OpenReadStream();
+    var metadata = TorrentMetadataParser.FromStream(stream);
+    var coreInfoHash = new Torrential.Core.InfoHash(metadata.InfoHash.P1, metadata.InfoHash.P2, metadata.InfoHash.P3);
+    return Results.Ok(new ParsedTorrentResponse(
+        coreInfoHash.AsString(),
+        metadata.Name,
+        metadata.TotalSize,
+        metadata.PieceSize,
+        metadata.NumberOfPieces,
+        metadata.Files.Select(f => new ParsedTorrentFileResponse((int)f.Id, f.Filename, f.FileSize)).ToList(),
+        metadata.AnnounceList.ToList(),
+        Convert.ToBase64String(metadata.PieceHashesConcatenated)
+    ));
+}).DisableAntiforgery();
+
 torrents.MapPost("/add", async (IFormFile file, ITorrentManager manager) =>
 {
     using var stream = file.OpenReadStream();
@@ -74,12 +91,12 @@ torrents.MapDelete("/{infoHash}", (InfoHash infoHash, bool? deleteData, ITorrent
     ToHttpResult(manager.Remove(infoHash, deleteData ?? false)));
 
 torrents.MapGet("/", (ITorrentManager manager) =>
-    Results.Ok(manager.GetAll()));
+    Results.Ok(manager.GetAll().Select(ToDto).ToList()));
 
 torrents.MapGet("/{infoHash}", (InfoHash infoHash, ITorrentManager manager) =>
 {
     var state = manager.GetState(infoHash);
-    return state is not null ? Results.Ok(state) : Results.NotFound();
+    return state is not null ? Results.Ok(ToDto(state)) : Results.NotFound();
 });
 
 app.Run();
@@ -98,6 +115,52 @@ static IResult ToHttpResult(TorrentManagerResult result)
         _ => Results.BadRequest(new { error = result.Error.ToString() })
     };
 }
+
+static TorrentDto ToDto(TorrentState state)
+{
+    var status = state.Status switch
+    {
+        TorrentStatus.Downloading => "Running",
+        TorrentStatus.Stopped => "Stopped",
+        _ => "Idle"
+    };
+
+    return new TorrentDto(
+        state.InfoHash.AsString(),
+        state.Name,
+        0,
+        0,
+        0,
+        0,
+        0,
+        state.TotalSize,
+        [],
+        status
+    );
+}
+
+public record TorrentDto(
+    string InfoHash,
+    string Name,
+    double Progress,
+    long BytesDownloaded,
+    long BytesUploaded,
+    double DownloadRate,
+    double UploadRate,
+    long TotalSizeBytes,
+    List<object> Peers,
+    string Status);
+
+public record ParsedTorrentFileResponse(int FileIndex, string FileName, long FileSize);
+public record ParsedTorrentResponse(
+    string InfoHash,
+    string Name,
+    long TotalSize,
+    long PieceSize,
+    int NumberOfPieces,
+    List<ParsedTorrentFileResponse> Files,
+    List<string> AnnounceUrls,
+    string PieceHashes);
 
 public record AddTorrentFileRequest(int FileIndex, string FileName, long FileSize);
 public record AddTorrentFileSelectionRequest(int FileIndex, bool Selected);

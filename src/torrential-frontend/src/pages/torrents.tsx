@@ -20,8 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { listTorrents, addTorrent, startTorrent, stopTorrent, removeTorrent } from '@/lib/api'
-import type { TorrentState } from '@/lib/api'
+import { listTorrents, parseTorrent, addTorrentWithSelections, startTorrent, stopTorrent, removeTorrent } from '@/lib/api'
+import type { TorrentState, ParsedTorrent } from '@/lib/api'
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -43,6 +43,12 @@ export function TorrentsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteFiles, setDeleteFiles] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Add torrent modal state
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [parsedTorrent, setParsedTorrent] = useState<ParsedTorrent | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set())
+  const [addingTorrent, setAddingTorrent] = useState(false)
 
   const fetchTorrents = useCallback(async () => {
     try {
@@ -91,38 +97,144 @@ export function TorrentsPage() {
     fetchTorrents()
   }
 
-  const handleAddTorrent = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      await addTorrent(file)
+      const parsed = await parseTorrent(file)
+      setParsedTorrent(parsed)
+      setSelectedFiles(new Set(parsed.files.map(f => f.fileIndex)))
+      setAddDialogOpen(true)
+    } catch (err) {
+      console.error('Failed to parse torrent', err)
+    }
+    e.target.value = ''
+  }
+
+  const toggleFileSelect = (fileIndex: number) => {
+    setSelectedFiles((prev) => {
+      const next = new Set(prev)
+      if (next.has(fileIndex)) {
+        next.delete(fileIndex)
+      } else {
+        next.add(fileIndex)
+      }
+      return next
+    })
+  }
+
+  const toggleAllFiles = () => {
+    if (!parsedTorrent) return
+    if (selectedFiles.size === parsedTorrent.files.length) {
+      setSelectedFiles(new Set())
+    } else {
+      setSelectedFiles(new Set(parsedTorrent.files.map(f => f.fileIndex)))
+    }
+  }
+
+  const handleConfirmAdd = async () => {
+    if (!parsedTorrent) return
+    setAddingTorrent(true)
+    try {
+      const fileSelections = parsedTorrent.files.map(f => ({
+        fileIndex: f.fileIndex,
+        selected: selectedFiles.has(f.fileIndex),
+      }))
+      await addTorrentWithSelections(parsedTorrent, fileSelections)
+      setAddDialogOpen(false)
+      setParsedTorrent(null)
+      setSelectedFiles(new Set())
       fetchTorrents()
     } catch (err) {
       console.error('Failed to add torrent', err)
+    } finally {
+      setAddingTorrent(false)
     }
-    e.target.value = ''
+  }
+
+  const handleCancelAdd = () => {
+    setAddDialogOpen(false)
+    setParsedTorrent(null)
+    setSelectedFiles(new Set())
   }
 
   const selectedTorrentNames = torrents
     .filter((t) => selected.has(t.infoHash))
     .map((t) => t.name)
 
+  const selectedTotalSize = parsedTorrent
+    ? parsedTorrent.files
+        .filter(f => selectedFiles.has(f.fileIndex))
+        .reduce((sum, f) => sum + f.fileSize, 0)
+    : 0
+
   if (torrents.length === 0) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
-        <p className="text-muted-foreground text-lg">No torrents added yet</p>
-        <input ref={fileInputRef} type="file" accept=".torrent" className="hidden" onChange={handleAddTorrent} />
-        <Button onClick={() => fileInputRef.current?.click()}>
-          <Plus />
-          Add Torrent
-        </Button>
-      </div>
+      <>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
+          <p className="text-muted-foreground text-lg">No torrents added yet</p>
+          <input ref={fileInputRef} type="file" accept=".torrent" className="hidden" onChange={handleFileSelected} />
+          <Button onClick={() => fileInputRef.current?.click()}>
+            <Plus />
+            Add Torrent
+          </Button>
+        </div>
+
+        {/* Add torrent file selection dialog */}
+        <Dialog open={addDialogOpen} onOpenChange={(open) => { if (!open) handleCancelAdd() }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Add Torrent</DialogTitle>
+              <DialogDescription>
+                {parsedTorrent?.name}
+              </DialogDescription>
+            </DialogHeader>
+            {parsedTorrent && (
+              <>
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Select files to download</span>
+                  <span>{formatBytes(selectedTotalSize)} of {formatBytes(parsedTorrent.totalSize)}</span>
+                </div>
+                <div className="flex items-center gap-2 border-b pb-2">
+                  <Checkbox
+                    checked={selectedFiles.size === parsedTorrent.files.length}
+                    onCheckedChange={toggleAllFiles}
+                  />
+                  <label className="text-sm font-medium cursor-pointer" onClick={toggleAllFiles}>
+                    Select All
+                  </label>
+                </div>
+                <div className="max-h-64 overflow-y-auto flex flex-col gap-1">
+                  {parsedTorrent.files.map((f) => (
+                    <div key={f.fileIndex} className="flex items-center gap-2 py-1">
+                      <Checkbox
+                        checked={selectedFiles.has(f.fileIndex)}
+                        onCheckedChange={() => toggleFileSelect(f.fileIndex)}
+                      />
+                      <span className="text-sm truncate flex-1">{f.fileName}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">{formatBytes(f.fileSize)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCancelAdd}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmAdd} disabled={selectedFiles.size === 0 || addingTorrent}>
+                Add
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
     )
   }
 
   return (
     <div className="flex flex-1 flex-col p-6 gap-4">
-      <input ref={fileInputRef} type="file" accept=".torrent" className="hidden" onChange={handleAddTorrent} />
+      <input ref={fileInputRef} type="file" accept=".torrent" className="hidden" onChange={handleFileSelected} />
 
       {/* Action toolbar */}
       <div className="flex items-center gap-2">
@@ -162,7 +274,7 @@ export function TorrentsPage() {
       {/* Torrent list */}
       <div className="flex flex-col gap-2">
         {torrents.map((t) => {
-          const config = statusConfig[t.status]
+          const config = statusConfig[t.status] ?? statusConfig.Idle
           const StatusIcon = config.icon
           const progressPercent = t.progress * 100
           const downloadedBytes = t.bytesDownloaded
@@ -224,6 +336,55 @@ export function TorrentsPage() {
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
               Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add torrent file selection dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={(open) => { if (!open) handleCancelAdd() }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Torrent</DialogTitle>
+            <DialogDescription>
+              {parsedTorrent?.name}
+            </DialogDescription>
+          </DialogHeader>
+          {parsedTorrent && (
+            <>
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Select files to download</span>
+                <span>{formatBytes(selectedTotalSize)} of {formatBytes(parsedTorrent.totalSize)}</span>
+              </div>
+              <div className="flex items-center gap-2 border-b pb-2">
+                <Checkbox
+                  checked={selectedFiles.size === parsedTorrent.files.length}
+                  onCheckedChange={toggleAllFiles}
+                />
+                <label className="text-sm font-medium cursor-pointer" onClick={toggleAllFiles}>
+                  Select All
+                </label>
+              </div>
+              <div className="max-h-64 overflow-y-auto flex flex-col gap-1">
+                {parsedTorrent.files.map((f) => (
+                  <div key={f.fileIndex} className="flex items-center gap-2 py-1">
+                    <Checkbox
+                      checked={selectedFiles.has(f.fileIndex)}
+                      onCheckedChange={() => toggleFileSelect(f.fileIndex)}
+                    />
+                    <span className="text-sm truncate flex-1">{f.fileName}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{formatBytes(f.fileSize)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelAdd}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmAdd} disabled={selectedFiles.size === 0 || addingTorrent}>
+              Add
             </Button>
           </DialogFooter>
         </DialogContent>
