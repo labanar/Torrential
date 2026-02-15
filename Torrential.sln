@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34309.116
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Torrential", "src\Torrential\Torrential.csproj", "{23E8CF05-F614-41D7-94DC-B99DFD4863C0}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Torrential.Tests", "test\Torrential.Tests\Torrential.Tests.csproj", "{4F829C73-8D6E-4F3A-88EB-7F18606A94A6}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Torrential.Web", "src\Torrential.Web\Torrential.Web.csproj", "{F240C48B-D603-4ADE-A16D-6CE1B69E4F66}"
@@ -31,18 +29,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Debug|x64.Build.0 = Debug|Any CPU
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Debug|x86.Build.0 = Debug|Any CPU
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Release|x64.ActiveCfg = Release|Any CPU
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Release|x64.Build.0 = Release|Any CPU
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Release|x86.ActiveCfg = Release|Any CPU
-		{23E8CF05-F614-41D7-94DC-B99DFD4863C0}.Release|x86.Build.0 = Release|Any CPU
 		{4F829C73-8D6E-4F3A-88EB-7F18606A94A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4F829C73-8D6E-4F3A-88EB-7F18606A94A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4F829C73-8D6E-4F3A-88EB-7F18606A94A6}.Debug|x64.ActiveCfg = Debug|Any CPU

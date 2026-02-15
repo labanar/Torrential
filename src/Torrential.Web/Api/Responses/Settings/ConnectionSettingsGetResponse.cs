@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Torrential.Application.Data;
 
 namespace Torrential.Web.Api.Responses.Settings
 {

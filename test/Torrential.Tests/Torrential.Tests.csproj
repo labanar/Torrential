@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Torrential\Torrential.csproj" />
+    <ProjectReference Include="..\..\src\Torrential.Application\Torrential.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

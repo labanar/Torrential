@@ -1,4 +1,6 @@
-﻿namespace Torrential.Tests
+﻿using Torrential.Core;
+
+namespace Torrential.Tests
 {
     public class BitConverterExtensionTests
     {

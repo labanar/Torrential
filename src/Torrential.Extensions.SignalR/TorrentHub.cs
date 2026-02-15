@@ -1,5 +1,5 @@
-﻿using Microsoft.AspNetCore.SignalR;
-using Torrential.Torrents;
+using Microsoft.AspNetCore.SignalR;
+using Torrential.Application.Events;
 
 namespace Torrential.Extensions.SignalR
 {
@@ -61,4 +61,3 @@ namespace Torrential.Extensions.SignalR
             => await Clients.All.TorrentStatsUpdated(@event);
     }
 }
-

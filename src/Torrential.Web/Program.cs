@@ -1,18 +1,18 @@
-using MassTransit;
-using MassTransit.Initializers;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Metrics;
 using Serilog;
 using Serilog.Core;
 using Serilog.Sinks.Grafana.Loki;
-using Torrential;
-using Torrential.Commands;
+using Torrential.Application;
+using Torrential.Application.Data;
+using Torrential.Application.Events;
+using Torrential.Application.Files;
+using Torrential.Application.Peers;
+using Torrential.Application.Settings;
+using Torrential.Application.Torrents;
+using Torrential.Application.Trackers;
+using Torrential.Core;
 using Torrential.Extensions.SignalR;
-using Torrential.Files;
-using Torrential.Peers;
-using Torrential.Settings;
-using Torrential.Torrents;
-using Torrential.Trackers;
 using Torrential.Web.Api.Models;
 using Torrential.Web.Api.Requests.Settings;
 using Torrential.Web.Api.Responses;
@@ -23,7 +23,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMemoryCache();
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(BuildLogger(builder.Configuration));
-builder.Services.AddTorrential();
+builder.Services.AddTorrentialApplication();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
@@ -46,14 +46,19 @@ builder.Services.AddCors(options =>
             .WithOrigins("http://localhost:3000", "http://localhost:5142", "http://192.168.10.49:5142", "http://localhost:5173"));
 });
 
-builder.Services.AddMassTransit(x =>
-{
-    x.AddConsumers(typeof(TorrentHubMessageDispatcher).Assembly, typeof(PieceValidator).Assembly);
-    x.UsingInMemory((context, cfg) =>
-    {
-        cfg.ConfigureEndpoints(context);
-    });
-});
+// Register SignalR event handlers
+builder.Services.AddScoped<TorrentHubMessageDispatcher>();
+builder.Services.AddScoped<IEventHandler<TorrentAddedEvent>>(sp => sp.GetRequiredService<TorrentHubMessageDispatcher>());
+builder.Services.AddScoped<IEventHandler<TorrentStartedEvent>>(sp => sp.GetRequiredService<TorrentHubMessageDispatcher>());
+builder.Services.AddScoped<IEventHandler<TorrentStoppedEvent>>(sp => sp.GetRequiredService<TorrentHubMessageDispatcher>());
+builder.Services.AddScoped<IEventHandler<TorrentCompleteEvent>>(sp => sp.GetRequiredService<TorrentHubMessageDispatcher>());
+builder.Services.AddScoped<IEventHandler<TorrentRemovedEvent>>(sp => sp.GetRequiredService<TorrentHubMessageDispatcher>());
+builder.Services.AddScoped<IEventHandler<TorrentPieceVerifiedEvent>>(sp => sp.GetRequiredService<TorrentHubMessageDispatcher>());
+builder.Services.AddScoped<IEventHandler<PeerConnectedEvent>>(sp => sp.GetRequiredService<TorrentHubMessageDispatcher>());
+builder.Services.AddScoped<IEventHandler<PeerDisconnectedEvent>>(sp => sp.GetRequiredService<TorrentHubMessageDispatcher>());
+builder.Services.AddScoped<IEventHandler<PeerBitfieldReceivedEvent>>(sp => sp.GetRequiredService<TorrentHubMessageDispatcher>());
+builder.Services.AddScoped<IEventHandler<TorrentStatsEvent>>(sp => sp.GetRequiredService<TorrentHubMessageDispatcher>());
+
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
@@ -72,16 +77,16 @@ app.MapHub<TorrentHub>("/torrents/hub");
 
 app.MapPost(
     "/torrents/add",
-    async (IFormFile file, ICommandHandler<TorrentAddCommand, TorrentAddResponse> handler) =>
+    async (IFormFile file, TorrentApplicationService service) =>
     {
         var meta = TorrentMetadataParser.FromStream(file.OpenReadStream());
-        return await handler.Execute(new() { Metadata = meta, DownloadPath = "", CompletedPath = "" });
+        return await service.AddTorrentAsync(meta, "", "");
     })
     .DisableAntiforgery();
 
 app.MapGet(
     "/torrents",
-    async (PeerSwarm swarms,
+    async (IPeerSwarm swarms,
     TorrentialDb torrentDb,
     BitfieldManager bitfieldManager,
     TorrentStatusCache statusCache,
@@ -129,7 +134,7 @@ app.MapGet(
 
 app.MapGet(
     "/torrents/{infoHash}",
-    async (InfoHash infoHash, TorrentMetadataCache cache, PeerSwarm swarms, BitfieldManager bitfieldManager, TorrentStatusCache statusCache, TorrentStats rates) =>
+    async (InfoHash infoHash, TorrentMetadataCache cache, IPeerSwarm swarms, BitfieldManager bitfieldManager, TorrentStatusCache statusCache, TorrentStats rates) =>
     {
         if (!cache.TryGet(infoHash, out var meta))
             return TorrentGetResponse.ErrorResponse(ErrorCode.Unknown);
@@ -170,20 +175,19 @@ app.MapGet(
 
 app.MapPost(
     "torrents/{infoHash}/start",
-    async (InfoHash infoHash, ICommandHandler<TorrentStartCommand, TorrentStartResponse> handler) =>
-        await handler.Execute(new() { InfoHash = infoHash }));
+    async (InfoHash infoHash, TorrentApplicationService service) =>
+        await service.StartTorrentAsync(infoHash));
 
 app.MapPost(
     "torrents/{infoHash}/stop",
-    async (InfoHash infoHash, ICommandHandler<TorrentStopCommand, TorrentStopResponse> handler) =>
-        await handler.Execute(new() { InfoHash = infoHash }));
+    async (InfoHash infoHash, TorrentApplicationService service) =>
+        await service.StopTorrentAsync(infoHash));
 
 app.MapPost(
     "torrents/{infoHash}/delete",
-    async (InfoHash infoHash, TorrentRemoveCommand cmd, ICommandHandler<TorrentRemoveCommand, TorrentRemoveResponse> handler) =>
+    async (InfoHash infoHash, TorrentRemoveRequest cmd, TorrentApplicationService service) =>
     {
-        cmd.InfoHash = infoHash;
-        await handler.Execute(cmd);
+        await service.RemoveTorrentAsync(infoHash, cmd.DeleteFiles);
     });
 
 
@@ -250,6 +254,11 @@ static Logger BuildLogger(IConfiguration configuration)
         });
 
     return config.CreateLogger();
+}
+
+internal class TorrentRemoveRequest
+{
+    public bool DeleteFiles { get; set; }
 }
 
 internal class InitializationService(

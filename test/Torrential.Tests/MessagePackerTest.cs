@@ -1,5 +1,5 @@
 ﻿using System.Buffers;
-using Torrential.Peers;
+using Torrential.Core;
 
 namespace Torrential.Tests;
 

@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
-using Torrential.Torrents;
-using Torrential.Trackers;
-using Torrential.Trackers.Http;
+using Torrential.Application.Peers;
+using Torrential.Application.Torrents;
+using Torrential.Application.Trackers;
+using Torrential.Application.Trackers.Http;
+using Torrential.Core;
 
 namespace Torrential.Tests
 {

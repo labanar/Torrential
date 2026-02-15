@@ -1,5 +1,6 @@
-﻿using Torrential.Peers;
-using Torrential.Torrents;
+﻿using Torrential.Application.Peers;
+using Torrential.Application.Torrents;
+using Torrential.Core;
 
 namespace Torrential.Tests
 {
