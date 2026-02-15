@@ -38,10 +38,8 @@ export async function stopTorrent(infoHash: string): Promise<void> {
 }
 
 export async function removeTorrent(infoHash: string, deleteFiles = false): Promise<void> {
-  const res = await fetch(`${BASE}/torrents/${infoHash}/delete`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ deleteFiles }),
+  const res = await fetch(`${BASE}/torrents/${infoHash}?deleteData=${deleteFiles}`, {
+    method: 'DELETE',
   });
   if (!res.ok) throw new Error('Failed to remove torrent');
 }

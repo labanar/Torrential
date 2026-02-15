@@ -4,6 +4,7 @@ using Torrential.Application;
 using Torrential.Core;
 using Torrential.Core.Trackers;
 using Torrential.Core.Trackers.Http;
+using Torrential.Torrents;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +15,7 @@ builder.Services.AddHttpClient<HttpTrackerClient>();
 builder.Services.AddTorrentApplication();
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull);
+builder.Services.AddAntiforgery();
 
 var app = builder.Build();
 
@@ -40,6 +42,27 @@ torrents.MapPost("/", (AddTorrentRequest request, ITorrentManager manager) =>
     var result = manager.Add(metaInfo, fileSelections);
     return ToHttpResult(result);
 });
+
+torrents.MapPost("/add", async (IFormFile file, ITorrentManager manager) =>
+{
+    using var stream = file.OpenReadStream();
+    var metadata = TorrentMetadataParser.FromStream(stream);
+    var coreInfoHash = new Torrential.Core.InfoHash(metadata.InfoHash.P1, metadata.InfoHash.P2, metadata.InfoHash.P3);
+    var metaInfo = new TorrentMetaInfo
+    {
+        InfoHash = coreInfoHash,
+        Name = metadata.Name,
+        TotalSize = metadata.TotalSize,
+        PieceSize = metadata.PieceSize,
+        NumberOfPieces = metadata.NumberOfPieces,
+        Files = metadata.Files.Select(f => new TorrentFileInfo((int)f.Id, f.Filename, f.FileSize)).ToList(),
+        AnnounceUrls = metadata.AnnounceList.ToList(),
+        PieceHashes = metadata.PieceHashesConcatenated
+    };
+
+    var result = manager.Add(metaInfo);
+    return ToHttpResult(result);
+}).DisableAntiforgery();
 
 torrents.MapPost("/{infoHash}/start", (InfoHash infoHash, ITorrentManager manager) =>
     ToHttpResult(manager.Start(infoHash)));
