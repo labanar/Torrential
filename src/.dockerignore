@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/bin
+**/obj
+**/.env*
+torrential-frontend
+torrential-ui
+torrential-ui-vite
+torrential-remix-ui
+torrential-expo-ui
+Torrential.Sample
+Torrential.Web
+Torrential.Harness
+Torrential.Extensions.SignalR

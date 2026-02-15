@@ -1,0 +1,42 @@
+services:
+  api:
+    build:
+      context: src/
+      dockerfile: Torrential.Api/Dockerfile
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/torrents"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  nginx:
+    build:
+      context: src/torrential-frontend/
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:80 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  playwright:
+    build:
+      context: test/Torrential.E2E/
+      dockerfile: Dockerfile
+    environment:
+      - BASE_URL=http://nginx:80
+      - SCREENSHOT_DIR=/app/screenshots
+    volumes:
+      - ./test/Torrential.E2E/screenshots:/app/screenshots
+    depends_on:
+      nginx:
+        condition: service_healthy
