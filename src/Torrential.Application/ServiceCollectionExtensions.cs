@@ -9,10 +9,10 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddTorrentApplication(this IServiceCollection services)
     {
-        var dbPath = Path.Combine(
-            Environment.GetEnvironmentVariable("APP_DATA_PATH")
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "torrential"),
-            "torrential-app.db");
+        var dataDir = Environment.GetEnvironmentVariable("APP_DATA_PATH")
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "torrential");
+        Directory.CreateDirectory(dataDir);
+        var dbPath = Path.Combine(dataDir, "torrential-app.db");
         services.AddDbContext<TorrentDbContext>(options =>
             options.UseSqlite($"Data Source={dbPath}"));
 
