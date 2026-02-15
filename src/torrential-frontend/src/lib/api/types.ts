@@ -49,6 +49,7 @@ export interface TorrentDetails {
   pieces: boolean[];
   files: TorrentFileDetail[];
   peers: PeerDetail[];
+  discoveredPeerCount: number;
 }
 
 export interface TorrentFileDetail {
