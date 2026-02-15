@@ -20,3 +20,20 @@ export interface TorrentState {
   peers: PeerSummary[];
   status: 'Running' | 'Stopped' | 'Idle';
 }
+
+export interface ParsedTorrentFile {
+  fileIndex: number;
+  fileName: string;
+  fileSize: number;
+}
+
+export interface ParsedTorrent {
+  infoHash: string;
+  name: string;
+  totalSize: number;
+  pieceSize: number;
+  numberOfPieces: number;
+  files: ParsedTorrentFile[];
+  announceUrls: string[];
+  pieceHashes: string;
+}

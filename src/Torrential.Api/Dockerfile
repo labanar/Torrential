@@ -4,6 +4,7 @@ WORKDIR /src
 
 # Copy csproj files and restore (layer caching)
 COPY Torrential.Core/Torrential.Core.csproj Torrential.Core/
+COPY Torrential/Torrential.csproj Torrential/
 COPY Torrential.Application/Torrential.Application.csproj Torrential.Application/
 COPY Torrential.Api/Torrential.Api.csproj Torrential.Api/
 RUN dotnet restore Torrential.Api/Torrential.Api.csproj
