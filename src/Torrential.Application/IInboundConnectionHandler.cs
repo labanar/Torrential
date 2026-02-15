@@ -4,6 +4,5 @@ namespace Torrential.Application;
 
 public interface IInboundConnectionHandler
 {
-    Task<bool> IsBlockedAsync(IPeerWireConnection connection);
-    Task HandleAsync(IPeerWireConnection connection);
+    Task<bool> HandleAsync(IPeerWireConnection connection, CancellationToken cancellationToken);
 }

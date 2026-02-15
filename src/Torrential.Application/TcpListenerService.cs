@@ -50,14 +50,11 @@ public sealed class TcpListenerService(
                 }
 
                 var connection = new PeerWireSocketConnection(socket, pwcLogger);
-                if (await connectionHandler.IsBlockedAsync(connection))
+                var success = await connectionHandler.HandleAsync(connection, stoppingToken);
+                if (!success)
                 {
-                    logger.LogInformation("Disposing blocked connection");
                     await connection.DisposeAsync();
-                    continue;
                 }
-
-                await connectionHandler.HandleAsync(connection);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
