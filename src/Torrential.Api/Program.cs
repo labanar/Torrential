@@ -136,6 +136,21 @@ torrents.MapPost("/{infoHash}/files", (InfoHash infoHash, UpdateFileSelectionsRe
     return ToHttpResult(manager.UpdateFileSelections(infoHash, selections));
 });
 
+var settings = app.MapGroup("/settings");
+
+settings.MapGet("/", async (ISettingsService settingsService) =>
+    Results.Ok(await settingsService.GetSettingsAsync()));
+
+settings.MapPut("/", async (UpdateSettingsRequest request, ISettingsService settingsService) =>
+{
+    var updated = await settingsService.UpdateSettingsAsync(
+        request.DownloadFolder,
+        request.CompletedFolder,
+        request.MaxHalfOpenConnections,
+        request.MaxPeersPerTorrent);
+    return Results.Ok(updated);
+});
+
 app.Run();
 
 static IResult ToHttpResult(TorrentManagerResult result)
@@ -238,3 +253,9 @@ public record PeerDetailDto(
 
 public record UpdateFileSelectionItem(int FileIndex, bool Selected);
 public record UpdateFileSelectionsRequest(List<UpdateFileSelectionItem> FileSelections);
+
+public record UpdateSettingsRequest(
+    string DownloadFolder,
+    string CompletedFolder,
+    int MaxHalfOpenConnections,
+    int MaxPeersPerTorrent);

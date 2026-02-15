@@ -68,3 +68,11 @@ export interface PeerDetail {
   progress: number;
   pieces: boolean[];
 }
+
+export interface Settings {
+  id: number;
+  downloadFolder: string;
+  completedFolder: string;
+  maxHalfOpenConnections: number;
+  maxPeersPerTorrent: number;
+}
