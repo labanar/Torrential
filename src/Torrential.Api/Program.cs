@@ -4,6 +4,7 @@ using Torrential.Application;
 using Torrential.Core;
 using Torrential.Core.Trackers;
 using Torrential.Core.Trackers.Http;
+using Torrential.Core.Trackers.Udp;
 using Torrential.Torrents;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<ITcpListenerSettings, DefaultTcpListenerSettings>();
 builder.Services.AddSingleton<HandshakeService>();
 builder.Services.AddSingleton<ITrackerClient, HttpTrackerClient>();
+builder.Services.AddSingleton<ITrackerClient, UdpTrackerClient>();
 builder.Services.AddHttpClient<HttpTrackerClient>();
 builder.Services.AddTorrentApplication();
 builder.Services.ConfigureHttpJsonOptions(o =>
@@ -87,19 +89,23 @@ torrents.MapPost("/{infoHash}/start", (InfoHash infoHash, ITorrentManager manage
 torrents.MapPost("/{infoHash}/stop", (InfoHash infoHash, ITorrentManager manager) =>
     ToHttpResult(manager.Stop(infoHash)));
 
-torrents.MapDelete("/{infoHash}", (InfoHash infoHash, bool? deleteData, ITorrentManager manager) =>
-    ToHttpResult(manager.Remove(infoHash, deleteData ?? false)));
-
-torrents.MapGet("/", (ITorrentManager manager) =>
-    Results.Ok(manager.GetAll().Select(ToDto).ToList()));
-
-torrents.MapGet("/{infoHash}", (InfoHash infoHash, ITorrentManager manager) =>
+torrents.MapDelete("/{infoHash}", (InfoHash infoHash, bool? deleteData, ITorrentManager manager, IPeerPool peerPool) =>
 {
-    var state = manager.GetState(infoHash);
-    return state is not null ? Results.Ok(ToDto(state)) : Results.NotFound();
+    var result = manager.Remove(infoHash, deleteData ?? false);
+    if (result.Success) peerPool.RemoveTorrent(infoHash);
+    return ToHttpResult(result);
 });
 
-torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manager) =>
+torrents.MapGet("/", (ITorrentManager manager, IPeerPool peerPool) =>
+    Results.Ok(manager.GetAll().Select(s => ToDto(s, peerPool)).ToList()));
+
+torrents.MapGet("/{infoHash}", (InfoHash infoHash, ITorrentManager manager, IPeerPool peerPool) =>
+{
+    var state = manager.GetState(infoHash);
+    return state is not null ? Results.Ok(ToDto(state, peerPool)) : Results.NotFound();
+});
+
+torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manager, IPeerPool peerPool) =>
 {
     var state = manager.GetState(infoHash);
     if (state is null) return Results.NotFound();
@@ -111,6 +117,17 @@ torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manag
         _ => "Idle"
     };
 
+    var peerDtos = peerPool.GetPeers(infoHash).Select(p => new PeerDetailDto(
+        "",
+        p.PeerInfo.Ip.ToString(),
+        p.PeerInfo.Port,
+        0,
+        0,
+        false,
+        0,
+        []
+    )).ToList();
+
     var details = new TorrentDetailsDto(
         state.InfoHash.AsString(),
         state.Name,
@@ -121,7 +138,7 @@ torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manag
         state.DateAdded,
         new bool[state.NumberOfPieces],
         state.Files.Select(f => new TorrentFileDto(f.FileIndex, f.FileName, f.FileSize, state.SelectedFileIndices.Contains(f.FileIndex))).ToList(),
-        []
+        peerDtos
     );
 
     return Results.Ok(details);
@@ -168,7 +185,7 @@ static IResult ToHttpResult(TorrentManagerResult result)
     };
 }
 
-static TorrentDto ToDto(TorrentState state)
+static TorrentDto ToDto(TorrentState state, IPeerPool peerPool)
 {
     var status = state.Status switch
     {
@@ -176,6 +193,8 @@ static TorrentDto ToDto(TorrentState state)
         TorrentStatus.Stopped => "Stopped",
         _ => "Idle"
     };
+
+    var peerCount = peerPool.GetPeerCount(state.InfoHash);
 
     return new TorrentDto(
         state.InfoHash.AsString(),
@@ -186,7 +205,7 @@ static TorrentDto ToDto(TorrentState state)
         0,
         0,
         state.TotalSize,
-        [],
+        Enumerable.Range(0, peerCount).Select(_ => (object)new { }).ToList(),
         status
     );
 }
