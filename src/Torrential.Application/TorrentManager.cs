@@ -1,12 +1,40 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Torrential.Application.Persistence;
 using Torrential.Core;
 
 namespace Torrential.Application;
 
-public class TorrentManager(ILogger<TorrentManager> logger) : ITorrentManager
+public class TorrentManager(ILogger<TorrentManager> logger, IServiceScopeFactory scopeFactory) : ITorrentManager
 {
     private readonly ConcurrentDictionary<InfoHash, TorrentState> _torrents = new();
+    private readonly ConcurrentDictionary<InfoHash, TorrentMetaInfo> _metaInfos = new();
+
+    private TorrentDbContext CreateDbContext()
+    {
+        var scope = scopeFactory.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<TorrentDbContext>();
+    }
+
+    private static TorrentEntity ToEntity(TorrentState state, TorrentMetaInfo metaInfo)
+    {
+        return new TorrentEntity
+        {
+            InfoHash = state.InfoHash.AsString(),
+            Name = state.Name,
+            TotalSize = state.TotalSize,
+            PieceSize = state.PieceSize,
+            NumberOfPieces = state.NumberOfPieces,
+            FilesJson = JsonSerializer.Serialize(state.Files),
+            SelectedFileIndicesJson = JsonSerializer.Serialize(state.SelectedFileIndices),
+            AnnounceUrlsJson = JsonSerializer.Serialize(metaInfo.AnnounceUrls),
+            PieceHashes = metaInfo.PieceHashes,
+            Status = state.Status.ToString(),
+            DateAdded = state.DateAdded
+        };
+    }
 
     public TorrentManagerResult Add(TorrentMetaInfo metaInfo, IReadOnlyList<TorrentFileSelection>? fileSelections = null)
     {
@@ -47,6 +75,12 @@ public class TorrentManager(ILogger<TorrentManager> logger) : ITorrentManager
         if (!_torrents.TryAdd(metaInfo.InfoHash, state))
             return TorrentManagerResult.Fail(TorrentManagerError.TorrentAlreadyExists);
 
+        _metaInfos.TryAdd(metaInfo.InfoHash, metaInfo);
+
+        using var db = CreateDbContext();
+        db.Torrents.Add(ToEntity(state, metaInfo));
+        db.SaveChanges();
+
         logger.LogInformation("Torrent added: {Name} ({InfoHash})", metaInfo.Name, metaInfo.InfoHash.AsString());
         return TorrentManagerResult.Ok();
     }
@@ -60,6 +94,15 @@ public class TorrentManager(ILogger<TorrentManager> logger) : ITorrentManager
             return TorrentManagerResult.Fail(TorrentManagerError.TorrentAlreadyRunning);
 
         state.Status = TorrentStatus.Downloading;
+
+        using var db = CreateDbContext();
+        var entity = db.Torrents.Find(infoHash.AsString());
+        if (entity is not null)
+        {
+            entity.Status = TorrentStatus.Downloading.ToString();
+            db.SaveChanges();
+        }
+
         logger.LogInformation("Torrent started: {Name} ({InfoHash})", state.Name, infoHash.AsString());
         return TorrentManagerResult.Ok();
     }
@@ -73,6 +116,15 @@ public class TorrentManager(ILogger<TorrentManager> logger) : ITorrentManager
             return TorrentManagerResult.Fail(TorrentManagerError.TorrentAlreadyStopped);
 
         state.Status = TorrentStatus.Stopped;
+
+        using var db = CreateDbContext();
+        var entity = db.Torrents.Find(infoHash.AsString());
+        if (entity is not null)
+        {
+            entity.Status = TorrentStatus.Stopped.ToString();
+            db.SaveChanges();
+        }
+
         logger.LogInformation("Torrent stopped: {Name} ({InfoHash})", state.Name, infoHash.AsString());
         return TorrentManagerResult.Ok();
     }
@@ -81,6 +133,16 @@ public class TorrentManager(ILogger<TorrentManager> logger) : ITorrentManager
     {
         if (!_torrents.TryRemove(infoHash, out var state))
             return TorrentManagerResult.Fail(TorrentManagerError.TorrentNotFound);
+
+        _metaInfos.TryRemove(infoHash, out _);
+
+        using var db = CreateDbContext();
+        var entity = db.Torrents.Find(infoHash.AsString());
+        if (entity is not null)
+        {
+            db.Torrents.Remove(entity);
+            db.SaveChanges();
+        }
 
         if (deleteData)
             logger.LogInformation("Torrent removed with data deletion requested: {Name} ({InfoHash})", state.Name, infoHash.AsString());
@@ -122,7 +184,56 @@ public class TorrentManager(ILogger<TorrentManager> logger) : ITorrentManager
         }
 
         state.SelectedFileIndices = updated;
+
+        using var db = CreateDbContext();
+        var entity = db.Torrents.Find(infoHash.AsString());
+        if (entity is not null)
+        {
+            entity.SelectedFileIndicesJson = JsonSerializer.Serialize(updated);
+            db.SaveChanges();
+        }
+
         logger.LogInformation("File selections updated for torrent: {Name} ({InfoHash})", state.Name, infoHash.AsString());
         return TorrentManagerResult.Ok();
+    }
+
+    internal void LoadFromEntities(IReadOnlyList<TorrentEntity> entities)
+    {
+        foreach (var entity in entities)
+        {
+            var infoHash = InfoHash.FromHexString(entity.InfoHash);
+            var files = JsonSerializer.Deserialize<List<TorrentFileInfo>>(entity.FilesJson) ?? [];
+            var selectedIndices = JsonSerializer.Deserialize<HashSet<int>>(entity.SelectedFileIndicesJson) ?? [];
+            var announceUrls = JsonSerializer.Deserialize<List<string>>(entity.AnnounceUrlsJson) ?? [];
+            var status = Enum.Parse<TorrentStatus>(entity.Status);
+
+            var state = new TorrentState
+            {
+                InfoHash = infoHash,
+                Name = entity.Name,
+                TotalSize = entity.TotalSize,
+                PieceSize = entity.PieceSize,
+                NumberOfPieces = entity.NumberOfPieces,
+                Files = files,
+                SelectedFileIndices = selectedIndices,
+                Status = status,
+                DateAdded = entity.DateAdded
+            };
+
+            var metaInfo = new TorrentMetaInfo
+            {
+                InfoHash = infoHash,
+                Name = entity.Name,
+                TotalSize = entity.TotalSize,
+                PieceSize = entity.PieceSize,
+                NumberOfPieces = entity.NumberOfPieces,
+                Files = files,
+                AnnounceUrls = announceUrls,
+                PieceHashes = entity.PieceHashes
+            };
+
+            _torrents.TryAdd(infoHash, state);
+            _metaInfos.TryAdd(infoHash, metaInfo);
+        }
     }
 }
