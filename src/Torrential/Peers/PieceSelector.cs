@@ -5,7 +5,7 @@ namespace Torrential.Peers
     public class PieceSelector(BitfieldManager bitfieldManager, PieceReservationService pieceReservationService, ILogger<PieceSelector> logger)
     {
         private const int RESERVATION_LENGTH_SECONDS = 30;
-        public async Task<PieceSuggestionResult> SuggestNextPieceAsync(InfoHash infohash, Bitfield peerBitfield)
+        public async Task<PieceSuggestionResult> SuggestNextPieceAsync(InfoHash infohash, Bitfield peerBitfield, PeerId peerId)
         {
             if (!bitfieldManager.TryGetVerificationBitfield(infohash, out var myBitfield))
                 return PieceSuggestionResult.NoMorePieces;
@@ -28,7 +28,7 @@ namespace Torrential.Peers
             if (myBitfield.CompletionRatio > 0.80)
                 reservationLengthSeconds = (int)(RESERVATION_LENGTH_SECONDS - ((RESERVATION_LENGTH_SECONDS - 1) * myBitfield.CompletionRatio));
 
-            var reserved = await pieceReservationService.TryReservePiece(infohash, suggestedIndex, reservationLengthSeconds);
+            var reserved = pieceReservationService.TryReservePiece(infohash, suggestedIndex, peerId, reservationLengthSeconds);
             if (!reserved)
             {
                 logger.LogDebug("Piece already reserved - {Index}", suggestedIndex);

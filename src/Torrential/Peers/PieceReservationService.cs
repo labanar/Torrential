@@ -1,22 +1,53 @@
-﻿namespace Torrential.Peers
+using System.Collections.Concurrent;
+
+namespace Torrential.Peers
 {
-    public class PieceReservationService(BitfieldManager bitfieldManager)
+    public readonly record struct PieceReservation(PeerId Owner, DateTimeOffset ExpiresAt);
+
+    public class PieceReservationService
     {
-        public async Task<bool> TryReservePiece(InfoHash infoHash, int pieceIndex, float reservationLengthSeconds = 10)
+        private readonly ConcurrentDictionary<(InfoHash, int), PieceReservation> _reservations = new();
+
+        public bool TryReservePiece(InfoHash infoHash, int pieceIndex, PeerId peerId, float reservationLengthSeconds = 10)
         {
-            if (!bitfieldManager.TryGetPieceReservationBitfield(infoHash, out var bitfield))
-                return false;
+            var key = (infoHash, pieceIndex);
+            var now = DateTimeOffset.UtcNow;
+            var newReservation = new PieceReservation(peerId, now.AddSeconds(reservationLengthSeconds));
 
-            if (bitfield.HasPiece(pieceIndex)) return false;
-            await bitfield.MarkHaveAsync(pieceIndex, CancellationToken.None);
+            // Fast path: no existing reservation
+            if (_reservations.TryAdd(key, newReservation))
+                return true;
 
-            _ = Task.Run(async () =>
+            // Existing reservation — check if expired
+            if (_reservations.TryGetValue(key, out var existing) && existing.ExpiresAt <= now)
             {
-                await Task.Delay(TimeSpan.FromSeconds(reservationLengthSeconds));
-                await bitfield.UnmarkHaveAsync(pieceIndex, CancellationToken.None);
-            });
+                // Expired — try to replace it atomically
+                // TryUpdate ensures we only overwrite the exact entry we checked
+                return _reservations.TryUpdate(key, newReservation, existing);
+            }
 
-            return true;
+            return false;
+        }
+
+        public void ReleasePiece(InfoHash infoHash, int pieceIndex)
+        {
+            _reservations.TryRemove((infoHash, pieceIndex), out _);
+        }
+
+        public void ReleaseAllForPeer(InfoHash infoHash, PeerId peerId)
+        {
+            foreach (var kvp in _reservations)
+            {
+                if (kvp.Key.Item1 == infoHash && kvp.Value.Owner == peerId)
+                    _reservations.TryRemove(kvp.Key, out _);
+            }
+        }
+
+        public bool IsReservedBy(InfoHash infoHash, int pieceIndex, PeerId peerId)
+        {
+            if (_reservations.TryGetValue((infoHash, pieceIndex), out var reservation))
+                return reservation.Owner == peerId && reservation.ExpiresAt > DateTimeOffset.UtcNow;
+            return false;
         }
     }
 }
