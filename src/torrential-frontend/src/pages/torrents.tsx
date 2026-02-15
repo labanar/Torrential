@@ -288,7 +288,7 @@ export function TorrentsPage() {
                     key={t.infoHash}
                     onClick={() => setActiveTorrent(isActive ? null : t.infoHash)}
                     className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
-                      isActive ? 'bg-accent border-accent-foreground/20' : 'hover:bg-muted/50'
+                      isActive ? 'bg-accent border-accent-foreground/20 border-l-4 border-l-primary' : 'hover:bg-muted/50'
                     }`}
                   >
                     <Checkbox
