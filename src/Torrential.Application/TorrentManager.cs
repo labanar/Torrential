@@ -37,6 +37,8 @@ public class TorrentManager(ILogger<TorrentManager> logger) : ITorrentManager
             InfoHash = metaInfo.InfoHash,
             Name = metaInfo.Name,
             TotalSize = metaInfo.TotalSize,
+            PieceSize = metaInfo.PieceSize,
+            NumberOfPieces = metaInfo.NumberOfPieces,
             Files = metaInfo.Files,
             SelectedFileIndices = selectedIndices,
             Status = TorrentStatus.Added
@@ -97,5 +99,30 @@ public class TorrentManager(ILogger<TorrentManager> logger) : ITorrentManager
     public IReadOnlyList<TorrentState> GetAll()
     {
         return _torrents.Values.ToList();
+    }
+
+    public TorrentManagerResult UpdateFileSelections(InfoHash infoHash, IReadOnlyList<TorrentFileSelection> fileSelections)
+    {
+        if (!_torrents.TryGetValue(infoHash, out var state))
+            return TorrentManagerResult.Fail(TorrentManagerError.TorrentNotFound);
+
+        foreach (var selection in fileSelections)
+        {
+            if (selection.FileIndex < 0 || selection.FileIndex >= state.Files.Count)
+                return TorrentManagerResult.Fail(TorrentManagerError.InvalidFileSelection);
+        }
+
+        var updated = state.SelectedFileIndices.ToHashSet();
+        foreach (var selection in fileSelections)
+        {
+            if (selection.Selected)
+                updated.Add(selection.FileIndex);
+            else
+                updated.Remove(selection.FileIndex);
+        }
+
+        state.SelectedFileIndices = updated;
+        logger.LogInformation("File selections updated for torrent: {Name} ({InfoHash})", state.Name, infoHash.AsString());
+        return TorrentManagerResult.Ok();
     }
 }

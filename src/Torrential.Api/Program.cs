@@ -99,6 +99,43 @@ torrents.MapGet("/{infoHash}", (InfoHash infoHash, ITorrentManager manager) =>
     return state is not null ? Results.Ok(ToDto(state)) : Results.NotFound();
 });
 
+torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manager) =>
+{
+    var state = manager.GetState(infoHash);
+    if (state is null) return Results.NotFound();
+
+    var status = state.Status switch
+    {
+        TorrentStatus.Downloading => "Running",
+        TorrentStatus.Stopped => "Stopped",
+        _ => "Idle"
+    };
+
+    var details = new TorrentDetailsDto(
+        state.InfoHash.AsString(),
+        state.Name,
+        state.TotalSize,
+        state.PieceSize,
+        state.NumberOfPieces,
+        status,
+        state.DateAdded,
+        new bool[state.NumberOfPieces],
+        state.Files.Select(f => new TorrentFileDto(f.FileIndex, f.FileName, f.FileSize, state.SelectedFileIndices.Contains(f.FileIndex))).ToList(),
+        []
+    );
+
+    return Results.Ok(details);
+});
+
+torrents.MapPost("/{infoHash}/files", (InfoHash infoHash, UpdateFileSelectionsRequest request, ITorrentManager manager) =>
+{
+    var selections = request.FileSelections
+        .Select(s => new TorrentFileSelection(s.FileIndex, s.Selected))
+        .ToList();
+
+    return ToHttpResult(manager.UpdateFileSelections(infoHash, selections));
+});
+
 app.Run();
 
 static IResult ToHttpResult(TorrentManagerResult result)
@@ -174,3 +211,30 @@ public record AddTorrentRequest(
     List<string> AnnounceUrls,
     string PieceHashes,
     List<AddTorrentFileSelectionRequest>? FileSelections = null);
+
+public record TorrentDetailsDto(
+    string InfoHash,
+    string Name,
+    long TotalSizeBytes,
+    long PieceSize,
+    int NumberOfPieces,
+    string Status,
+    DateTimeOffset DateAdded,
+    bool[] Pieces,
+    List<TorrentFileDto> Files,
+    List<PeerDetailDto> Peers);
+
+public record TorrentFileDto(int FileIndex, string FileName, long FileSize, bool Selected);
+
+public record PeerDetailDto(
+    string PeerId,
+    string IpAddress,
+    int Port,
+    long BytesDownloaded,
+    long BytesUploaded,
+    bool IsSeed,
+    double Progress,
+    bool[] Pieces);
+
+public record UpdateFileSelectionItem(int FileIndex, bool Selected);
+public record UpdateFileSelectionsRequest(List<UpdateFileSelectionItem> FileSelections);

@@ -34,4 +34,9 @@ public interface ITorrentManager
     /// Gets the current state of all managed torrents.
     /// </summary>
     IReadOnlyList<TorrentState> GetAll();
+
+    /// <summary>
+    /// Updates which files are selected for download on the given torrent.
+    /// </summary>
+    TorrentManagerResult UpdateFileSelections(InfoHash infoHash, IReadOnlyList<TorrentFileSelection> fileSelections);
 }
