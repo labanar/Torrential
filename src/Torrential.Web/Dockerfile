@@ -1,20 +1,20 @@
 #See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/dotnet/aspnet:8.0.3-jammy-chiseled-extra AS base
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra AS base
 USER app
 WORKDIR /app
 EXPOSE 8080 
 EXPOSE 53123/tcp
 
 # Ensure the directory exists and set correct permissions
-FROM ubuntu:jammy AS setup
+FROM ubuntu:noble AS setup
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 RUN mkdir -p /app/data && chmod -R 777 /app/data
 
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/dotnet/sdk:8.0.203-jammy AS build
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
 ARG BUILD_CONFIGURATION=Release
 ARG TARGETARCH
 WORKDIR /src
