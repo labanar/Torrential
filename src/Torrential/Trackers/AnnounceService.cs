@@ -31,33 +31,40 @@ namespace Torrential.Trackers
                 {
                     processedAny = true;
                     logger.LogInformation("Announcing {InfoHash}", torrent.InfoHash);
-                    await foreach (var announceResponse in Announce(torrent))
+                    try
                     {
-                        foreach (var peer in announceResponse.Peers)
+                        await foreach (var announceResponse in Announce(torrent))
                         {
-                            _ = Task.Run(async () =>
+                            foreach (var peer in announceResponse.Peers)
                             {
-                                var conn = default(PeerWireSocketConnection);
-                                var socket = default(Socket);
-                                try
+                                _ = Task.Run(async () =>
                                 {
-                                    var timeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                                    socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-                                    socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-                                    var endpoint = new IPEndPoint(peer.Ip, peer.Port);
-                                    await socket.ConnectAsync(endpoint, timeoutToken.Token);
-                                    conn = new PeerWireSocketConnection(socket, logger);
-                                    await connectionManager.QueueOutboundConnection(conn, torrent.InfoHash);
-                                }
-                                catch
-                                {
-                                    if (conn != null)
-                                        await conn.DisposeAsync();
-                                    else if (socket != null)
-                                        socket.Dispose();
-                                }
-                            });
+                                    var conn = default(PeerWireSocketConnection);
+                                    var socket = default(Socket);
+                                    try
+                                    {
+                                        var timeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                                        socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+                                        socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+                                        var endpoint = new IPEndPoint(peer.Ip, peer.Port);
+                                        await socket.ConnectAsync(endpoint, timeoutToken.Token);
+                                        conn = new PeerWireSocketConnection(socket, logger);
+                                        await connectionManager.QueueOutboundConnection(conn, torrent.InfoHash);
+                                    }
+                                    catch
+                                    {
+                                        if (conn != null)
+                                            await conn.DisposeAsync();
+                                        else if (socket != null)
+                                            socket.Dispose();
+                                    }
+                                });
+                            }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to announce {InfoHash}, will retry next cycle", torrent.InfoHash);
                     }
                 }
 

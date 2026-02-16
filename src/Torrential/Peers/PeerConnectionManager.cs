@@ -10,7 +10,7 @@ namespace Torrential.Peers;
 public sealed class HalfOpenConnectionShakerService(PeerConnectionManager connectionManager, HandshakeService handshakeService, PeerSwarm swarm, ILogger<HalfOpenConnectionShakerService> logger)
     : BackgroundService
 {
-    private Channel<Task> _connectionTasks = Channel.CreateBounded<Task>(new BoundedChannelOptions(50)
+    private Channel<Task> _connectionTasks = Channel.CreateBounded<Task>(new BoundedChannelOptions(200)
     {
         SingleWriter = true,
         SingleReader = true
@@ -123,7 +123,7 @@ public sealed class HalfOpenConnectionShakerService(PeerConnectionManager connec
 
 public sealed class PeerConnectionManager(GeoIpService geoService, ILogger<PeerConnectionManager> logger)
 {
-    public readonly Channel<HalfOpenConnection> HalfOpenConnections = Channel.CreateBounded<HalfOpenConnection>(new BoundedChannelOptions(50)
+    public readonly Channel<HalfOpenConnection> HalfOpenConnections = Channel.CreateBounded<HalfOpenConnection>(new BoundedChannelOptions(200)
     {
         SingleReader = true,
         SingleWriter = false

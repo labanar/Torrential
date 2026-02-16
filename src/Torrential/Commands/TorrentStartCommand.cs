@@ -23,7 +23,12 @@ namespace Torrential.Commands
             {
                 throw new ArgumentException("Torrent not found");
             }
-            await mgr.Start(command.InfoHash);
+
+            var result = await mgr.Start(command.InfoHash);
+            if (!result.Success)
+            {
+                throw new InvalidOperationException($"Failed to start torrent: {result.Error}");
+            }
 
             torrent.Status = TorrentStatus.Running;
             await db.SaveChangesAsync();

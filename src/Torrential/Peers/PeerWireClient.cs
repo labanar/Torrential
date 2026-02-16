@@ -172,6 +172,12 @@ public sealed class PeerWireClient : IAsyncDisposable
 
                 while (TryReadMessage(ref buffer, out var messageSize, out var messageId, out ReadOnlySequence<byte> payload))
                 {
+                    if (messageSize < 0)
+                    {
+                        _logger.LogError("Peer sent invalid message size: {MessageSize} - disconnecting", messageSize);
+                        return;
+                    }
+
                     if (!await ProcessAsync(messageSize, messageId, payload))
                     {
                         _logger.LogInformation("Failed to process message {MessageId} {MessageSize} - ending peer connection read processor", messageId, messageSize);
@@ -224,11 +230,20 @@ public sealed class PeerWireClient : IAsyncDisposable
             return true;
         }
 
-        if (!sequenceReader.TryRead(out messageId))
+        //Per BEP 3: length is a 4-byte big-endian unsigned integer.
+        //A negative value when read as signed int means corrupt/malicious data.
+        //Return true so the caller can inspect messageSize and disconnect.
+        if (messageSize < 0)
         {
-            _logger.LogError("Could not read message Id");
-            return false;
+            buffer = buffer.Slice(4);
+            return true;
         }
+
+        //Ensure the buffer contains the complete message before parsing
+        if (sequenceReader.Remaining < messageSize)
+            return false;
+
+        sequenceReader.TryRead(out messageId);
 
         if (messageSize == 1)
         {
