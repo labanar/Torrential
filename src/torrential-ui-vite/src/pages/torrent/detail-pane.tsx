@@ -195,19 +195,52 @@ function BitfieldSection({
 }: {
   bitfield: { pieceCount: number; haveCount: number; bitfield: string };
 }) {
-  const pieces = useMemo(() => {
-    if (!bitfield.bitfield) return [];
+  const buckets = useMemo(() => {
+    if (!bitfield.bitfield || bitfield.pieceCount <= 0) return [];
     try {
       const raw = atob(bitfield.bitfield);
-      const result: boolean[] = [];
+
+      const bytes = new Uint8Array(raw.length);
       for (let i = 0; i < raw.length; i++) {
-        const byte = raw.charCodeAt(i);
-        for (let bit = 7; bit >= 0; bit--) {
-          if (result.length >= bitfield.pieceCount) break;
-          result.push(((byte >> bit) & 1) === 1);
-        }
+        bytes[i] = raw.charCodeAt(i);
       }
-      return result;
+
+      const maxBuckets = 2048;
+      const bucketCount = Math.min(bitfield.pieceCount, maxBuckets);
+
+      const hasPiece = (pieceIndex: number) => {
+        const byteIndex = pieceIndex >> 3;
+        const bitOffset = 7 - (pieceIndex & 7);
+        return ((bytes[byteIndex] >> bitOffset) & 1) === 1;
+      };
+
+      // Bounded sampling keeps rendering responsive even for very large torrents.
+      return Array.from({ length: bucketCount }, (_, bucketIndex) => {
+        const startPiece = Math.floor(
+          (bucketIndex * bitfield.pieceCount) / bucketCount
+        );
+        const endPiece = Math.max(
+          startPiece + 1,
+          Math.floor(((bucketIndex + 1) * bitfield.pieceCount) / bucketCount)
+        );
+        const span = endPiece - startPiece;
+        const sampleCount = Math.min(8, span);
+
+        let haveSamples = 0;
+        for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+          const sampledPiece =
+            startPiece + Math.floor(((sampleIndex + 0.5) * span) / sampleCount);
+          if (hasPiece(sampledPiece)) {
+            haveSamples++;
+          }
+        }
+
+        return {
+          ratio: haveSamples / sampleCount,
+          startPiece,
+          endPiece,
+        };
+      });
     } catch {
       return [];
     }
@@ -224,15 +257,18 @@ function BitfieldSection({
         <span>
           Pieces: {bitfield.haveCount} / {bitfield.pieceCount} ({pct}%)
         </span>
+        <span>{buckets.length} buckets</span>
       </div>
       <div className={styles.bitfieldGrid}>
-        {pieces.map((have, i) => (
+        {buckets.map((bucket, i) => (
           <div
             key={i}
             className={classNames(
               styles.bitfieldPiece,
-              have ? styles.bitfieldPieceHave : styles.bitfieldPieceMissing
+              bucket.ratio > 0 ? styles.bitfieldPieceHave : styles.bitfieldPieceMissing
             )}
+            style={{ opacity: Math.max(0.2, bucket.ratio) }}
+            title={`Pieces ${bucket.startPiece} - ${bucket.endPiece - 1}`}
           />
         ))}
       </div>

@@ -20,10 +20,10 @@ import { PeerSummary } from "../types";
 import { removeTorrent, updateTorrent } from "../store/slices/torrentsSlice";
 import { queueNotification } from "../store/slices/notificationsSlice";
 import {
+  applyVerifiedPiecesToDetailBitfield,
   updateDetailBitfield,
   updateDetailFiles,
 } from "../store/slices/torrentDetailSlice";
-import { fetchTorrentDetail } from "./api";
 import {
   faCheckCircle,
   faPlayCircle,
@@ -77,7 +77,7 @@ export class SignalRService {
       }
     );
 
-    this.connection.on(`PieceVerified`, async (event: PieceVerifiedEvent) => {
+    this.connection.on(`PieceVerified`, (event: PieceVerifiedEvent) => {
       const { infoHash, progress } = event;
       const payload = {
         infoHash,
@@ -85,15 +85,23 @@ export class SignalRService {
       };
       store.dispatch(updateTorrent(payload));
 
-      // Refresh bitfield in detail pane if this torrent is selected
+      // Apply incremental piece updates to detail pane if this torrent is selected.
       const { torrentDetail } = store.getState();
-      if (torrentDetail.selectedInfoHash === infoHash) {
-        const detail = await fetchTorrentDetail(infoHash);
-        if (detail) {
+      if (torrentDetail.selectedInfoHash === infoHash && torrentDetail.detail) {
+        if (event.verifiedPieces && event.verifiedPieces.length > 0) {
+          store.dispatch(
+            applyVerifiedPiecesToDetailBitfield({
+              verifiedPieces: event.verifiedPieces,
+            })
+          );
+        } else {
           store.dispatch(
             updateDetailBitfield({
-              haveCount: detail.bitfield.haveCount,
-              bitfield: detail.bitfield.bitfield,
+              haveCount: Math.min(
+                torrentDetail.detail.bitfield.pieceCount,
+                torrentDetail.detail.bitfield.haveCount + 1
+              ),
+              bitfield: torrentDetail.detail.bitfield.bitfield,
             })
           );
         }
