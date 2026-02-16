@@ -8,11 +8,13 @@ namespace Torrential.Application;
 public sealed class PieceDownloadService(
     ITorrentManager torrentManager,
     PeerConnectionService peerConnectionService,
+    IPieceStorage pieceStorage,
     ILogger<PieceDownloadService> logger) : BackgroundService
 {
     private const int BlockSize = 16384;
     private readonly ConcurrentDictionary<InfoHash, Bitfield> _localBitfields = new();
     private readonly ConcurrentDictionary<(InfoHash, int), byte> _inFlightPieces = new();
+    private readonly ConcurrentDictionary<InfoHash, Task> _initTasks = new();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -50,6 +52,15 @@ public sealed class PieceDownloadService(
 
             var torrentState = torrentManager.GetState(infoHash);
             if (torrentState is null) continue;
+
+            var initTask = _initTasks.GetOrAdd(infoHash, _ => pieceStorage.InitializeTorrentStorageAsync(metaInfo));
+            if (!initTask.IsCompleted)
+                continue;
+            if (initTask.IsFaulted)
+            {
+                logger.LogError(initTask.Exception, "Failed to initialize storage for torrent {InfoHash}", infoHash.AsString());
+                continue;
+            }
 
             var localBitfield = _localBitfields.GetOrAdd(infoHash, _ => new Bitfield(torrentState.NumberOfPieces));
             var connectedPeers = peerConnectionService.GetConnectedPeers(infoHash);
@@ -170,9 +181,19 @@ public sealed class PieceDownloadService(
             var expectedHash = metaInfo.PieceHashes.AsSpan(pieceIndex * 20, 20);
             if (assembled.Verify(expectedHash))
             {
+                await pieceStorage.WritePieceAsync(infoHash, pieceIndex, metaInfo, assembled);
                 localBitfield.MarkHave(pieceIndex);
-                logger.LogInformation("Piece {PieceIndex} verified successfully for torrent {InfoHash}",
+                logger.LogInformation("Piece {PieceIndex} verified and written to disk for torrent {InfoHash}",
                     pieceIndex, infoHash.AsString());
+
+                // Check if any files are now complete
+                for (var i = 0; i < metaInfo.Files.Count; i++)
+                {
+                    if (pieceStorage.IsFileComplete(infoHash, i, metaInfo, localBitfield))
+                    {
+                        await pieceStorage.FinalizeFileAsync(infoHash, i, metaInfo);
+                    }
+                }
             }
             else
             {

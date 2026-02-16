@@ -27,8 +27,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<PeerConnectionService>();
         services.AddSingleton<IPeerConnectionManager>(sp => sp.GetRequiredService<PeerConnectionService>());
         services.AddHostedService(sp => sp.GetRequiredService<PeerConnectionService>());
-        services.AddHostedService<PieceDownloadService>();
         services.AddSingleton<IPieceStorage, DiskPieceStorage>();
+        services.AddHostedService<PieceDownloadService>();
         return services;
     }
 }
