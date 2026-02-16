@@ -40,6 +40,23 @@ public class FileSelectionRegressionTests
     }
 
     [Fact]
+    public void Selected_total_size_uses_only_selected_files()
+    {
+        var metadata = CreateMetadata(
+            pieceSize: 8,
+            totalSize: 24,
+            numberOfPieces: 3,
+            files:
+            [
+                new TorrentMetadataFile { Id = 0, Filename = "a.bin", FileStartByte = 0, FileSize = 8, IsSelected = true },
+                new TorrentMetadataFile { Id = 1, Filename = "b.bin", FileStartByte = 8, FileSize = 8, IsSelected = false },
+                new TorrentMetadataFile { Id = 2, Filename = "c.bin", FileStartByte = 16, FileSize = 8, IsSelected = true }
+            ]);
+
+        Assert.Equal(16, metadata.SelectedTotalSize);
+    }
+
+    [Fact]
     public void Wanted_pieces_map_selected_ranges_with_shared_boundaries_and_final_partial_piece()
     {
         var metadata = CreateMetadata(

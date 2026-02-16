@@ -12,6 +12,8 @@ public class TorrentMetadata
     public required long PieceSize { get; set; }
     public required InfoHash InfoHash { get; set; }
     public required long TotalSize { get; set; }
+    [JsonIgnore]
+    public long SelectedTotalSize => Files.Where(static f => f.IsSelected).Sum(static f => f.FileSize);
 
     private byte[] _pieceHashesConcat = Array.Empty<byte>();
     private int _numberOfPieces = 0;
