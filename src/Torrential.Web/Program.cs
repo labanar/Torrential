@@ -74,11 +74,37 @@ app.MapHub<TorrentHub>("/torrents/hub");
 
 
 app.MapPost(
-    "/torrents/add",
-    async (IFormFile file, ICommandHandler<TorrentAddCommand, TorrentAddResponse> handler) =>
+    "/torrents/preview",
+    (IFormFile file) =>
     {
         var meta = TorrentMetadataParser.FromStream(file.OpenReadStream());
-        return await handler.Execute(new() { Metadata = meta, DownloadPath = "", CompletedPath = "" });
+        return new TorrentPreviewVm
+        {
+            Name = meta.Name,
+            TotalSize = meta.TotalSize,
+            Files = meta.Files.Select(f => new TorrentPreviewFileVm
+            {
+                Id = f.Id,
+                Filename = f.Filename,
+                FileSize = f.FileSize
+            }).ToArray()
+        };
+    })
+    .DisableAntiforgery();
+
+app.MapPost(
+    "/torrents/add",
+    async (IFormFile file, string? selectedFileIds, ICommandHandler<TorrentAddCommand, TorrentAddResponse> handler) =>
+    {
+        var meta = TorrentMetadataParser.FromStream(file.OpenReadStream());
+        long[]? parsedIds = null;
+        if (!string.IsNullOrEmpty(selectedFileIds))
+        {
+            parsedIds = selectedFileIds.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(long.Parse)
+                .ToArray();
+        }
+        return await handler.Execute(new() { Metadata = meta, DownloadPath = "", CompletedPath = "", SelectedFileIds = parsedIds });
     })
     .DisableAntiforgery();
 

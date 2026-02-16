@@ -9,6 +9,7 @@ namespace Torrential.Commands
         public required TorrentMetadata Metadata { get; init; }
         public required string DownloadPath { get; init; }
         public required string CompletedPath { get; init; }
+        public long[]? SelectedFileIds { get; init; }
     }
 
     public class TorrentAddResponse
