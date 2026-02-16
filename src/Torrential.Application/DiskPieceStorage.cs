@@ -1,16 +1,22 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32.SafeHandles;
 using Torrential.Core;
 
 namespace Torrential.Application;
 
-public class DiskPieceStorage(ISettingsService settingsService, ILogger<DiskPieceStorage> logger) : IPieceStorage
+public class DiskPieceStorage(ISettingsService settingsService, ILogger<DiskPieceStorage> logger) : IPieceStorage, IDisposable
 {
     private static readonly char[] InvalidFileNameChars = Path.GetInvalidFileNameChars();
 
+    // Cache file handles per torrent+file to avoid repeated open/close
+    private readonly ConcurrentDictionary<(InfoHash, int), SafeFileHandle> _fileHandles = new();
+    private readonly SemaphoreSlim _handleSemaphore = new(1, 1);
+    private string? _downloadFolder;
+
     public async Task InitializeTorrentStorageAsync(TorrentMetaInfo metaInfo)
     {
-        var settings = await settingsService.GetSettingsAsync();
-        var torrentFolder = GetTorrentFolder(settings.DownloadFolder, metaInfo.Name);
+        var torrentFolder = await GetTorrentFolder(metaInfo.Name);
         Directory.CreateDirectory(torrentFolder);
 
         foreach (var file in metaInfo.Files)
@@ -31,15 +37,14 @@ public class DiskPieceStorage(ISettingsService settingsService, ILogger<DiskPiec
             }
 
             logger.LogInformation("Pre-allocating {FileName} ({FileSize} bytes)", file.FileName, file.FileSize);
-            await using var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous);
+            using var fs = File.Create(filePath);
             fs.SetLength(file.FileSize);
         }
     }
 
     public async Task WritePieceAsync(InfoHash infoHash, int pieceIndex, TorrentMetaInfo metaInfo, AssembledPiece piece)
     {
-        var settings = await settingsService.GetSettingsAsync();
-        var torrentFolder = GetTorrentFolder(settings.DownloadFolder, metaInfo.Name);
+        var torrentFolder = await GetTorrentFolder(metaInfo.Name);
 
         var pieceOffset = (long)pieceIndex * metaInfo.PieceSize;
         var isLastPiece = pieceIndex == metaInfo.NumberOfPieces - 1;
@@ -69,18 +74,8 @@ public class DiskPieceStorage(ISettingsService settingsService, ILogger<DiskPiec
             var offsetInFile = globalOffset - fileStart;
             var bytesInFile = (int)Math.Min(bytesRemaining, fileEnd - globalOffset);
 
-            var filePath = GetPartFilePath(torrentFolder, file.FileName);
-            // Also check the finalized path in case file was already completed
-            if (!File.Exists(filePath))
-            {
-                var finalPath = GetFinalFilePath(torrentFolder, file.FileName);
-                if (File.Exists(finalPath))
-                    filePath = finalPath;
-            }
-
-            await using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite, 4096, FileOptions.Asynchronous);
-            fs.Seek(offsetInFile, SeekOrigin.Begin);
-            piece.WriteRangeTo(fs, pieceDataOffset, bytesInFile);
+            var handle = await GetOrCreateFileHandle(infoHash, file.FileIndex, torrentFolder, file.FileName);
+            piece.WriteRangeTo(handle, offsetInFile, pieceDataOffset, bytesInFile);
 
             logger.LogDebug("Wrote {Bytes} bytes to {File} at offset {Offset} for piece {PieceIndex}",
                 bytesInFile, file.FileName, offsetInFile, pieceIndex);
@@ -111,9 +106,12 @@ public class DiskPieceStorage(ISettingsService settingsService, ILogger<DiskPiec
 
     public async Task FinalizeFileAsync(InfoHash infoHash, int fileIndex, TorrentMetaInfo metaInfo)
     {
-        var settings = await settingsService.GetSettingsAsync();
-        var torrentFolder = GetTorrentFolder(settings.DownloadFolder, metaInfo.Name);
+        var torrentFolder = await GetTorrentFolder(metaInfo.Name);
         var file = metaInfo.Files[fileIndex];
+
+        // Close and remove the cached handle before renaming
+        if (_fileHandles.TryRemove((infoHash, fileIndex), out var handle))
+            handle.Close();
 
         var partPath = GetPartFilePath(torrentFolder, file.FileName);
         var finalPath = GetFinalFilePath(torrentFolder, file.FileName);
@@ -125,10 +123,46 @@ public class DiskPieceStorage(ISettingsService settingsService, ILogger<DiskPiec
         }
     }
 
-    private static string GetTorrentFolder(string downloadFolder, string torrentName)
+    private async Task<SafeFileHandle> GetOrCreateFileHandle(InfoHash infoHash, int fileIndex, string torrentFolder, string fileName)
     {
+        var key = (infoHash, fileIndex);
+        if (_fileHandles.TryGetValue(key, out var existing))
+            return existing;
+
+        await _handleSemaphore.WaitAsync();
+        try
+        {
+            if (_fileHandles.TryGetValue(key, out existing))
+                return existing;
+
+            var filePath = GetPartFilePath(torrentFolder, fileName);
+            if (!File.Exists(filePath))
+            {
+                var finalPath = GetFinalFilePath(torrentFolder, fileName);
+                if (File.Exists(finalPath))
+                    filePath = finalPath;
+            }
+
+            var handle = File.OpenHandle(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous);
+            _fileHandles.TryAdd(key, handle);
+            return handle;
+        }
+        finally
+        {
+            _handleSemaphore.Release();
+        }
+    }
+
+    private async Task<string> GetTorrentFolder(string torrentName)
+    {
+        if (_downloadFolder is null)
+        {
+            var settings = await settingsService.GetSettingsAsync();
+            _downloadFolder = settings.DownloadFolder;
+        }
+
         var sanitized = SanitizePathSegment(torrentName);
-        return Path.Combine(downloadFolder, sanitized);
+        return Path.Combine(_downloadFolder, sanitized);
     }
 
     private static string GetPartFilePath(string torrentFolder, string fileName)
@@ -166,5 +200,13 @@ public class DiskPieceStorage(ISettingsService settingsService, ILogger<DiskPiec
         var firstPiece = (int)(fileStart / metaInfo.PieceSize);
         var lastPiece = (int)(fileEnd / metaInfo.PieceSize);
         return (firstPiece, lastPiece);
+    }
+
+    public void Dispose()
+    {
+        foreach (var handle in _fileHandles.Values)
+            handle.Close();
+        _fileHandles.Clear();
+        _handleSemaphore.Dispose();
     }
 }

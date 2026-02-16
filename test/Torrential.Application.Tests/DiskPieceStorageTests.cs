@@ -22,6 +22,7 @@ public class DiskPieceStorageTests : IDisposable
 
     public void Dispose()
     {
+        _storage.Dispose();
         if (Directory.Exists(_tempDir))
             Directory.Delete(_tempDir, true);
     }

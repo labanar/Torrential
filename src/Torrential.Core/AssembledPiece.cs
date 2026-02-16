@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Microsoft.Win32.SafeHandles;
 
 namespace Torrential.Core;
 
@@ -53,6 +54,34 @@ public sealed class AssembledPiece : IDisposable
             var toWrite = Math.Min(available, count - bytesWritten);
 
             stream.Write(block.Buffer.Slice(startInBlock, toWrite));
+            bytesWritten += toWrite;
+            bytesSkipped += blockSize;
+
+            if (bytesWritten >= count)
+                break;
+        }
+    }
+
+    public void WriteRangeTo(SafeFileHandle fileHandle, long fileOffset, int pieceDataOffset, int count)
+    {
+        var bytesSkipped = 0;
+        var bytesWritten = 0;
+
+        foreach (var block in _blocks)
+        {
+            var blockSize = block.Buffer.Length;
+
+            if (bytesSkipped + blockSize <= pieceDataOffset)
+            {
+                bytesSkipped += blockSize;
+                continue;
+            }
+
+            var startInBlock = Math.Max(0, pieceDataOffset - bytesSkipped);
+            var available = blockSize - startInBlock;
+            var toWrite = Math.Min(available, count - bytesWritten);
+
+            RandomAccess.Write(fileHandle, block.Buffer.Slice(startInBlock, toWrite), fileOffset + bytesWritten);
             bytesWritten += toWrite;
             bytesSkipped += blockSize;
 
