@@ -5,6 +5,7 @@ import {
 } from "@microsoft/signalr";
 import { addPeer, removePeer, updatePeer } from "../store/slices/peersSlice";
 import {
+  FileSelectionChangedEvent,
   PeerBitfieldReceivedEvent,
   PeerConnectedEvent,
   PeerDisconnectedEvent,
@@ -18,6 +19,11 @@ import {
 import { PeerSummary } from "../types";
 import { removeTorrent, updateTorrent } from "../store/slices/torrentsSlice";
 import { queueNotification } from "../store/slices/notificationsSlice";
+import {
+  applyVerifiedPiecesToDetailBitfield,
+  updateDetailBitfield,
+  updateDetailFiles,
+} from "../store/slices/torrentDetailSlice";
 import {
   faCheckCircle,
   faPlayCircle,
@@ -78,6 +84,28 @@ export class SignalRService {
         update: { progress: Number(progress.toFixed(3)) },
       };
       store.dispatch(updateTorrent(payload));
+
+      // Apply incremental piece updates to detail pane if this torrent is selected.
+      const { torrentDetail } = store.getState();
+      if (torrentDetail.selectedInfoHash === infoHash && torrentDetail.detail) {
+        if (event.verifiedPieces && event.verifiedPieces.length > 0) {
+          store.dispatch(
+            applyVerifiedPiecesToDetailBitfield({
+              verifiedPieces: event.verifiedPieces,
+            })
+          );
+        } else {
+          store.dispatch(
+            updateDetailBitfield({
+              haveCount: Math.min(
+                torrentDetail.detail.bitfield.pieceCount,
+                torrentDetail.detail.bitfield.haveCount + 1
+              ),
+              bitfield: torrentDetail.detail.bitfield.bitfield,
+            })
+          );
+        }
+      }
     });
 
     this.connection.on("TorrentStarted", (event: TorrentStartedEvent) => {
@@ -202,6 +230,18 @@ export class SignalRService {
         })
       );
     });
+
+    this.connection.on(
+      "FileSelectionChanged",
+      (event: FileSelectionChangedEvent) => {
+        const { torrentDetail } = store.getState();
+        if (torrentDetail.selectedInfoHash === event.infoHash) {
+          store.dispatch(
+            updateDetailFiles({ selectedFileIds: event.selectedFileIds })
+          );
+        }
+      }
+    );
   }
 
   public async startConnection(): Promise<void> {

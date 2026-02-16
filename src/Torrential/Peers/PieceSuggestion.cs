@@ -39,6 +39,30 @@ public static class PieceSuggestion
         ReadOnlySpan<byte> wantedBytes,
         int numPieces)
     {
+        return SuggestPiece(
+            ourBytes,
+            peerBytes,
+            reservationBytes,
+            availabilityCounts,
+            wantedBytes,
+            ReadOnlySpan<byte>.Empty,
+            numPieces);
+    }
+
+    /// <summary>
+    /// Suggests the best piece to download, additionally filtering by an allowed-pieces mask.
+    /// When allowedBytes is non-empty, only pieces whose bit is set in the allowed mask are considered.
+    /// This enables file-selection-aware downloading: pieces outside selected files are skipped.
+    /// </summary>
+    public static PieceSuggestionResult SuggestPiece(
+        ReadOnlySpan<byte> ourBytes,
+        ReadOnlySpan<byte> peerBytes,
+        ReadOnlySpan<byte> reservationBytes,
+        ReadOnlySpan<int> availabilityCounts,
+        ReadOnlySpan<byte> wantedBytes,
+        ReadOnlySpan<byte> allowedBytes,
+        int numPieces)
+    {
         int sizeInBytes = ourBytes.Length;
         if (sizeInBytes == 0 || numPieces == 0)
             return PieceSuggestionResult.NoMorePieces;
@@ -64,6 +88,10 @@ public static class PieceSuggestion
 
             // candidate = peer has AND wanted AND we do NOT have AND NOT reserved
             byte candidate = (byte)(peerByte & wantedByte & ~ourByte & ~resByte);
+
+            // Apply allowed-pieces mask: only consider pieces belonging to selected files
+            if (!allowedBytes.IsEmpty && byteIdx < allowedBytes.Length)
+                candidate &= allowedBytes[byteIdx];
 
             if (candidate == 0)
                 continue;
@@ -143,7 +171,14 @@ public static class PieceSuggestion
         ReadOnlySpan<byte> reservationBytes,
         int numPieces)
     {
-        return SuggestPiece(ourBytes, peerBytes, reservationBytes, ReadOnlySpan<int>.Empty, ReadOnlySpan<byte>.Empty, numPieces);
+        return SuggestPiece(
+            ourBytes,
+            peerBytes,
+            reservationBytes,
+            ReadOnlySpan<int>.Empty,
+            ReadOnlySpan<byte>.Empty,
+            ReadOnlySpan<byte>.Empty,
+            numPieces);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

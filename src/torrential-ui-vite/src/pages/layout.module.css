@@ -37,7 +37,9 @@
   
   .main {
     flex-grow: 1;
-    overflow-y: auto; /* Ensure scrolling if content is long */
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
   }
   
   .sidebarTitle {

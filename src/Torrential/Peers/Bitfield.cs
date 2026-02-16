@@ -316,12 +316,25 @@ namespace Torrential.Peers
             PieceAvailability? availability,
             IBitfield? wantedBitfield)
         {
+            return SuggestPieceToDownload(peerBitfield, reservationBitfield, availability, wantedBitfield, null);
+        }
+
+        public PieceSuggestionResult SuggestPieceToDownload(
+            IBitfield peerBitfield,
+            IBitfield? reservationBitfield,
+            PieceAvailability? availability,
+            IBitfield? wantedBitfield,
+            IBitfield? allowedPieces)
+        {
             var resBytes = reservationBitfield != null
                 ? reservationBitfield.Bytes
                 : ReadOnlySpan<byte>.Empty;
             var availCounts = availability != null
                 ? availability.Counts
                 : ReadOnlySpan<int>.Empty;
+            var allowedBytes = allowedPieces != null
+                ? allowedPieces.Bytes
+                : ReadOnlySpan<byte>.Empty;
             var wantedBytes = wantedBitfield != null
                 ? wantedBitfield.Bytes
                 : ReadOnlySpan<byte>.Empty;
@@ -332,6 +345,7 @@ namespace Torrential.Peers
                 resBytes,
                 availCounts,
                 wantedBytes,
+                allowedBytes,
                 _numOfPieces);
         }
 

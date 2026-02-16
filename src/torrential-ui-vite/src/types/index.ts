@@ -18,6 +18,44 @@ export interface PeerSummary {
   isSeed: boolean;
 }
 
+export interface TorrentDetail {
+  infoHash: string;
+  name: string;
+  status: string;
+  progress: number;
+  totalSizeBytes: number;
+  bytesDownloaded: number;
+  bytesUploaded: number;
+  downloadRate: number;
+  uploadRate: number;
+  peers: TorrentDetailPeer[];
+  bitfield: BitfieldInfo;
+  files: TorrentFile[];
+}
+
+export interface TorrentDetailPeer {
+  peerId: string;
+  ipAddress: string;
+  port: number;
+  bytesDownloaded: number;
+  bytesUploaded: number;
+  isSeed: boolean;
+  progress: number;
+}
+
+export interface BitfieldInfo {
+  pieceCount: number;
+  haveCount: number;
+  bitfield: string; // Base64 encoded
+}
+
+export interface TorrentFile {
+  id: number;
+  filename: string;
+  size: number;
+  isSelected: boolean;
+}
+
 export interface TorrentPreviewFileSummary {
   id: number;
   filename: string;

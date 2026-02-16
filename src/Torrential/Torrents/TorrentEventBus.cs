@@ -66,6 +66,9 @@ public sealed class TorrentEventBus : IAsyncDisposable
     private readonly List<Func<TorrentFileCopyStartedEvent, Task>> _fileCopyStartedHandlers = [];
     private readonly List<Func<TorrentFileCopyCompletedEvent, Task>> _fileCopyCompletedHandlers = [];
 
+    // File selection
+    private readonly List<Func<FileSelectionChangedEvent, Task>> _fileSelectionChangedHandlers = [];
+
     // ---------------------------------------------------------------------------
     // Registration (called during DI setup, before any Publish)
     // ---------------------------------------------------------------------------
@@ -92,6 +95,8 @@ public sealed class TorrentEventBus : IAsyncDisposable
 
     public void OnFileCopyStarted(Func<TorrentFileCopyStartedEvent, Task> handler) => _fileCopyStartedHandlers.Add(handler);
     public void OnFileCopyCompleted(Func<TorrentFileCopyCompletedEvent, Task> handler) => _fileCopyCompletedHandlers.Add(handler);
+
+    public void OnFileSelectionChanged(Func<FileSelectionChangedEvent, Task> handler) => _fileSelectionChangedHandlers.Add(handler);
 
     /// <summary>
     /// Starts the background channel reader for PieceValidationRequest.
@@ -133,6 +138,8 @@ public sealed class TorrentEventBus : IAsyncDisposable
 
     public Task PublishFileCopyStarted(TorrentFileCopyStartedEvent evt) => InvokeAll(_fileCopyStartedHandlers, evt);
     public Task PublishFileCopyCompleted(TorrentFileCopyCompletedEvent evt) => InvokeAll(_fileCopyCompletedHandlers, evt);
+
+    public Task PublishFileSelectionChanged(FileSelectionChangedEvent evt) => InvokeAll(_fileSelectionChangedHandlers, evt);
 
     // ---------------------------------------------------------------------------
     // Internal

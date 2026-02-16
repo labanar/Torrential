@@ -1,0 +1,156 @@
+.detailPane {
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+  overflow-y: auto;
+  border-top: 1px solid var(--chakra-colors-chakra-border-color);
+}
+
+.detailHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5em 1.25em;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.detailHeaderTitle {
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  font-size: 0.85em;
+}
+
+.tabs {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  border-bottom: 1px solid var(--chakra-colors-chakra-border-color);
+  padding: 0 1.25em;
+}
+
+.tab {
+  padding: 0.5em 1em;
+  font-size: 0.8em;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 2px solid transparent;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.tab:hover {
+  opacity: 0.85;
+}
+
+.tabActive {
+  opacity: 1;
+  border-bottom-color: var(--chakra-colors-blue-400);
+}
+
+.tabContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75em 1.25em;
+}
+
+/* Peers table */
+.peersTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8em;
+}
+
+.peersTable th {
+  text-align: left;
+  padding: 0.4em 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 0.85em;
+  opacity: 0.7;
+  border-bottom: 1px solid var(--chakra-colors-chakra-border-color);
+}
+
+.peersTable td {
+  padding: 0.35em 0.75em;
+  font-size: 0.9em;
+}
+
+.peersTable tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Bitfield visualization */
+.bitfieldContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.bitfieldStats {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5em;
+  font-size: 0.8em;
+  opacity: 0.8;
+}
+
+.bitfieldGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+}
+
+.bitfieldPiece {
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+}
+
+.bitfieldPieceHave {
+  background-color: var(--chakra-colors-green-400);
+}
+
+.bitfieldPieceMissing {
+  background-color: var(--chakra-colors-whiteAlpha-200);
+}
+
+/* Files section */
+.filesTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8em;
+}
+
+.filesTable th {
+  text-align: left;
+  padding: 0.4em 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 0.85em;
+  opacity: 0.7;
+  border-bottom: 1px solid var(--chakra-colors-chakra-border-color);
+}
+
+.filesTable td {
+  padding: 0.35em 0.75em;
+  font-size: 0.9em;
+}
+
+.filesTable tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3em;
+  opacity: 0.4;
+  font-size: 0.85em;
+  letter-spacing: 0.05em;
+}

@@ -17,7 +17,7 @@ namespace Torrential.Commands
         public InfoHash InfoHash { get; init; }
     }
 
-    public class TorrentAddCommandHandler(TorrentialDb db, TorrentTaskManager mgr, IMetadataFileService metaFileService, SettingsManager settingsManager)
+    public class TorrentAddCommandHandler(TorrentialDb db, TorrentTaskManager mgr, IMetadataFileService metaFileService, IFileSelectionService fileSelectionService, SettingsManager settingsManager)
         : ICommandHandler<TorrentAddCommand, TorrentAddResponse>
     {
         public async Task<TorrentAddResponse> Execute(TorrentAddCommand command)
@@ -36,6 +36,10 @@ namespace Torrential.Commands
 
             //Save the metadata to the file system
             await metaFileService.SaveMetadata(command.Metadata);
+
+            // Default all files selected on add
+            var allFileIds = command.Metadata.Files.Select(f => f.Id).ToArray();
+            await fileSelectionService.SetSelectedFileIds(command.Metadata.InfoHash, allFileIds);
 
             await db.SaveChangesAsync();
             await mgr.Add(command.Metadata);

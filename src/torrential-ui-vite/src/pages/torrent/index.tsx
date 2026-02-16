@@ -52,11 +52,15 @@ import {
 import { PeerSummary, TorrentPreviewSummary, TorrentSummary } from "../../types";
 import { setPeers } from "../../store/slices/peersSlice";
 import {
+  selectTorrentForDetail,
+} from "../../store/slices/torrentDetailSlice";
+import {
   FileUpload,
   FileUploadElement,
 } from "../../components/FileUpload/file-upload";
 import Layout from "../layout";
 import { AlfredContext, setContext } from "../../store/slices/alfredSlice";
+import { DetailPane } from "./detail-pane";
 
 export default function TorrentPage() {
   return (
@@ -208,11 +212,6 @@ function Page() {
   useHotkeys(
     "space",
     () => {
-      // let nextId = selectedId - 1;
-      // if (nextId < 0) nextId = suggestions.length - 1;
-      // setSelectedId(nextId);
-      // console.log(nextId);
-
       selectTorrent(torrents[currentPosition].infoHash);
       console.log("space from torrents");
     },
@@ -222,17 +221,23 @@ function Page() {
     }
   );
 
+  // Track focused torrent for the detail pane
+  const focusedInfoHash = torrents[currentPosition]?.infoHash ?? null;
+
+  useEffect(() => {
+    dispatch(selectTorrentForDetail(focusedInfoHash));
+  }, [dispatch, focusedInfoHash]);
+
   return (
     <>
       <div className={styles.root}>
-        {memoActionRow}
-        {/* <ActionsRow selectedTorrents={selectedTorrents} /> */}
-        <div className={styles.torrentDivider}>
-          <Divider orientation="horizontal" />
-        </div>
-        <div className={styles.torrentList}>
-          {torrents.map((t, i) => (
-            <>
+        <div className={styles.topPane}>
+          {memoActionRow}
+          <div className={styles.torrentDivider}>
+            <Divider orientation="horizontal" />
+          </div>
+          <div className={styles.torrentList}>
+            {torrents.map((t, i) => (
               <TorrentRow
                 toggleSelect={selectTorrent}
                 toggleFocus={() => setCurrentPosition(i)}
@@ -259,9 +264,14 @@ function Page() {
                 totalBytes={t.sizeInBytes ?? 0}
                 title={t.name ?? "???"}
               />
-            </>
-          ))}
+            ))}
+          </div>
         </div>
+        {focusedInfoHash && (
+          <div className={styles.bottomPane}>
+            <DetailPane infoHash={focusedInfoHash} />
+          </div>
+        )}
       </div>
     </>
   );
