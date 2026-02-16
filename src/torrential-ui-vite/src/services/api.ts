@@ -1,5 +1,14 @@
 export function fetchTorrents() {}
 
+interface ApiErrorData {
+  code: string;
+}
+
+interface ApiResponse<T> {
+  data?: T;
+  error?: ApiErrorData;
+}
+
 export interface TorrentApiModel {
   infoHash: string;
   name: string;
@@ -133,4 +142,57 @@ export async function updateFileSelection(
   if (!response.ok) return false;
   const result = await response.json();
   return result.data?.success ?? false;
+}
+
+export interface TorrentPreviewFileApiModel {
+  id: number;
+  filename: string;
+  sizeBytes: number;
+  defaultSelected: boolean;
+}
+
+export interface TorrentPreviewApiModel {
+  name: string;
+  infoHash: string;
+  totalSizeBytes: number;
+  files: TorrentPreviewFileApiModel[];
+}
+
+export async function previewTorrent(file: File): Promise<TorrentPreviewApiModel> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/preview`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to preview torrent file");
+  }
+
+  const result: ApiResponse<TorrentPreviewApiModel> = await response.json();
+
+  if (result.error || !result.data) {
+    throw new Error("Preview endpoint returned an error");
+  }
+
+  return result.data;
+}
+
+export async function addTorrent(file: File, selectedFileIds: number[]): Promise<void> {
+  const formData = new FormData();
+  formData.append("file", file);
+  selectedFileIds.forEach((id) => {
+    formData.append("SelectedFileIds", `${id}`);
+  });
+
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/add`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to add torrent");
+  }
 }

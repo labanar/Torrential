@@ -8,6 +8,7 @@ namespace Torrential.Peers
     {
         private ConcurrentDictionary<InfoHash, Bitfield> _downloadBitfields = [];
         private ConcurrentDictionary<InfoHash, Bitfield> _verificationBitfields = [];
+        private ConcurrentDictionary<InfoHash, Bitfield> _wantedPieceBitfields = [];
         private ConcurrentDictionary<InfoHash, Bitfield> _blockBitfields = [];
         private ConcurrentDictionary<InfoHash, Bitfield> _pieceReservationBitfields = [];
         private ConcurrentDictionary<InfoHash, PieceAvailability> _pieceAvailability = [];
@@ -19,6 +20,7 @@ namespace Torrential.Peers
         {
             _downloadBitfields.TryRemove(infoHash, out _);
             _verificationBitfields.TryRemove(infoHash, out _);
+            _wantedPieceBitfields.TryRemove(infoHash, out _);
             _blockBitfields.TryRemove(infoHash, out _);
             _pieceReservationBitfields.TryRemove(infoHash, out _);
             _pieceAvailability.TryRemove(infoHash, out _);
@@ -31,13 +33,14 @@ namespace Torrential.Peers
 
             var downloadBitfield = new Bitfield(numPieces);
             var verificationBitfield = new Bitfield(numPieces);
+            var wantedPieceBitfield = BuildWantedPieceBitfield(meta);
 
 
             await LoadDownloadBitfieldData(infoHash, downloadBitfield);
             await LoadVerificationBitfieldData(infoHash, verificationBitfield);
 
             //We have pieces to download and verify
-            if (!verificationBitfield.HasAll())
+            if (!verificationBitfield.HasAll(wantedPieceBitfield.Bytes))
             {
                 var blockBitfield = new Bitfield(meta.TotalNumberOfChunks);
                 var pieceReservationBitfield = new Bitfield(numPieces);
@@ -49,11 +52,12 @@ namespace Torrential.Peers
 
             _downloadBitfields[infoHash] = downloadBitfield;
             _verificationBitfields[infoHash] = verificationBitfield;
+            _wantedPieceBitfields[infoHash] = wantedPieceBitfield;
 
             //Determine which pieces are downloaded but not verified and request verification
             for (var i = 0; i < numPieces; i++)
             {
-                if (downloadBitfield.HasPiece(i) && !verificationBitfield.HasPiece(i))
+                if (wantedPieceBitfield.HasPiece(i) && downloadBitfield.HasPiece(i) && !verificationBitfield.HasPiece(i))
                     await eventBus.PublishPieceValidationRequest(new PieceValidationRequest { InfoHash = infoHash, PieceIndex = i });
             }
         }
@@ -71,6 +75,27 @@ namespace Torrential.Peers
         public bool TryGetVerificationBitfield(InfoHash infoHash, out Bitfield bitfield)
         {
             return _verificationBitfields.TryGetValue(infoHash, out bitfield);
+        }
+
+        public bool TryGetWantedPieceBitfield(InfoHash infoHash, out Bitfield bitfield)
+        {
+            return _wantedPieceBitfields.TryGetValue(infoHash, out bitfield);
+        }
+
+        public bool HasAllWantedPieces(InfoHash infoHash, Bitfield verificationBitfield)
+        {
+            if (!_wantedPieceBitfields.TryGetValue(infoHash, out var wantedBitfield))
+                return verificationBitfield.HasAll();
+
+            return verificationBitfield.HasAll(wantedBitfield.Bytes);
+        }
+
+        public float GetWantedCompletionRatio(InfoHash infoHash, Bitfield verificationBitfield)
+        {
+            if (!_wantedPieceBitfields.TryGetValue(infoHash, out var wantedBitfield))
+                return verificationBitfield.CompletionRatio;
+
+            return verificationBitfield.GetCompletionRatio(wantedBitfield.Bytes);
         }
 
         public bool TryGetPieceReservationBitfield(InfoHash infoHash, out Bitfield bitfield)
@@ -110,6 +135,15 @@ namespace Torrential.Peers
             var buffer = new byte[bitField.Bytes.Length];
             fs.ReadExactly(buffer);
             bitField.Fill(buffer);
+        }
+
+        private static Bitfield BuildWantedPieceBitfield(TorrentMetadata meta)
+        {
+            var wantedBitfield = new Bitfield(meta.NumberOfPieces);
+            foreach (var pieceIndex in meta.WantedPieces)
+                wantedBitfield.MarkHave(pieceIndex);
+
+            return wantedBitfield;
         }
     }
 }

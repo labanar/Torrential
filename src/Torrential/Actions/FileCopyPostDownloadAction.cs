@@ -51,7 +51,7 @@ namespace Torrential.Pipelines
             {
                 var partFileHandle = await fileHandleProvider.GetPartFileHandle(infoHash);
 
-                foreach (var fileInfo in meta.Files)
+                foreach (var fileInfo in meta.Files.Where(static file => file.IsSelected))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 

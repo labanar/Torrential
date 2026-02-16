@@ -36,9 +36,17 @@ public static class PieceSuggestion
         ReadOnlySpan<byte> peerBytes,
         ReadOnlySpan<byte> reservationBytes,
         ReadOnlySpan<int> availabilityCounts,
+        ReadOnlySpan<byte> wantedBytes,
         int numPieces)
     {
-        return SuggestPiece(ourBytes, peerBytes, reservationBytes, availabilityCounts, ReadOnlySpan<byte>.Empty, numPieces);
+        return SuggestPiece(
+            ourBytes,
+            peerBytes,
+            reservationBytes,
+            availabilityCounts,
+            wantedBytes,
+            ReadOnlySpan<byte>.Empty,
+            numPieces);
     }
 
     /// <summary>
@@ -51,6 +59,7 @@ public static class PieceSuggestion
         ReadOnlySpan<byte> peerBytes,
         ReadOnlySpan<byte> reservationBytes,
         ReadOnlySpan<int> availabilityCounts,
+        ReadOnlySpan<byte> wantedBytes,
         ReadOnlySpan<byte> allowedBytes,
         int numPieces)
     {
@@ -73,9 +82,12 @@ public static class PieceSuggestion
             byte resByte = !reservationBytes.IsEmpty && byteIdx < reservationBytes.Length
                 ? reservationBytes[byteIdx]
                 : (byte)0;
+            byte wantedByte = !wantedBytes.IsEmpty && byteIdx < wantedBytes.Length
+                ? wantedBytes[byteIdx]
+                : (byte)0xFF;
 
-            // candidate = peer has AND we do NOT have AND NOT reserved
-            byte candidate = (byte)(peerByte & ~ourByte & ~resByte);
+            // candidate = peer has AND wanted AND we do NOT have AND NOT reserved
+            byte candidate = (byte)(peerByte & wantedByte & ~ourByte & ~resByte);
 
             // Apply allowed-pieces mask: only consider pieces belonging to selected files
             if (!allowedBytes.IsEmpty && byteIdx < allowedBytes.Length)
@@ -140,7 +152,7 @@ public static class PieceSuggestion
         if (!anyCandidate)
         {
             // Check if WE have all pieces (download complete) vs just no candidates from this peer
-            bool weHaveAll = HasAllPieces(ourBytes, numPieces);
+            bool weHaveAll = HasAllPieces(ourBytes, wantedBytes, numPieces);
             return weHaveAll
                 ? PieceSuggestionResult.NoMorePieces
                 : new PieceSuggestionResult(null, true); // More pieces exist but this peer cannot help
@@ -159,15 +171,44 @@ public static class PieceSuggestion
         ReadOnlySpan<byte> reservationBytes,
         int numPieces)
     {
-        return SuggestPiece(ourBytes, peerBytes, reservationBytes, ReadOnlySpan<int>.Empty, numPieces);
+        return SuggestPiece(
+            ourBytes,
+            peerBytes,
+            reservationBytes,
+            ReadOnlySpan<int>.Empty,
+            ReadOnlySpan<byte>.Empty,
+            ReadOnlySpan<byte>.Empty,
+            numPieces);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool HasAllPieces(ReadOnlySpan<byte> bytes, int numPieces)
+    private static bool HasAllPieces(ReadOnlySpan<byte> bytes, ReadOnlySpan<byte> wantedBytes, int numPieces)
     {
-        int count = 0;
+        if (wantedBytes.IsEmpty)
+        {
+            int count = 0;
+            for (int i = 0; i < bytes.Length; i++)
+                count += BitOperations.PopCount(bytes[i]);
+            return count >= numPieces;
+        }
+
         for (int i = 0; i < bytes.Length; i++)
-            count += BitOperations.PopCount(bytes[i]);
-        return count >= numPieces;
+        {
+            byte required = i < wantedBytes.Length ? wantedBytes[i] : (byte)0;
+            if (i == bytes.Length - 1)
+            {
+                int remainingBits = numPieces % 8;
+                if (remainingBits > 0)
+                {
+                    byte validMask = (byte)(0xFF << (8 - remainingBits));
+                    required &= validMask;
+                }
+            }
+
+            if ((bytes[i] & required) != required)
+                return false;
+        }
+
+        return true;
     }
 }

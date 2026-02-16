@@ -55,3 +55,16 @@ export interface TorrentFile {
   size: number;
   isSelected: boolean;
 }
+
+export interface TorrentPreviewFileSummary {
+  id: number;
+  filename: string;
+  sizeBytes: number;
+}
+
+export interface TorrentPreviewSummary {
+  name: string;
+  infoHash: string;
+  totalSizeBytes: number;
+  files: TorrentPreviewFileSummary[];
+}

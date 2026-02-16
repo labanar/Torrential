@@ -9,6 +9,7 @@ namespace Torrential.Commands
         public required TorrentMetadata Metadata { get; init; }
         public required string DownloadPath { get; init; }
         public required string CompletedPath { get; init; }
+        public IReadOnlyCollection<long>? SelectedFileIds { get; init; }
     }
 
     public class TorrentAddResponse
@@ -22,6 +23,7 @@ namespace Torrential.Commands
         public async Task<TorrentAddResponse> Execute(TorrentAddCommand command)
         {
             var fileSettings = await settingsManager.GetFileSettings();
+            ApplyFileSelection(command.Metadata, command.SelectedFileIds);
 
             await db.AddAsync(new TorrentConfiguration
             {
@@ -42,6 +44,22 @@ namespace Torrential.Commands
             await db.SaveChangesAsync();
             await mgr.Add(command.Metadata);
             return new() { InfoHash = command.Metadata.InfoHash };
+        }
+
+        private static void ApplyFileSelection(TorrentMetadata metadata, IReadOnlyCollection<long>? selectedFileIds)
+        {
+            // Backward compatibility: if no selection is provided, keep all files selected.
+            if (selectedFileIds == null)
+            {
+                foreach (var file in metadata.Files)
+                    file.IsSelected = true;
+
+                return;
+            }
+
+            var selected = selectedFileIds.ToHashSet();
+            foreach (var file in metadata.Files)
+                file.IsSelected = selected.Contains(file.Id);
         }
     }
 }

@@ -126,7 +126,46 @@
     gap: 2em;
   }
   
-  .actionSearch {
-    flex-grow: 1;
-  }
+.actionSearch {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.uploadError {
+  margin-top: 4px;
+}
+
+.previewModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 60vh;
+}
+
+.previewTorrentName {
+  font-weight: 600;
+}
+
+.previewSelectAll {
+  align-self: flex-start;
+}
+
+.previewFileList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.previewFileRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
   
