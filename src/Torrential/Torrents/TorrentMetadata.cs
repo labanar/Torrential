@@ -64,4 +64,5 @@ public class TorrentMetadataFile
     public required string Filename { get; set; }
     public required long FileStartByte { get; set; }
     public required long FileSize { get; set; }
+    public bool IsSelected { get; set; } = true;
 }
