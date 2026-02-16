@@ -128,9 +128,9 @@ namespace Torrential.Torrents
                 try
                 {
                     var fileHandle = await fileHandleProvider.GetPartFileHandle(meta.InfoHash);
-                    long fileOffset = (request.PieceIndex * meta.PieceSize) + request.Begin;
+                    long fileOffset = (request.Index * meta.PieceSize) + request.Begin;
                     RandomAccess.Read(fileHandle, buffer, fileOffset);
-                    var pak = MessagePacker.Pack(request.PieceIndex, request.Begin, buffer.AsSpan().Slice(0, request.Length));
+                    var pak = PreparedPieceMessage.Create(request.Index, request.Begin, buffer.AsSpan().Slice(0, request.Length));
                     await peer.SendPiece(pak);
 
                     // Record upload bytes directly -- no event allocation.

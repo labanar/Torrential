@@ -9,8 +9,6 @@ namespace Torrential.Peers;
 
 public sealed class HandshakeService(IPeerService peerService, TorrentMetadataCache metaCache, ILogger<HandshakeService> logger)
 {
-    //Empty until support for extensions is added
-    static byte[] EMPTY_RESERVED = [0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
     static ReadOnlySpan<byte> PROTOCOL_BYTES => "BitTorrent protocol"u8;
 
     public async Task<HandshakeResponse> HandleInbound(PipeWriter writer, PipeReader reader, CancellationToken stoppingToken)
@@ -103,12 +101,14 @@ public sealed class HandshakeService(IPeerService peerService, TorrentMetadataCa
 
     private void Writehandshake(PipeWriter writer, InfoHash infoHash)
     {
+        Span<byte> hashBytes = stackalloc byte[20];
+        infoHash.CopyTo(hashBytes);
+        Span<byte> peerIdBytes = stackalloc byte[20];
+        peerService.Self.Id.CopyTo(peerIdBytes);
+        var handshake = HandshakeData.Create(hashBytes, peerIdBytes);
+        Span<byte> handshakeSpan = handshake;
         var buffer = writer.GetSpan(68);
-        buffer[0] = 19;
-        PROTOCOL_BYTES.CopyTo(buffer[1..]);
-        EMPTY_RESERVED.CopyTo(buffer[20..]);
-        infoHash.CopyTo(buffer[28..]);
-        peerService.Self.Id.CopyTo(buffer[48..]);
+        handshakeSpan.CopyTo(buffer);
         writer.Advance(68);
     }
 

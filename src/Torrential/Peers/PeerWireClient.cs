@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Threading.Channels;
@@ -257,53 +257,47 @@ public sealed class PeerWireClient : IAsyncDisposable
 
         //Certain messages can be processed immediately, so we'll handle those upfront
         bool handled;
-        switch (messageId)
+        switch ((PeerWireMessageId)messageId)
         {
-            case PeerWireMessageType.Choke:
+            case PeerWireMessageId.Choke:
                 HandleChoke();
                 handled = true;
                 break;
-            case PeerWireMessageType.Unchoke:
+            case PeerWireMessageId.Unchoke:
                 HandleUnchoke();
                 handled = true;
                 break;
-            case PeerWireMessageType.Interested:
+            case PeerWireMessageId.Interested:
                 HandleInterested();
                 handled = true;
                 break;
-            case PeerWireMessageType.NotInterested:
+            case PeerWireMessageId.NotInterested:
                 HandleNotInterested();
                 handled = true;
                 break;
-            case PeerWireMessageType.Bitfield:
+            case PeerWireMessageId.Bitfield:
                 HandleBitfield(payload);
                 handled = true;
                 break;
-            case PeerWireMessageType.Have:
+            case PeerWireMessageId.Have:
                 HandleHave(payload);
                 handled = true;
                 break;
-            case PeerWireMessageType.Piece:
+            case PeerWireMessageId.Piece:
                 handled = await HandlePieceAsync(payload, messageSize - 9);
                 break;
-            case PeerWireMessageType.Request:
+            case PeerWireMessageId.Request:
                 handled = await HandleRequestAsync(payload);
                 break;
-            case PeerWireMessageType.Cancel:
+            case PeerWireMessageId.Cancel:
                 handled = HandleCancel(payload);
                 break;
             default:
                 _logger.LogWarning("Unhandled message type {MessageType}", messageId);
                 handled = true;
                 break;
-                ////Return false here when we cannot process the message. It tells the main loop to disconnect and stop comms with this peer
-                ////For now we'll return true, but we should change this to false once we've implemented all the message handlers
-                //handled = true;
-                //break;
         }
 
-        //If the peer bitfield is null, then we can assume that the peer has an empty bitfield
-        //_state.PeerBitfield ??= new Bitfield(_meta.NumberOfPieces);
         LastMessageTimestamp = DateTimeOffset.UtcNow;
         return handled;
     }
@@ -393,14 +387,20 @@ public sealed class PeerWireClient : IAsyncDisposable
     }
 
 
-    public async Task SendBitfield(IBitfield bitfield) => await WriteBitfieldAsync(bitfield);
-    public async Task SendIntereted() => await SendMessageAsync(PeerWireMessageType.Interested);
-    public async Task SendNotInterested() => await SendMessageAsync(PeerWireMessageType.NotInterested);
-    public async Task SendChoke() => await SendMessageAsync(PeerWireMessageType.Choke);
-    public async Task SendUnchoke() => await SendMessageAsync(PeerWireMessageType.Unchoke);
-    public async Task SendHave(int pieceIndex) => await SendMessageAsync(PeerWireMessageType.Have, pieceIndex);
+    public async Task SendBitfield(IBitfield bitfield) =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(PreparedPacket.FromPeerPacket(new BitfieldMessage(bitfield)), _cts.Token);
+    public async Task SendIntereted() =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(PreparedPacket.FromPeerPacket(new InterestedMessage()), _cts.Token);
+    public async Task SendNotInterested() =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(PreparedPacket.FromPeerPacket(new NotInterestedMessage()), _cts.Token);
+    public async Task SendChoke() =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(PreparedPacket.FromPeerPacket(new ChokeMessage()), _cts.Token);
+    public async Task SendUnchoke() =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(PreparedPacket.FromPeerPacket(new UnchokeMessage()), _cts.Token);
+    public async Task SendHave(int pieceIndex) =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(PreparedPacket.FromPeerPacket(new HaveMessage(pieceIndex)), _cts.Token);
     public async Task SendPieceRequest(int pieceIndex, int begin, int length = DEFAULT_BLOCK_SIZE) =>
-        await SendMessageAsync(PeerWireMessageType.Request, pieceIndex, begin, length);
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(PreparedPacket.FromPeerPacket(new PieceRequestMessage(pieceIndex, begin, length)), _cts.Token);
 
     public async Task SendPiece(PreparedPacket pak)
     {
@@ -408,23 +408,8 @@ public sealed class PeerWireClient : IAsyncDisposable
         BytesUploaded += pak.Size - 13;
     }
 
-    public async Task SendCancel(int pieceIndex, int begin, int length) => await SendMessageAsync(PeerWireMessageType.Cancel, pieceIndex, begin, length);
-
-    private async Task SendMessageAsync(byte messageId) => await WritePacketAsync(messageId);
-    private async Task SendMessageAsync(byte messageId, int p1) => await WritePacketAsync(messageId, p1);
-    private async Task SendMessageAsync(byte messageId, int p1, int p2) => await WritePacketAsync(messageId, p1, p2);
-    private async Task SendMessageAsync(byte messageId, int p1, int p2, int p3) => await WritePacketAsync(messageId, p1, p2, p3);
-
-    private async Task WriteBitfieldAsync(IBitfield bitfield) =>
-        await OUTBOUND_MESSAGES.Writer.WriteAsync(MessagePacker.Pack(bitfield), _cts.Token);
-    private async Task WritePacketAsync(byte messageId) =>
-        await OUTBOUND_MESSAGES.Writer.WriteAsync(MessagePacker.Pack(messageId), _cts.Token);
-    private async Task WritePacketAsync(byte messageId, int p1) =>
-        await OUTBOUND_MESSAGES.Writer.WriteAsync(MessagePacker.Pack(messageId, p1), _cts.Token);
-    private async Task WritePacketAsync(byte messageId, int p1, int p2) =>
-        await OUTBOUND_MESSAGES.Writer.WriteAsync(MessagePacker.Pack(messageId, p1, p2), _cts.Token);
-    private async Task WritePacketAsync(byte messageId, int p1, int p2, int p3) =>
-        await OUTBOUND_MESSAGES.Writer.WriteAsync(MessagePacker.Pack(messageId, p1, p2, p3), _cts.Token);
+    public async Task SendCancel(int pieceIndex, int begin, int length) =>
+        await OUTBOUND_MESSAGES.Writer.WriteAsync(PreparedPacket.FromPeerPacket(new CancelMessage(pieceIndex, begin, length)), _cts.Token);
 
 
     public async ValueTask DisposeAsync()
@@ -432,22 +417,6 @@ public sealed class PeerWireClient : IAsyncDisposable
         _logger.LogDebug("Disposing peer client {PeerId}", PeerId);
         _cts.Cancel();
         await _connection.DisposeAsync();
-    }
-}
-
-public readonly record struct PieceRequestMessage(int PieceIndex, int Begin, int Length)
-{
-    public static PieceRequestMessage FromReadOnlySequence(ReadOnlySequence<byte> payload)
-    {
-        var reader = new SequenceReader<byte>(payload);
-        if (!reader.TryReadBigEndian(out int pieceIndex))
-            throw new InvalidDataException("Could not read piece index");
-        if (!reader.TryReadBigEndian(out int begin))
-            throw new InvalidDataException("Could not read begin index");
-        if (!reader.TryReadBigEndian(out int length))
-            throw new InvalidDataException("Could not read length");
-
-        return new PieceRequestMessage(pieceIndex, begin, length);
     }
 }
 
@@ -462,6 +431,22 @@ public sealed class PreparedPacket : IDisposable
         _pool = ArrayPool<byte>.Shared;
         _buffer = _pool.Rent(size);
         Size = size;
+    }
+
+    public PreparedPacket(ArrayPool<byte> pool, int size)
+    {
+        _pool = pool;
+        _buffer = pool.Rent(size);
+        Size = size;
+    }
+
+    public ReadOnlySpan<byte> PacketData => _buffer.AsSpan()[..Size];
+
+    public static PreparedPacket FromPeerPacket<T>(T packet) where T : IPeerPacket<T>, allows ref struct
+    {
+        var preparedPacket = new PreparedPacket(packet.MessageSize + 4);
+        T.WritePacket(preparedPacket.AsSpan(), packet);
+        return preparedPacket;
     }
 
     public void Dispose()
