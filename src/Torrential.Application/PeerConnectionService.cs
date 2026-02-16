@@ -43,6 +43,14 @@ public sealed class PeerConnectionService(
         return peers.Count;
     }
 
+    public PeerWireClient? GetPeerClient(InfoHash infoHash, PeerInfo peerInfo)
+    {
+        if (!_connections.TryGetValue(infoHash, out var peers))
+            return null;
+
+        return peers.TryGetValue(peerInfo, out var managed) ? managed.Client : null;
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("PeerConnectionService started with PeerId: {PeerId}", _selfId.ToAsciiString());
