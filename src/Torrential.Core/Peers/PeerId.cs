@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Text;
 using Torrential.Core.Utils;
 
 namespace Torrential.Core.Peers;
@@ -9,13 +7,11 @@ public readonly record struct PeerId(long P1, long P2, int P3)
     private static readonly ushort TorrentialImplementation = CreateImplementationShort('T', 'O');
     public static PeerId None { get; } = new(long.MaxValue, long.MaxValue, int.MaxValue);
 
-    public static implicit operator string(PeerId value) => value.ToAsciiString();
+    public static explicit operator string(PeerId value) => value.ToAsciiString();
 
     public static PeerId From(ReadOnlySpan<byte> span)
     {
-        Span<byte> buffer = stackalloc byte[span.Length];
-        span.CopyTo(buffer);
-        return new(buffer.ReadBigEndianInt64(), buffer[8..].ReadBigEndianInt64(), buffer[16..].ReadBigEndianInt32());
+        return new(span.ReadBigEndianInt64(), span[8..].ReadBigEndianInt64(), span[16..].ReadBigEndianInt32());
     }
 
     public static PeerId From(Span<byte> buffer) =>

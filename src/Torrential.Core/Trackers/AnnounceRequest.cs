@@ -1,4 +1,7 @@
-﻿namespace Torrential.Trackers;
+﻿using Torrential.Core.Peers;
+using Torrential.Core.Torrents;
+
+namespace Torrential.Trackers;
 
 public class AnnounceRequest
 {

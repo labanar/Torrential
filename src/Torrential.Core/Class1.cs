@@ -37,6 +37,6 @@ public class Chunk : IDisposable
 
     public void Dispose()
     {
-        ArrayPool<byte>.Shared.Return(_buffer);
+        ArrayPool<byte>.Shared.Return(_buffer, clearArray: true);
     }
 }

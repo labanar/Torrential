@@ -32,7 +32,7 @@ public readonly record struct InfoHash(InfoHashData data)
         if (hexString.IsEmpty || hexString.Length != 40)
             throw new ArgumentException("Input string must be a valid hexadecimal string and have a length of 40.");
 
-        Span<byte> buffer = new byte[20];
+        Span<byte> buffer = stackalloc byte[20];
         for (int i = 0; i < hexString.Length; i += 2)
         {
             int highDigit = FromHexChar(hexString[i]);

@@ -59,16 +59,21 @@ public static class TorrentMetadataParser
         {
             urlList = bObject switch
             {
-                BList bUrlList => bUrlList?.Select(x => x?.ToString() ?? "")?.Where(x => !string.IsNullOrEmpty(x))?.ToArray() ?? Array.Empty<string>(),
+                BList bUrlList => ParseUrlList(bUrlList),
                 BString bUrlString when !string.IsNullOrEmpty(bUrlString?.ToString()) => [bUrlString.ToString()],
                 _ => Array.Empty<string>()
             };
         }
 
+        var trackerList = new List<string>();
+        foreach (var tier in torrent.Trackers)
+            foreach (var tracker in tier)
+                trackerList.Add(tracker);
+
         return new TorrentMetadata
         {
             Name = torrent.DisplayName,
-            AnnounceList = torrent.Trackers.SelectMany(x => x).ToArray(),
+            AnnounceList = trackerList.ToArray(),
             Files = files,
             PieceSize = torrent.PieceSize,
             InfoHash = torrent.OriginalInfoHashBytes,
@@ -76,5 +81,20 @@ public static class TorrentMetadataParser
             PieceHashesConcatenated = torrent.Pieces,
             TotalSize = torrent.TotalSize
         };
+    }
+
+    private static string[] ParseUrlList(BList? bUrlList)
+    {
+        if (bUrlList == null || bUrlList.Count == 0)
+            return Array.Empty<string>();
+
+        var result = new List<string>(bUrlList.Count);
+        foreach (var item in bUrlList)
+        {
+            var str = item?.ToString();
+            if (!string.IsNullOrEmpty(str))
+                result.Add(str);
+        }
+        return result.ToArray();
     }
 }

@@ -5,8 +5,8 @@ public class TorrentMetadata
     private const int STANDARD_CHUNK_SIZE = 16384; // 16 KB per chunk
     public required string Name { get; init; }
     public string[] UrlList { get; init; } = Array.Empty<string>();
-    public required ICollection<string> AnnounceList { get; set; } = Array.Empty<string>();
-    public required ICollection<TorrentMetadataFile> Files { get; set; } = Array.Empty<TorrentMetadataFile>();
+    public required string[] AnnounceList { get; set; } = Array.Empty<string>();
+    public required TorrentMetadataFile[] Files { get; set; } = Array.Empty<TorrentMetadataFile>();
     public required long PieceSize { get; set; }
     public required InfoHash InfoHash { get; set; }
     public required long TotalSize { get; set; }

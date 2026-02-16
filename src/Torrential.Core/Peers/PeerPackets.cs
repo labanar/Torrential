@@ -14,7 +14,6 @@ public struct HandshakeData
 {
     private byte _element0;
 
-    private static byte[] EMPTY_RESERVED = [0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0];
     private static ReadOnlySpan<byte> PROTOCOL_BYTES => "BitTorrent protocol"u8;
 
     public static HandshakeData Create(ReadOnlySpan<byte> infoHash, ReadOnlySpan<byte> peerId)
@@ -22,7 +21,7 @@ public struct HandshakeData
         Span<byte> data = stackalloc byte[68];
         data[0] = 19;
         PROTOCOL_BYTES.Slice(0, 19).CopyTo(data.Slice(1, 19));
-        EMPTY_RESERVED.CopyTo(data.Slice(20, 8));
+        data.Slice(20, 8).Clear();
         infoHash.CopyTo(data.Slice(28, 20));
         peerId.CopyTo(data.Slice(48, 20));
         var handshakeData = new HandshakeData();
@@ -31,47 +30,54 @@ public struct HandshakeData
     }
 }
 
-public class BitfieldMessage(byte[] data) : IPeerPacket<BitfieldMessage>
+public readonly ref struct BitfieldMessage : IPeerPacket<BitfieldMessage>
 {
+    private readonly ReadOnlySpan<byte> _data;
+
     public static PeerWireMessageId MessageId => PeerWireMessageId.Bitfield;
 
-    public int MessageSize => data.Length;
+    public int MessageSize => 1 + _data.Length;
+
+    public BitfieldMessage(ReadOnlySpan<byte> data) { _data = data; }
+    public BitfieldMessage(IBitfield bitfield) : this(bitfield.Bytes) { }
 
     public static void WritePacket(Span<byte> buffer, BitfieldMessage message)
     {
-        throw new NotImplementedException();
+        BinaryPrimitives.WriteInt32BigEndian(buffer, 1 + message._data.Length);
+        buffer[4] = (byte)MessageId;
+        message._data.CopyTo(buffer[5..]);
     }
 }
 
 public readonly ref struct ChokeMessage : IPeerActionPacket<ChokeMessage>
 {
-    public int MessageSize => 5;
+    public int MessageSize => 1;
     public static PeerWireMessageId MessageId => PeerWireMessageId.Choke;
 
 }
 
 public readonly ref struct UnchokeMessage : IPeerActionPacket<UnchokeMessage>
 {
-    public int MessageSize => 5;
+    public int MessageSize => 1;
     public static PeerWireMessageId MessageId => PeerWireMessageId.Unchoke;
 }
 
 public readonly ref struct InterestedMessage : IPeerActionPacket<InterestedMessage>
 {
-    public int MessageSize => 5;
+    public int MessageSize => 1;
     public static PeerWireMessageId MessageId => PeerWireMessageId.Interested;
 }
 
 public readonly ref struct NotInterestedMessage : IPeerActionPacket<NotInterestedMessage>
 {
-    public int MessageSize => 5;
+    public int MessageSize => 1;
     public static PeerWireMessageId MessageId => PeerWireMessageId.NotInterested;
 }
 
 public readonly ref struct HaveMessage(int index) : IPeerPacket<HaveMessage>
 {
     public readonly int Index => index;
-    public int MessageSize => 9;
+    public int MessageSize => 5;
     public static PeerWireMessageId MessageId => PeerWireMessageId.Have;
     private static HaveMessage Default => new HaveMessage(0);
     public bool TryReadPacketData(ReadOnlySequence<byte> payload, out HaveMessage message)
@@ -93,7 +99,7 @@ public readonly ref struct HaveMessage(int index) : IPeerPacket<HaveMessage>
     }
 }
 
-public ref struct PieceRequestMessage : IPeerPacket<PieceRequestMessage>
+public readonly struct PieceRequestMessage : IPeerPacket<PieceRequestMessage>
 {
     public static PeerWireMessageId MessageId => PeerWireMessageId.Request;
     public int Index { get; }
@@ -107,6 +113,20 @@ public ref struct PieceRequestMessage : IPeerPacket<PieceRequestMessage>
         Begin = begin;
         Length = length;
     }
+
+    public static PieceRequestMessage FromReadOnlySequence(ReadOnlySequence<byte> payload)
+    {
+        var reader = new SequenceReader<byte>(payload);
+        if (!reader.TryReadBigEndian(out int pieceIndex))
+            throw new InvalidDataException("Could not read piece index");
+        if (!reader.TryReadBigEndian(out int begin))
+            throw new InvalidDataException("Could not read begin index");
+        if (!reader.TryReadBigEndian(out int length))
+            throw new InvalidDataException("Could not read length");
+
+        return new PieceRequestMessage(pieceIndex, begin, length);
+    }
+
     public static void WritePacket(Span<byte> buffer, PieceRequestMessage message)
     {
         BinaryPrimitives.WriteInt32BigEndian(buffer, 13);
@@ -114,26 +134,6 @@ public ref struct PieceRequestMessage : IPeerPacket<PieceRequestMessage>
         BinaryPrimitives.WriteInt32BigEndian(buffer[5..], message.Index);
         BinaryPrimitives.WriteInt32BigEndian(buffer[9..], message.Begin);
         BinaryPrimitives.WriteInt32BigEndian(buffer[13..], message.Length);
-    }
-}
-
-public class PieceMessage : IPeerPacket<PieceMessage>
-{
-    public static PeerWireMessageId MessageId => PeerWireMessageId.Piece;
-    public int Index { get; }
-    public int Begin { get; }
-    public int Length { get; }
-    public ReadOnlySequence<byte> Data { get; }
-    public int MessageSize => 13 + (int)Data.Length;
-
-    public static void WritePacket(Span<byte> buffer, PieceMessage message)
-    {
-        BinaryPrimitives.WriteInt32BigEndian(buffer, message.MessageSize);
-        buffer[4] = (byte)MessageId;
-        BinaryPrimitives.WriteInt32BigEndian(buffer[5..], message.Index);
-        BinaryPrimitives.WriteInt32BigEndian(buffer[9..], message.Begin);
-        BinaryPrimitives.WriteInt32BigEndian(buffer[13..], message.Length);
-        message.Data.CopyTo(buffer[17..]);
     }
 }
 

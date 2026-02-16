@@ -2,7 +2,6 @@
 using BencodeNET.Parsing;
 using Microsoft.Extensions.Logging;
 using System.Net;
-using System.Text;
 using System.Web;
 using Torrential.Core.Utils;
 
@@ -24,7 +23,7 @@ public class HttpTrackerClient : ITrackerClient
 
     public bool IsValidAnnounceForClient(string announceUrl)
     {
-        return (announceUrl.StartsWith("http://") || announceUrl.StartsWith("https://")) && !announceUrl.Contains("ipv6");
+        return (announceUrl.StartsWith("http://", StringComparison.Ordinal) || announceUrl.StartsWith("https://", StringComparison.Ordinal)) && !announceUrl.Contains("ipv6", StringComparison.Ordinal);
     }
 
     private bool TryParsePeers(IBObject bPeers, out PeerInfo[] peers)
@@ -90,20 +89,6 @@ public class HttpTrackerClient : ITrackerClient
         }
     }
 
-    public string UrlEncodeHash(in byte[] hash)
-    {
-        StringBuilder encoded = new StringBuilder();
-
-        foreach (byte b in hash)
-        {
-            encoded.AppendFormat("%{0:X2}", b);
-        }
-
-        return encoded.ToString();
-    }
-
-
-
     //TODO - if announce fails we need to handle this case
     public async Task<AnnounceResponse> Announce(AnnounceRequest request)
     {
@@ -117,7 +102,6 @@ public class HttpTrackerClient : ITrackerClient
         {
             using var response = await _client.GetAsync($"{request.Url}?info_hash={info_hash}&port={request.Port}&peer_id={peer_id}&numwant={request.NumWant}&no_peer_id=1&compact=1&downloaded={request.BytesDownloaded}&uploaded={request.BytesUploaded}&left={request.BytesRemaining}");
 
-            var rawContent = await response.Content.ReadAsStringAsync();
             var parser = new BencodeParser();
             var responseDictionary = parser.Parse<BDictionary>(await response.Content.ReadAsStreamAsync());
 

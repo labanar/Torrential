@@ -9,7 +9,7 @@ public class AnnounceResponse
     public string TrackerId { get; init; }
     public int Complete { get; init; }
     public int Incomplete { get; init; }
-    public required ICollection<PeerInfo> Peers { get; init; }
+    public required PeerInfo[] Peers { get; init; }
 }
 
 public class PeerInfo

@@ -32,16 +32,16 @@ public sealed class PreparedPacket : IDisposable
     }
 
     public static PreparedPacket FromPeerPacket<T>(T packet)
-        where T : IPeerPacket<T>
+        where T : IPeerPacket<T>, allows ref struct
     {
-        var preparedPacket = new PreparedPacket(packet.MessageSize);
+        var preparedPacket = new PreparedPacket(packet.MessageSize + 4);
         T.WritePacket(preparedPacket.AsSpan(), packet);
         return preparedPacket;
     }
 
     public void Dispose()
     {
-        ArrayPool<byte>.Shared.Return(_buffer);
+        _pool.Return(_buffer);
     }
     public Span<byte> AsSpan() => _buffer.AsSpan()[..Size];
 }

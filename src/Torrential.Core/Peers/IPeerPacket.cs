@@ -12,7 +12,7 @@ public interface IPeerPacket<T>
     static abstract void WritePacket(Span<byte> buffer, T message);
     static virtual void WritePacket(PipeWriter writer, T message)
     {
-        var buff = writer.GetSpan(message.MessageSize);
+        var buff = writer.GetSpan(message.MessageSize + 4);
         T.WritePacket(buff, message);
     }
 }
@@ -64,14 +64,14 @@ public abstract class PreparedPeerPacket<T> : IDisposable, IPeerPacket<T>, IPrep
 
     public static PreparedPacket FromPeerPacket(T packet)
     {
-        var preparedPacket = new PreparedPacket(packet.MessageSize);
+        var preparedPacket = new PreparedPacket(packet.MessageSize + 4);
         T.WritePacket(preparedPacket.AsSpan(), packet);
         return preparedPacket;
     }
 
     public void Dispose()
     {
-        ArrayPool<byte>.Shared.Return(_buffer);
+        _pool.Return(_buffer);
     }
     public Span<byte> AsSpan() => _buffer.AsSpan()[..Size];
 

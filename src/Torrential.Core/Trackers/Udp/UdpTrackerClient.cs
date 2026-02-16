@@ -14,7 +14,7 @@ public class UdpTrackerClient()
 {
     public bool IsValidAnnounceForClient(string announceUrl)
     {
-        return announceUrl.StartsWith("udp");
+        return announceUrl.StartsWith("udp", StringComparison.Ordinal);
     }
 
     public Task<AnnounceResponse> Announce(AnnounceRequest request)
@@ -53,7 +53,8 @@ public class UdpTrackerClient()
         Span<byte> buffer = stackalloc byte[98];
         buffer[..8].TryWriteBigEndian(connectionId);
         buffer[8..].TryWriteBigEndian(1);
-        infoHash.CopyTo(buffer[16..]);
+        var hashData = infoHash.data;
+        ((ReadOnlySpan<byte>)hashData).CopyTo(buffer[16..]);
         peerId.CopyTo(buffer[36..]);
         buffer[56..].TryWriteBigEndian(downloaded);
         buffer[64..].TryWriteBigEndian(left);
@@ -80,27 +81,24 @@ public class UdpTrackerClient()
         if ((recBuff.Length - 20) % 6 != 0)
             throw new Exception("UdpClient received a partial response");
 
-        var resp = new AnnounceResponse
-        {
-            Interval = recBuff.AsSpan()[8..].ReadBigEndianInt32(),
-            Peers = new List<PeerInfo>()
-        };
-
         var numOfPeers = (recBuff.Length - 20) / 6;
+        var peers = new PeerInfo[numOfPeers];
         for (int n = 0; n < numOfPeers; n++)
         {
             var ipBytes = recBuff.AsSpan().Slice(20 + (6 * n), 4);
             var portBytes = recBuff.AsSpan().Slice(24 + (6 * n), 2);
-            var ip = new IPAddress(ipBytes);
-            var peerPort = portBytes.ReadBigEndianUInt16();
-            resp.Peers.Add(new PeerInfo
+            peers[n] = new PeerInfo
             {
-                Ip = ip,
-                Port = peerPort
-            });
+                Ip = new IPAddress(ipBytes),
+                Port = portBytes.ReadBigEndianUInt16()
+            };
         }
 
-        return resp;
+        return new AnnounceResponse
+        {
+            Interval = recBuff.AsSpan()[8..].ReadBigEndianInt32(),
+            Peers = peers
+        };
     }
 
 

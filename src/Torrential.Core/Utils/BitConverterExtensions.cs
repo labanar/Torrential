@@ -1,111 +1,55 @@
-﻿using System.Buffers;
+using System.Buffers;
+using System.Buffers.Binary;
 
 namespace Torrential.Core.Utils;
 
 public static class BitConverterExtensions
 {
     public static ushort ReadBigEndianUInt16(this Span<byte> buffer)
-    {
-        if (BitConverter.IsLittleEndian)
-            buffer[..2].Reverse();
+        => BinaryPrimitives.ReadUInt16BigEndian(buffer);
 
-        var value = BitConverter.ToUInt16(buffer[..2]);
-
-        if (BitConverter.IsLittleEndian)
-            buffer[..2].Reverse();
-
-        return value;
-    }
+    public static ushort ReadBigEndianUInt16(this ReadOnlySpan<byte> buffer)
+        => BinaryPrimitives.ReadUInt16BigEndian(buffer);
 
     public static ushort ReadBigEndianUInt16(this ReadOnlySequence<byte> sequence)
     {
         Span<byte> buffer = stackalloc byte[2];
         sequence.CopyTo(buffer);
-        return buffer.ReadBigEndianUInt16();
+        return BinaryPrimitives.ReadUInt16BigEndian(buffer);
     }
-
 
     public static int ReadBigEndianInt32(this Span<byte> buffer)
-    {
-        if (BitConverter.IsLittleEndian)
-            buffer[..4].Reverse();
+        => BinaryPrimitives.ReadInt32BigEndian(buffer);
 
-        var value = BitConverter.ToInt32(buffer[..4]);
-
-        if (BitConverter.IsLittleEndian)
-            buffer[..4].Reverse();
-
-        return value;
-    }
+    public static int ReadBigEndianInt32(this ReadOnlySpan<byte> buffer)
+        => BinaryPrimitives.ReadInt32BigEndian(buffer);
 
     public static int ReadBigEndianInt32(this ReadOnlySequence<byte> sequence)
     {
         Span<byte> buffer = stackalloc byte[4];
         sequence.CopyTo(buffer);
-        return buffer.ReadBigEndianInt32();
+        return BinaryPrimitives.ReadInt32BigEndian(buffer);
     }
 
     public static long ReadBigEndianInt64(this Span<byte> buffer)
-    {
-        if (BitConverter.IsLittleEndian)
-            buffer[..8].Reverse();
+        => BinaryPrimitives.ReadInt64BigEndian(buffer);
 
-        var value = BitConverter.ToInt64(buffer[..8]);
-
-        if (BitConverter.IsLittleEndian)
-            buffer[..8].Reverse();
-
-        return value;
-    }
+    public static long ReadBigEndianInt64(this ReadOnlySpan<byte> buffer)
+        => BinaryPrimitives.ReadInt64BigEndian(buffer);
 
     public static long ReadBigEndianInt64(this ReadOnlySequence<byte> sequence)
     {
         Span<byte> buffer = stackalloc byte[8];
         sequence.CopyTo(buffer);
-        return buffer.ReadBigEndianInt64();
+        return BinaryPrimitives.ReadInt64BigEndian(buffer);
     }
 
     public static bool TryWriteBigEndian(this Span<byte> buffer, int value)
-    {
-        if (buffer.Length < 4)
-            return false;
-
-        if (!BitConverter.TryWriteBytes(buffer[..4], value))
-            return false;
-
-        if (BitConverter.IsLittleEndian)
-            buffer[..4].Reverse();
-
-        return true;
-    }
+        => BinaryPrimitives.TryWriteInt32BigEndian(buffer, value);
 
     public static bool TryWriteBigEndian(this Span<byte> buffer, long value)
-    {
-        if (buffer.Length < 8)
-            return false;
-
-        if (!BitConverter.TryWriteBytes(buffer[..8], value))
-            return false;
-
-        if (BitConverter.IsLittleEndian)
-            buffer[..8].Reverse();
-
-        return true;
-    }
-
+        => BinaryPrimitives.TryWriteInt64BigEndian(buffer, value);
 
     public static bool TryWriteBigEndian(this Span<byte> buffer, uint value)
-    {
-        if (buffer.Length < 4)
-            return false;
-
-        if (!BitConverter.TryWriteBytes(buffer[..4], value))
-            return false;
-
-        if (BitConverter.IsLittleEndian)
-            buffer[..4].Reverse();
-
-        return true;
-    }
+        => BinaryPrimitives.TryWriteUInt32BigEndian(buffer, value);
 }
-
