@@ -366,3 +366,4 @@ FodyWeavers.xsd
 /src/Torrential.Web/torrential.db-shm
 /src/Torrential.Web/torrential.db-wal
 /src/Torrential.Web/torrential.db
+/.claude/settings.local.json

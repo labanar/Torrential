@@ -1,14 +1,14 @@
-# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-USER $APP_UID
+# ---------- 1. Build the Vite frontend ----------
+FROM node:20-slim AS frontend
 WORKDIR /app
-EXPOSE 8080
+COPY src/torrential-ui-vite/package.json src/torrential-ui-vite/package-lock.json ./
+RUN npm ci
+COPY src/torrential-ui-vite/ .
+ENV VITE_API_BASE_URL=""
+RUN npm run build -- --outDir /app/wwwroot
 
-
-# This stage is used to build the service project
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# ---------- 2. Build the .NET backend ----------
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["src/Torrential.Web/Torrential.Web.csproj", "src/Torrential.Web/"]
@@ -16,16 +16,16 @@ COPY ["src/Torrential.Extensions.SignalR/Torrential.Extensions.SignalR.csproj", 
 COPY ["src/Torrential/Torrential.csproj", "src/Torrential/"]
 RUN dotnet restore "./src/Torrential.Web/Torrential.Web.csproj"
 COPY . .
+# Copy pre-built frontend into wwwroot so the MSBuild ViteBuild target is skipped
+COPY --from=frontend /app/wwwroot /src/src/Torrential.Web/wwwroot
 WORKDIR "/src/src/Torrential.Web"
-RUN dotnet build "./Torrential.Web.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet publish "./Torrential.Web.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false /p:SKIP_VITE_BUILD=true
 
-# This stage is used to publish the service project to be copied to the final stage
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Torrential.Web.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
-
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
-FROM base AS final
+# ---------- 3. Final runtime image ----------
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY --from=publish /app/publish .
+EXPOSE 8080
+RUN mkdir -p /app/data
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "Torrential.Web.dll"]

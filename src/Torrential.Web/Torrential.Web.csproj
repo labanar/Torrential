@@ -52,7 +52,7 @@
 		<ViteProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\torrential-ui-vite'))</ViteProjectDir>
 	</PropertyGroup>
 
-	<Target Name="NpmInstall" BeforeTargets="ViteBuild" Inputs="$(ViteProjectDir)\package.json" Outputs="$(ViteProjectDir)\node_modules\.package-lock.json">
+	<Target Name="NpmInstall" BeforeTargets="ViteBuild" Condition="'$(SKIP_VITE_BUILD)' != 'true'" Inputs="$(ViteProjectDir)\package.json" Outputs="$(ViteProjectDir)\node_modules\.package-lock.json">
 		<Exec Command="npm install" WorkingDirectory="$(ViteProjectDir)" />
 	</Target>
 

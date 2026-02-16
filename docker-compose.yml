@@ -1,0 +1,28 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: src/Torrential.Web/Dockerfile
+    environment:
+      - APP_DATA_PATH=/app/data
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/torrents"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  playwright:
+    build:
+      context: test/Torrential.E2E/
+      dockerfile: Dockerfile
+    environment:
+      - BASE_URL=http://app:8080
+      - SCREENSHOT_DIR=/app/screenshots
+    volumes:
+      - ./test/Torrential.E2E/screenshots:/app/screenshots
+    depends_on:
+      app:
+        condition: service_healthy
