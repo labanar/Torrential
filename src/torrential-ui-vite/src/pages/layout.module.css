@@ -38,7 +38,7 @@
   .main {
     flex-grow: 1;
     height: 0;
-    overflow-y: auto;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
   }
