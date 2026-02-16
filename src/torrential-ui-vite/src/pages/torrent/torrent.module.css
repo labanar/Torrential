@@ -133,6 +133,10 @@
   font-weight: 600;
 }
 
+.previewSelectAll {
+  align-self: flex-start;
+}
+
 .previewFileList {
   display: flex;
   flex-direction: column;

@@ -410,6 +410,21 @@ const ActionsRow = ({
     });
   };
 
+  const toggleAllFileSelection = () => {
+    if (!preview) {
+      return;
+    }
+
+    setSelectedFileIds((current) => {
+      const allIds = preview.files.map((f) => f.id);
+      if (current.length === allIds.length) {
+        return [];
+      }
+
+      return allIds;
+    });
+  };
+
   const confirmAddTorrent = async () => {
     if (selectedFile === null) {
       setAddError("No torrent file selected.");
@@ -458,6 +473,7 @@ const ActionsRow = ({
         onClose={closePreviewModal}
         onConfirm={confirmAddTorrent}
         onToggleFile={toggleFileSelection}
+        onToggleAllFiles={toggleAllFileSelection}
       />
 
       <div className={styles.actionSearch}>
@@ -528,6 +544,7 @@ interface TorrentFilePreviewModalProps {
   isAddLoading: boolean;
   addError: string | null;
   onToggleFile: (id: number) => void;
+  onToggleAllFiles: () => void;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -539,6 +556,7 @@ function TorrentFilePreviewModal({
   isAddLoading,
   addError,
   onToggleFile,
+  onToggleAllFiles,
   onConfirm,
   onClose,
 }: TorrentFilePreviewModalProps) {
@@ -549,6 +567,10 @@ function TorrentFilePreviewModal({
     if (i === 0) return bytes + " " + sizes[i];
     return (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i];
   };
+
+  const totalFiles = preview?.files.length ?? 0;
+  const hasSomeSelected = selectedFileIds.length > 0;
+  const hasAllSelected = totalFiles > 0 && selectedFileIds.length === totalFiles;
 
   return (
     <Modal isOpen={open} onClose={onClose} size={"xl"}>
@@ -563,6 +585,15 @@ function TorrentFilePreviewModal({
               ? `${selectedFileIds.length} of ${preview.files.length} selected`
               : ""}
           </Text>
+          <Checkbox
+            className={styles.previewSelectAll}
+            isChecked={hasAllSelected}
+            isIndeterminate={hasSomeSelected && !hasAllSelected}
+            onChange={onToggleAllFiles}
+            isDisabled={totalFiles === 0}
+          >
+            {hasAllSelected ? "Deselect All" : "Select All"}
+          </Checkbox>
           <div className={styles.previewFileList}>
             {preview?.files.map((file) => (
               <div key={file.id} className={styles.previewFileRow}>
