@@ -14,6 +14,7 @@ using Torrential.Torrents;
 using Torrential.Trackers;
 using Torrential.Web.Api.Models;
 using Torrential.Web.Api.Requests.Settings;
+using Torrential.Web.Api.Requests.Torrents;
 using Torrential.Web.Api.Responses;
 using Torrential.Web.Api.Responses.Settings;
 using Torrential.Web.Api.Responses.Torrents;
@@ -171,6 +172,77 @@ app.MapGet(
         return new TorrentGetResponse(summary);
     });
 
+app.MapGet(
+    "/torrents/{infoHash}/detail",
+    async (InfoHash infoHash, TorrentMetadataCache cache, PeerSwarm swarms, BitfieldManager bitfieldManager, TorrentStatusCache statusCache, TorrentStats rates, IFileSelectionService fileSelection) =>
+    {
+        if (!cache.TryGet(infoHash, out var meta))
+            return TorrentDetailResponse.ErrorResponse(ErrorCode.Unknown);
+
+        if (!bitfieldManager.TryGetVerificationBitfield(infoHash, out var verificationBitfield))
+            return TorrentDetailResponse.ErrorResponse(ErrorCode.Unknown);
+
+        var peers = await swarms.GetPeers(infoHash);
+        var peerSummaries = peers.Select(x => new PeerSummaryVm
+        {
+            PeerId = x.PeerId.ToAsciiString(),
+            IpAddress = x.PeerInfo.Ip.ToString(),
+            Port = x.PeerInfo.Port,
+            BytesDownloaded = x.BytesDownloaded,
+            BytesUploaded = x.BytesUploaded,
+            IsSeed = x.State?.PeerBitfield?.HasAll() ?? false,
+            Progress = x.State?.PeerBitfield?.CompletionRatio ?? 0
+        });
+
+        var status = await statusCache.GetStatus(infoHash);
+        var selectedFileIds = await fileSelection.GetSelectedFileIds(infoHash);
+
+        var files = meta.Files.Select(f => new TorrentFileVm
+        {
+            Id = f.Id,
+            Filename = f.Filename,
+            Size = f.FileSize,
+            IsSelected = selectedFileIds.Contains(f.Id)
+        });
+
+        var bitfieldBytes = verificationBitfield.Bytes;
+        var bitfieldVm = new BitfieldVm
+        {
+            PieceCount = verificationBitfield.NumberOfPieces,
+            HaveCount = (int)(verificationBitfield.CompletionRatio * verificationBitfield.NumberOfPieces),
+            Bitfield = Convert.ToBase64String(bitfieldBytes)
+        };
+
+        var detail = new TorrentDetailVm
+        {
+            InfoHash = meta.InfoHash,
+            Name = meta.Name,
+            Status = status.ToString(),
+            Progress = verificationBitfield.CompletionRatio,
+            TotalSizeBytes = meta.PieceSize * meta.NumberOfPieces,
+            DownloadRate = rates.GetIngressRate(infoHash),
+            UploadRate = rates.GetEgressRate(infoHash),
+            BytesDownloaded = rates.GetTotalDownloaded(infoHash),
+            BytesUploaded = rates.GetTotalUploaded(infoHash),
+            Peers = peerSummaries,
+            Bitfield = bitfieldVm,
+            Files = files,
+        };
+
+        return new TorrentDetailResponse(detail);
+    });
+
+app.MapPost(
+    "/torrents/{infoHash}/files/select",
+    async (InfoHash infoHash, FileSelectionRequest request, TorrentMetadataCache cache, IFileSelectionService fileSelection) =>
+    {
+        if (!cache.TryGet(infoHash, out _))
+            return ActionResponse.ErrorResponse(ErrorCode.Unknown);
+
+        await fileSelection.SetSelectedFileIds(infoHash, request.FileIds);
+        return ActionResponse.SuccessResponse;
+    });
+
 app.MapPost(
     "torrents/{infoHash}/start",
     async (InfoHash infoHash, ICommandHandler<TorrentStartCommand, TorrentStartResponse> handler) =>
@@ -310,6 +382,7 @@ internal class InitializationService(
     IServiceProvider serviceProvider,
     TorrentTaskManager taskManager,
     IMetadataFileService metaFileService,
+    FileSelectionService fileSelectionService,
     TorrentStatusCache statusCache,
     IServiceScopeFactory scopeFactory,
     AnnounceServiceState announceServiceState,
@@ -335,6 +408,12 @@ internal class InitializationService(
         await foreach (var torrentMeta in metaFileService.GetAllMetadataFiles())
         {
             await taskManager.Add(torrentMeta);
+
+            // Load persisted file selection or default to all files selected
+            var selectedIds = await fileSelectionService.GetSelectedFileIds(torrentMeta.InfoHash);
+            if (selectedIds.Count == 0)
+                fileSelectionService.InitializeAllSelected(torrentMeta.InfoHash, torrentMeta.Files.Select(f => f.Id));
+
             var config = await GetFromDatabase(torrentMeta.InfoHash);
             if (config?.Status != null)
                 statusCache.UpdateStatus(torrentMeta.InfoHash, config.Status);
