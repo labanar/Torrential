@@ -1,27 +1,32 @@
 .root {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
     height: 100%;
   }
 
   .topPane {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1 1 0%;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   .bottomPane {
     flex: 0 0 auto;
     max-height: 50%;
+    min-height: 200px;
     overflow-y: auto;
   }
 
   .torrentList {
     display: flex;
     flex-direction: column;
-    flex-grow: 1;
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-y: auto;
   }
   
   .torrentContainer {

@@ -38,7 +38,7 @@ export function DetailPane({ infoHash }: { infoHash: string }) {
           bytesUploaded: data.bytesUploaded,
           downloadRate: data.downloadRate,
           uploadRate: data.uploadRate,
-          peers: data.peers.map((p) => ({
+          peers: (data.peers ?? []).map((p) => ({
             peerId: p.peerId,
             ipAddress: p.ipAddress,
             port: p.port,
@@ -47,8 +47,8 @@ export function DetailPane({ infoHash }: { infoHash: string }) {
             isSeed: p.isSeed,
             progress: p.progress,
           })),
-          bitfield: data.bitfield,
-          files: data.files.map((f) => ({
+          bitfield: data.bitfield ?? { pieceCount: 0, haveCount: 0, bitfield: "" },
+          files: (data.files ?? []).map((f) => ({
             id: f.id,
             filename: f.filename,
             size: f.size,
@@ -89,7 +89,15 @@ export function DetailPane({ infoHash }: { infoHash: string }) {
     );
   }
 
-  if (!detail) return null;
+  if (!detail) {
+    return (
+      <div className={styles.detailPane}>
+        <div className={styles.emptyState}>
+          <Text>No details available</Text>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.detailPane}>

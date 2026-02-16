@@ -38,27 +38,16 @@ export default function RootLayout({
   const alfred = useMemo(() => <Alfred />, []);
 
   return (
-    <html lang="en" style={{ height: "100%", margin: 0 }}>
-      <body
-        style={{
-          height: "100%",
-          margin: 0,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div className={styles.root}>
-          <SideBar />
-          {alfred}
-          <div className={styles.divider}>
-            <Divider orientation="vertical" />
-          </div>
-          <div id="main" className={styles.main}>
-            {children}
-          </div>
-        </div>
-      </body>
-    </html>
+    <div className={styles.root}>
+      <SideBar />
+      {alfred}
+      <div className={styles.divider}>
+        <Divider orientation="vertical" />
+      </div>
+      <div id="main" className={styles.main}>
+        {children}
+      </div>
+    </div>
   );
 }
 
