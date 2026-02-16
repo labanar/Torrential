@@ -5,16 +5,24 @@ using Torrential.Core;
 
 namespace Torrential.Application;
 
+public interface IBitfieldProvider
+{
+    Bitfield? GetLocalBitfield(InfoHash infoHash);
+}
+
 public sealed class PieceDownloadService(
     ITorrentManager torrentManager,
     PeerConnectionService peerConnectionService,
     IPieceStorage pieceStorage,
-    ILogger<PieceDownloadService> logger) : BackgroundService
+    ILogger<PieceDownloadService> logger) : BackgroundService, IBitfieldProvider
 {
     private const int BlockSize = 16384;
     private readonly ConcurrentDictionary<InfoHash, Bitfield> _localBitfields = new();
     private readonly ConcurrentDictionary<(InfoHash, int), byte> _inFlightPieces = new();
     private readonly ConcurrentDictionary<InfoHash, Task> _initTasks = new();
+
+    public Bitfield? GetLocalBitfield(InfoHash infoHash)
+        => _localBitfields.TryGetValue(infoHash, out var bitfield) ? bitfield : null;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

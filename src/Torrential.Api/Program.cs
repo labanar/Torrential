@@ -105,7 +105,7 @@ torrents.MapGet("/{infoHash}", (InfoHash infoHash, ITorrentManager manager, IPee
     return state is not null ? Results.Ok(ToDto(state, peerConnectionManager)) : Results.NotFound();
 });
 
-torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manager, IPeerPool peerPool, IPeerConnectionManager peerConnectionManager) =>
+torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manager, IPeerPool peerPool, IPeerConnectionManager peerConnectionManager, IBitfieldProvider bitfieldProvider) =>
 {
     var state = manager.GetState(infoHash);
     if (state is null) return Results.NotFound();
@@ -130,6 +130,11 @@ torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manag
             : []
     )).ToList();
 
+    var localBitfield = bitfieldProvider.GetLocalBitfield(infoHash);
+    var pieces = localBitfield is not null
+        ? Enumerable.Range(0, state.NumberOfPieces).Select(i => localBitfield.HasPiece(i)).ToArray()
+        : new bool[state.NumberOfPieces];
+
     var details = new TorrentDetailsDto(
         state.InfoHash.AsString(),
         state.Name,
@@ -138,7 +143,7 @@ torrents.MapGet("/{infoHash}/details", (InfoHash infoHash, ITorrentManager manag
         state.NumberOfPieces,
         status,
         state.DateAdded,
-        new bool[state.NumberOfPieces],
+        pieces,
         state.Files.Select(f => new TorrentFileDto(f.FileIndex, f.FileName, f.FileSize, state.SelectedFileIndices.Contains(f.FileIndex))).ToList(),
         peerDtos,
         peerPool.GetPeerCount(infoHash)
