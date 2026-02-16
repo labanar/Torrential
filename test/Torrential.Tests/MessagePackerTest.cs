@@ -1,101 +1,110 @@
-﻿using System.Buffers;
+using System.Buffers.Binary;
 using Torrential.Peers;
 
 namespace Torrential.Tests;
 
-public class MessagePackerTest
+public class PeerPacketTest
 {
     [Fact]
-    public void Pack_MessageId()
+    public void ChokeMessage_WritesCorrectPacket()
     {
-        using var pak = MessagePacker.Pack(1);
+        using var pak = PreparedPacket.FromPeerPacket(new ChokeMessage());
         var span = pak.AsSpan();
         Assert.Equal(5, span.Length);
-        Assert.Equal(1, span[4]);
+        Assert.Equal(1, BinaryPrimitives.ReadInt32BigEndian(span));
+        Assert.Equal((byte)PeerWireMessageId.Choke, span[4]);
     }
 
     [Fact]
-    public void Pack_MessageId_P1()
+    public void UnchokeMessage_WritesCorrectPacket()
     {
-        using var pak = MessagePacker.Pack(1, 2);
+        using var pak = PreparedPacket.FromPeerPacket(new UnchokeMessage());
+        var span = pak.AsSpan();
+        Assert.Equal(5, span.Length);
+        Assert.Equal(1, BinaryPrimitives.ReadInt32BigEndian(span));
+        Assert.Equal((byte)PeerWireMessageId.Unchoke, span[4]);
+    }
+
+    [Fact]
+    public void InterestedMessage_WritesCorrectPacket()
+    {
+        using var pak = PreparedPacket.FromPeerPacket(new InterestedMessage());
+        var span = pak.AsSpan();
+        Assert.Equal(5, span.Length);
+        Assert.Equal(1, BinaryPrimitives.ReadInt32BigEndian(span));
+        Assert.Equal((byte)PeerWireMessageId.Interested, span[4]);
+    }
+
+    [Fact]
+    public void NotInterestedMessage_WritesCorrectPacket()
+    {
+        using var pak = PreparedPacket.FromPeerPacket(new NotInterestedMessage());
+        var span = pak.AsSpan();
+        Assert.Equal(5, span.Length);
+        Assert.Equal(1, BinaryPrimitives.ReadInt32BigEndian(span));
+        Assert.Equal((byte)PeerWireMessageId.NotInterested, span[4]);
+    }
+
+    [Fact]
+    public void HaveMessage_WritesCorrectPacket()
+    {
+        using var pak = PreparedPacket.FromPeerPacket(new HaveMessage(42));
         var span = pak.AsSpan();
         Assert.Equal(9, span.Length);
-        Assert.Equal(1, span[4]);
-        Assert.Equal(2, span.Slice(5).ReadBigEndianInt32());
+        Assert.Equal(5, BinaryPrimitives.ReadInt32BigEndian(span));
+        Assert.Equal((byte)PeerWireMessageId.Have, span[4]);
+        Assert.Equal(42, BinaryPrimitives.ReadInt32BigEndian(span[5..]));
     }
 
     [Fact]
-    public void Pack_MessageId_P1_P2()
+    public void PieceRequestMessage_WritesCorrectPacket()
     {
-        using var pak = MessagePacker.Pack(1, 2, 3);
-        var span = pak.AsSpan();
-        Assert.Equal(13, span.Length);
-        Assert.Equal(1, span[4]);
-        Assert.Equal(2, span.Slice(5).ReadBigEndianInt32());
-        Assert.Equal(3, span.Slice(9).ReadBigEndianInt32());
-    }
-
-    [Fact]
-    public void Pack_MessageId_P1_P2_P3()
-    {
-        using var pak = MessagePacker.Pack(1, 2, 3, 4);
+        using var pak = PreparedPacket.FromPeerPacket(new PieceRequestMessage(1, 2, 3));
         var span = pak.AsSpan();
         Assert.Equal(17, span.Length);
-        Assert.Equal(1, span[4]);
-        Assert.Equal(2, span.Slice(5).ReadBigEndianInt32());
-        Assert.Equal(3, span.Slice(9).ReadBigEndianInt32());
-        Assert.Equal(4, span.Slice(13).ReadBigEndianInt32());
+        Assert.Equal(13, BinaryPrimitives.ReadInt32BigEndian(span));
+        Assert.Equal((byte)PeerWireMessageId.Request, span[4]);
+        Assert.Equal(1, BinaryPrimitives.ReadInt32BigEndian(span[5..]));
+        Assert.Equal(2, BinaryPrimitives.ReadInt32BigEndian(span[9..]));
+        Assert.Equal(3, BinaryPrimitives.ReadInt32BigEndian(span[13..]));
     }
 
     [Fact]
-    public void Pack_PieceData()
+    public void CancelMessage_WritesCorrectPacket()
+    {
+        using var pak = PreparedPacket.FromPeerPacket(new CancelMessage(1, 2, 3));
+        var span = pak.AsSpan();
+        Assert.Equal(17, span.Length);
+        Assert.Equal(13, BinaryPrimitives.ReadInt32BigEndian(span));
+        Assert.Equal((byte)PeerWireMessageId.Cancel, span[4]);
+        Assert.Equal(1, BinaryPrimitives.ReadInt32BigEndian(span[5..]));
+        Assert.Equal(2, BinaryPrimitives.ReadInt32BigEndian(span[9..]));
+        Assert.Equal(3, BinaryPrimitives.ReadInt32BigEndian(span[13..]));
+    }
+
+    [Fact]
+    public void PreparedPieceMessage_WritesCorrectPacket()
     {
         var data = new byte[] { 1, 2, 3, 4, 5 };
-        using var pak = MessagePacker.Pack(1, 2, data);
+        using var pak = PreparedPieceMessage.Create(1, 2, data);
         var span = pak.AsSpan();
         Assert.Equal(13 + data.Length, span.Length);
-        Assert.Equal(PeerWireMessageType.Piece, span[4]);
-        Assert.Equal(1, span.Slice(5).ReadBigEndianInt32());
-        Assert.Equal(2, span.Slice(9).ReadBigEndianInt32());
+        Assert.Equal(9 + data.Length, BinaryPrimitives.ReadInt32BigEndian(span));
+        Assert.Equal((byte)PeerWireMessageId.Piece, span[4]);
+        Assert.Equal(1, BinaryPrimitives.ReadInt32BigEndian(span[5..]));
+        Assert.Equal(2, BinaryPrimitives.ReadInt32BigEndian(span[9..]));
         Assert.Equal(data, span.Slice(13).ToArray());
     }
 
     [Fact]
-    public void Pack_Bitfield()
+    public void BitfieldMessage_WritesCorrectPacket()
     {
         var bitfield = new Bitfield(20);
-        using var pak = MessagePacker.Pack(bitfield);
+        using var pak = PreparedPacket.FromPeerPacket(new BitfieldMessage(bitfield));
         var span = pak.AsSpan();
         Assert.Equal(5 + bitfield.Bytes.Length, span.Length);
-        Assert.Equal(PeerWireMessageType.Bitfield, span[4]);
-        Assert.True(bitfield.Bytes.SequenceEqual(span.Slice(5)));
-    }
-
-
-    //Tests to pack from ReadOnlySequence<byte> instead of ReadOnlySpan<byte>
-
-    [Fact]
-    public void Pack_PieceData_Sequence()
-    {
-        var data = new byte[] { 1, 2, 3, 4, 5 };
-        using var pak = MessagePacker.Pack(1, 2, new ReadOnlySequence<byte>(data));
-        var span = pak.AsSpan();
-        Assert.Equal(13 + data.Length, span.Length);
-        Assert.Equal(PeerWireMessageType.Piece, span[4]);
-        Assert.Equal(1, span.Slice(5).ReadBigEndianInt32());
-        Assert.Equal(2, span.Slice(9).ReadBigEndianInt32());
-        Assert.Equal(data, span.Slice(13).ToArray());
-    }
-
-    [Fact]
-    public void Pack_Bitfield_Sequence()
-    {
-        var bitfield = new Bitfield(20);
-        using var pak = MessagePacker.PackBitfield(bitfield.Bytes);
-        var span = pak.AsSpan();
-
-        Assert.Equal(8, span.Length);
-        Assert.Equal(PeerWireMessageType.Bitfield, span[4]);
+        Assert.Equal(1 + bitfield.Bytes.Length, BinaryPrimitives.ReadInt32BigEndian(span));
+        Assert.Equal((byte)PeerWireMessageId.Bitfield, span[4]);
         Assert.True(bitfield.Bytes.SequenceEqual(span.Slice(5)));
     }
 }
