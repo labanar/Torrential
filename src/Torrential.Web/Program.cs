@@ -234,12 +234,23 @@ app.MapGet(
 
 app.MapPost(
     "/torrents/{infoHash}/files/select",
-    async (InfoHash infoHash, FileSelectionRequest request, TorrentMetadataCache cache, IFileSelectionService fileSelection) =>
+    async (InfoHash infoHash, FileSelectionRequest request, TorrentMetadataCache cache, IFileSelectionService fileSelection, FileSelectionPieceMap pieceMap, TorrentEventBus eventBus) =>
     {
         if (!cache.TryGet(infoHash, out _))
             return ActionResponse.ErrorResponse(ErrorCode.Unknown);
 
         await fileSelection.SetSelectedFileIds(infoHash, request.FileIds);
+
+        // Recompute allowed-pieces bitfield so the download engine picks up changes immediately
+        await pieceMap.Recompute(infoHash);
+
+        // Notify UI clients that file selection has changed
+        await eventBus.PublishFileSelectionChanged(new FileSelectionChangedEvent
+        {
+            InfoHash = infoHash,
+            SelectedFileIds = request.FileIds
+        });
+
         return ActionResponse.SuccessResponse;
     });
 
@@ -354,6 +365,9 @@ static void WireEventBus(IServiceProvider services)
     // --- Stats -> SignalR ---
     bus.OnTorrentStats(hubDispatcher.HandleTorrentStats);
 
+    // --- File selection changed -> SignalR ---
+    bus.OnFileSelectionChanged(hubDispatcher.HandleFileSelectionChanged);
+
     // Start the validation channel background reader
     bus.Start();
 }
@@ -383,6 +397,7 @@ internal class InitializationService(
     TorrentTaskManager taskManager,
     IMetadataFileService metaFileService,
     FileSelectionService fileSelectionService,
+    FileSelectionPieceMap fileSelectionPieceMap,
     TorrentStatusCache statusCache,
     IServiceScopeFactory scopeFactory,
     AnnounceServiceState announceServiceState,
@@ -413,6 +428,9 @@ internal class InitializationService(
             var selectedIds = await fileSelectionService.GetSelectedFileIds(torrentMeta.InfoHash);
             if (selectedIds.Count == 0)
                 fileSelectionService.InitializeAllSelected(torrentMeta.InfoHash, torrentMeta.Files.Select(f => f.Id));
+
+            // Compute allowed-pieces bitfield from file selection
+            await fileSelectionPieceMap.Recompute(torrentMeta.InfoHash);
 
             var config = await GetFromDatabase(torrentMeta.InfoHash);
             if (config?.Status != null)

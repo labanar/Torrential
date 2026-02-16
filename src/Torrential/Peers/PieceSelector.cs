@@ -1,8 +1,9 @@
 using Microsoft.Extensions.Logging;
+using Torrential.Files;
 
 namespace Torrential.Peers
 {
-    public class PieceSelector(BitfieldManager bitfieldManager, PieceReservationService pieceReservationService, ILogger<PieceSelector> logger)
+    public class PieceSelector(BitfieldManager bitfieldManager, PieceReservationService pieceReservationService, FileSelectionPieceMap fileSelectionPieceMap, ILogger<PieceSelector> logger)
     {
         private const int RESERVATION_LENGTH_SECONDS = 30;
 
@@ -16,6 +17,10 @@ namespace Torrential.Peers
             bitfieldManager.TryGetPieceReservationBitfield(infohash, out var reservationBitfield);
             bitfieldManager.TryGetPieceAvailability(infohash, out var availability);
 
+            // Retrieve allowed-pieces mask from file selection.
+            // When null, all pieces are allowed (no file filtering).
+            var allowedPieces = fileSelectionPieceMap.GetAllowedPieces(infohash);
+
             // Yield to prevent herding when many peers call this at the same instant.
             // Previous: Task.Delay(Random.Shared.Next(0, 250)) allocated a Timer + Task per call.
             // Task.Yield() is zero-allocation on the hot path (just reschedules the continuation).
@@ -25,8 +30,9 @@ namespace Torrential.Peers
             //   - peer bitfield (only suggest pieces the peer has)
             //   - reservation bitfield (skip already-reserved pieces)
             //   - availability counts (prefer rarest pieces)
+            //   - allowed pieces (only suggest pieces belonging to selected files)
             // This is a single O(n/8) pass with zero heap allocations.
-            var suggestedPiece = myBitfield.SuggestPieceToDownload(peerBitfield, reservationBitfield, availability);
+            var suggestedPiece = myBitfield.SuggestPieceToDownload(peerBitfield, reservationBitfield, availability, allowedPieces);
             if (!suggestedPiece.Index.HasValue)
                 return suggestedPiece;
 

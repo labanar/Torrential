@@ -51,6 +51,12 @@ export interface PieceVerifiedEvent {
   infoHash: string;
   pieceIndex: number;
   progress: number;
+  verifiedPieces?: number[];
+}
+
+export interface FileSelectionChangedEvent {
+  infoHash: string;
+  selectedFileIds: number[];
 }
 
 export interface TorrentStartedEvent {

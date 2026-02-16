@@ -17,6 +17,7 @@ namespace Torrential.Torrents
     [JsonDerivedType(typeof(TorrentBlockDownloaded), "block_downloaded")]
     [JsonDerivedType(typeof(TorrentBlockUploadedEvent), "block_uploaded")]
     [JsonDerivedType(typeof(TorrentStatsEvent), "throughput")]
+    [JsonDerivedType(typeof(FileSelectionChangedEvent), "file_selection_changed")]
     public interface ITorrentEvent
     {
         InfoHash InfoHash { get; }
@@ -89,6 +90,7 @@ namespace Torrential.Torrents
         public required InfoHash InfoHash { get; init; }
         public required int PieceIndex { get; init; }
         public required float Progress { get; init; }
+        public int[]? VerifiedPieces { get; init; }
     }
 
     public class PeerConnectedEvent : ITorrentEvent
@@ -122,6 +124,12 @@ namespace Torrential.Torrents
     {
         public required InfoHash InfoHash { get; init; }
         public required string FileName { get; init; }
+    }
+
+    public class FileSelectionChangedEvent : ITorrentEvent
+    {
+        public required InfoHash InfoHash { get; init; }
+        public required long[] SelectedFileIds { get; init; }
     }
 
 

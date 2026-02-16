@@ -236,7 +236,8 @@ namespace Torrential.Peers
         public PieceSuggestionResult SuggestPieceToDownload(
             IBitfield peerBitfield,
             IBitfield? reservationBitfield,
-            PieceAvailability? availability)
+            PieceAvailability? availability,
+            Bitfield? allowedPieces = null)
         {
             var resBytes = reservationBitfield != null
                 ? reservationBitfield.Bytes
@@ -244,12 +245,16 @@ namespace Torrential.Peers
             var availCounts = availability != null
                 ? availability.Counts
                 : ReadOnlySpan<int>.Empty;
+            var allowedBytes = allowedPieces != null
+                ? allowedPieces.Bytes
+                : ReadOnlySpan<byte>.Empty;
 
             return PieceSuggestion.SuggestPiece(
                 Bytes,
                 peerBitfield.Bytes,
                 resBytes,
                 availCounts,
+                allowedBytes,
                 _numOfPieces);
         }
 

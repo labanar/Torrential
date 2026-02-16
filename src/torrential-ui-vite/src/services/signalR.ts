@@ -5,6 +5,7 @@ import {
 } from "@microsoft/signalr";
 import { addPeer, removePeer, updatePeer } from "../store/slices/peersSlice";
 import {
+  FileSelectionChangedEvent,
   PeerBitfieldReceivedEvent,
   PeerConnectedEvent,
   PeerDisconnectedEvent,
@@ -202,6 +203,14 @@ export class SignalRService {
         })
       );
     });
+
+    this.connection.on(
+      "FileSelectionChanged",
+      (_event: FileSelectionChangedEvent) => {
+        // The detail pane re-fetches on this event via its own subscription.
+        // No global store update needed; event is available for component-level listeners.
+      }
+    );
   }
 
   public async startConnection(): Promise<void> {
