@@ -42,13 +42,18 @@ import {
   useAppDispatch,
 } from "../../store";
 import { TorrentsState, setTorrents } from "../../store/slices/torrentsSlice";
-import { PeerApiModel, TorrentApiModel } from "../../services/api";
+import {
+  PeerApiModel,
+  TorrentApiModel,
+  TorrentPreview,
+} from "../../services/api";
 import { PeerSummary, TorrentSummary } from "../../types";
 import { setPeers } from "../../store/slices/peersSlice";
 import {
   FileUpload,
   FileUploadElement,
 } from "../../components/FileUpload/file-upload";
+import { TorrentFilePreviewModal } from "../../components/TorrentFilePreviewModal/torrent-file-preview-modal";
 import Layout from "../layout";
 import { AlfredContext, setContext } from "../../store/slices/alfredSlice";
 
@@ -272,10 +277,42 @@ const ActionsRow = ({
 }: ActionsRowProps) => {
   const uploadRef = useRef<FileUploadElement | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<TorrentPreview | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   const onUpload = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/torrents/preview`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to preview torrent");
+      }
+
+      const result = await response.json();
+      setPreviewData(result);
+      setPendingFile(file);
+      setPreviewModalOpen(true);
+    } catch (error) {
+      console.error("Error previewing torrent:", error);
+    }
+  };
+
+  const onConfirmAdd = async (selectedFileIds: number[]) => {
+    if (!pendingFile) return;
+
+    const formData = new FormData();
+    formData.append("file", pendingFile);
+    formData.append("selectedFileIds", selectedFileIds.join(","));
 
     try {
       const response = await fetch(
@@ -290,13 +327,20 @@ const ActionsRow = ({
         throw new Error("File upload failed");
       }
 
-      const result = await response.json();
-      console.log("File uploaded successfully:", result);
-      // Handle success
+      console.log("Torrent added successfully");
     } catch (error) {
-      console.error("Error uploading file:", error);
-      // Handle error
+      console.error("Error adding torrent:", error);
     }
+
+    setPreviewModalOpen(false);
+    setPreviewData(null);
+    setPendingFile(null);
+  };
+
+  const onCancelPreview = () => {
+    setPreviewModalOpen(false);
+    setPreviewData(null);
+    setPendingFile(null);
   };
 
   const stopTorrent = async (infoHash: string) => {
@@ -381,6 +425,13 @@ const ActionsRow = ({
         infoHashes={selectedTorrents}
         onClose={() => setDeleteModalOpen(false)}
         onRemove={(_, deleteFiles) => removeTorrents(deleteFiles)}
+      />
+
+      <TorrentFilePreviewModal
+        isOpen={previewModalOpen}
+        onClose={onCancelPreview}
+        onConfirm={onConfirmAdd}
+        preview={previewData}
       />
 
       <div className={styles.actionSearch}>

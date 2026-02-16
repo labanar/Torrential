@@ -74,3 +74,15 @@ export interface TorrentAddedEvent {
   totalSize: number;
   name: string;
 }
+
+export interface TorrentPreview {
+  name: string;
+  totalSize: number;
+  files: TorrentPreviewFile[];
+}
+
+export interface TorrentPreviewFile {
+  id: number;
+  filename: string;
+  fileSize: number;
+}
