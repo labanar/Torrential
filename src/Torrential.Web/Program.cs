@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc;
 using OpenTelemetry.Metrics;
 using Serilog;
 using Serilog.Core;
@@ -13,6 +14,8 @@ using Torrential.Settings;
 using Torrential.Torrents;
 using Torrential.Trackers;
 using Torrential.Web.Api.Models;
+using Torrential.Web.Api.Models.Torrents;
+using Torrential.Web.Api.Requests.Torrents;
 using Torrential.Web.Api.Requests.Settings;
 using Torrential.Web.Api.Responses;
 using Torrential.Web.Api.Responses.Settings;
@@ -74,11 +77,47 @@ app.MapHub<TorrentHub>("/torrents/hub");
 
 
 app.MapPost(
-    "/torrents/add",
-    async (IFormFile file, ICommandHandler<TorrentAddCommand, TorrentAddResponse> handler) =>
+    "/torrents/preview",
+    ([FromForm] TorrentPreviewRequest request) =>
     {
-        var meta = TorrentMetadataParser.FromStream(file.OpenReadStream());
-        return await handler.Execute(new() { Metadata = meta, DownloadPath = "", CompletedPath = "" });
+        try
+        {
+            var meta = TorrentMetadataParser.FromStream(request.File.OpenReadStream());
+            var files = meta.Files.Select(x => new TorrentPreviewFileVm
+            {
+                Id = x.Id,
+                Filename = x.Filename,
+                SizeBytes = x.FileSize,
+                DefaultSelected = true
+            }).ToArray();
+
+            return new TorrentPreviewResponse(new TorrentPreviewVm
+            {
+                Name = meta.Name,
+                InfoHash = meta.InfoHash,
+                TotalSizeBytes = meta.TotalSize,
+                Files = files
+            });
+        }
+        catch
+        {
+            return TorrentPreviewResponse.ErrorResponse(ErrorCode.Unknown);
+        }
+    })
+    .DisableAntiforgery();
+
+app.MapPost(
+    "/torrents/add",
+    async ([FromForm] TorrentAddRequest request, ICommandHandler<TorrentAddCommand, TorrentAddResponse> handler) =>
+    {
+        var meta = TorrentMetadataParser.FromStream(request.File.OpenReadStream());
+        return await handler.Execute(new()
+        {
+            Metadata = meta,
+            DownloadPath = "",
+            CompletedPath = "",
+            SelectedFileIds = request.SelectedFileIds
+        });
     })
     .DisableAntiforgery();
 
@@ -116,8 +155,8 @@ app.MapGet(
                 Name = meta.Name,
                 InfoHash = meta.InfoHash,
                 Status = status.ToString(),
-                Progress = bitfield.CompletionRatio,
-                TotalSizeBytes = meta.PieceSize * meta.NumberOfPieces,
+                Progress = bitfieldManager.GetWantedCompletionRatio(torrent.InfoHash, bitfield),
+                TotalSizeBytes = meta.SelectedTotalSize,
                 DownloadRate = rates.GetIngressRate(torrent.InfoHash),
                 UploadRate = rates.GetEgressRate(torrent.InfoHash),
                 BytesDownloaded = rates.GetTotalDownloaded(torrent.InfoHash),
@@ -158,8 +197,8 @@ app.MapGet(
             Name = meta.Name,
             InfoHash = meta.InfoHash,
             Status = status.ToString(),
-            Progress = verificationBitfield.CompletionRatio,
-            TotalSizeBytes = meta.PieceSize * meta.NumberOfPieces,
+            Progress = bitfieldManager.GetWantedCompletionRatio(infoHash, verificationBitfield),
+            TotalSizeBytes = meta.SelectedTotalSize,
             DownloadRate = rates.GetIngressRate(infoHash),
             UploadRate = rates.GetEgressRate(infoHash),
             BytesDownloaded = rates.GetTotalDownloaded(infoHash),

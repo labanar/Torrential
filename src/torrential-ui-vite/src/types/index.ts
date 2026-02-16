@@ -17,3 +17,16 @@ export interface PeerSummary {
   port: number;
   isSeed: boolean;
 }
+
+export interface TorrentPreviewFileSummary {
+  id: number;
+  filename: string;
+  sizeBytes: number;
+}
+
+export interface TorrentPreviewSummary {
+  name: string;
+  infoHash: string;
+  totalSizeBytes: number;
+  files: TorrentPreviewFileSummary[];
+}

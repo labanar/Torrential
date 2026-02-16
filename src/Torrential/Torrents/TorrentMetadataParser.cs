@@ -31,6 +31,7 @@ public static class TorrentMetadataParser
                     Filename = torrent.Files[i].FullPath,
                     FileSize = torrent.Files[i].FileSize,
                     FileStartByte = startByte,
+                    IsSelected = true,
                 };
                 startByte += torrent.Files[i].FileSize;
             }
@@ -45,6 +46,7 @@ public static class TorrentMetadataParser
                     FileStartByte = 0,
                     Filename = torrent.File.FileName,
                     FileSize = torrent.TotalSize,
+                    IsSelected = true,
                 }
             ];
         }

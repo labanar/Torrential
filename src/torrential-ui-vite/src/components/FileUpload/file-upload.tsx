@@ -38,6 +38,7 @@ export const FileUpload = forwardRef<FileUploadElement, FileUploadProps>(
             const f = e.target.files?.item(0);
             if (f === null || f === undefined) return;
             onFileChange(f);
+            e.target.value = "";
           }}
         />
       </>
