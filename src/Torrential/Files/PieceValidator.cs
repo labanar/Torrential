@@ -1,7 +1,8 @@
-﻿using MassTransit;
+using MassTransit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32.SafeHandles;
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.IO.Pipelines;
 using Torrential.Peers;
 using Torrential.Torrents;
@@ -18,6 +19,10 @@ namespace Torrential.Files
     public class PieceValidator(ILogger<PieceValidator> logger, TorrentMetadataCache metaCache, IFileHandleProvider fileHandleProvider, BitfieldManager bitfieldMgr, IBus bus)
         : IConsumer<PieceValidationRequest>
     {
+        // Tracks whether TorrentCompleteEvent has already been published for each torrent.
+        // TryAdd is atomic: only the first caller to add the key succeeds, guaranteeing exactly-once publish.
+        private static readonly ConcurrentDictionary<InfoHash, byte> _completionPublished = new();
+
         public async Task Consume(ConsumeContext<PieceValidationRequest> context)
         {
             var request = context.Message;
@@ -59,18 +64,29 @@ namespace Torrential.Files
 
             if (result)
             {
-                await verificationBitfield.MarkHaveAsync(request.PieceIndex, CancellationToken.None);
+                verificationBitfield.MarkHave(request.PieceIndex);
                 await bus.Publish(new TorrentPieceVerifiedEvent { InfoHash = request.InfoHash, PieceIndex = request.PieceIndex, Progress = verificationBitfield.CompletionRatio });
+
                 if (verificationBitfield.HasAll())
                 {
-                    logger.LogInformation("All pieces verified");
-                    await bus.Publish(new TorrentCompleteEvent { InfoHash = request.InfoHash });
+                    // Atomic guard: TryAdd returns true only for the first thread that inserts the key.
+                    // All concurrent threads that also see HasAll() == true will get false from TryAdd
+                    // and skip the publish, guaranteeing exactly one TorrentCompleteEvent per torrent.
+                    if (_completionPublished.TryAdd(request.InfoHash, 1))
+                    {
+                        logger.LogInformation("All pieces verified");
+                        await bus.Publish(new TorrentCompleteEvent { InfoHash = request.InfoHash });
+                    }
+                    else
+                    {
+                        logger.LogDebug("All pieces verified but completion event already published — skipping duplicate");
+                    }
                 }
             }
             else
             {
                 logger.LogWarning("Piece verification failed for {Piece}, unmarking from download bitfield", request.PieceIndex);
-                await downloadBitfield.UnmarkHaveAsync(request.PieceIndex, CancellationToken.None);
+                downloadBitfield.UnmarkHave(request.PieceIndex);
             }
         }
 

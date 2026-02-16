@@ -27,6 +27,8 @@ builder.Services.AddTorrential();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<PieceVerifiedBatchService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PieceVerifiedBatchService>());
 builder.Services.AddOpenTelemetry()
     .WithMetrics(b =>
     {

@@ -1,4 +1,4 @@
-﻿using Torrential.Peers;
+using Torrential.Peers;
 using Torrential.Torrents;
 
 namespace Torrential.Tests
@@ -43,13 +43,13 @@ namespace Torrential.Tests
 
 
         [Fact]
-        public async Task Has_all_with_partial_final_byte_async()
+        public void Has_all_with_partial_final_byte_thread_safe()
         {
-            var myBitfield = new AsyncBitfield(2516);
+            var myBitfield = new Bitfield(2516);
             var peerBitfieldData = new byte[315];
             Array.Fill(peerBitfieldData, (byte)255);
 
-            var peerBitfield = new AsyncBitfield(peerBitfieldData);
+            var peerBitfield = new Bitfield(peerBitfieldData);
 
             //Stage my bitfield to have all but the final byte set
             var myPeerBitfieldData = new byte[314];
@@ -60,16 +60,16 @@ namespace Torrential.Tests
             var suggestedPiece = myBitfield.SuggestPieceToDownload(peerBitfield);
             Assert.NotNull(suggestedPiece.Index);
 
-            await myBitfield.MarkHaveAsync(2512, CancellationToken.None);
+            myBitfield.MarkHave(2512);
             Assert.False(myBitfield.HasAll());
 
-            await myBitfield.MarkHaveAsync(2513, CancellationToken.None);
+            myBitfield.MarkHave(2513);
             Assert.False(myBitfield.HasAll());
 
-            await myBitfield.MarkHaveAsync(2514, CancellationToken.None);
+            myBitfield.MarkHave(2514);
             Assert.False(myBitfield.HasAll());
 
-            await myBitfield.MarkHaveAsync(2515, CancellationToken.None);
+            myBitfield.MarkHave(2515);
             Assert.True(myBitfield.HasAll());
             Assert.Equal(1.0, myBitfield.CompletionRatio, 0);
 
@@ -109,10 +109,10 @@ namespace Torrential.Tests
 
 
         [Fact]
-        public async Task Chunk_field_with_partial_final_piece()
+        public void Chunk_field_with_partial_final_piece()
         {
             var meta = TorrentMetadataParser.FromFile("./debian-12.5.0-arm64-netinst.iso.torrent");
-            var chunkField = new AsyncBitfield(meta.TotalNumberOfChunks);
+            var chunkField = new Bitfield(meta.TotalNumberOfChunks);
             var blockLength = (int)Math.Pow(2, 14);
 
             var chunksPerFullPiece = (int)(meta.PieceSize / Math.Pow(2, 14));
@@ -127,24 +127,24 @@ namespace Torrential.Tests
             var offset = 0;
             var extra = offset / blockLength;
             var chunkIndex = 2105 * chunksPerFullPiece + extra;
-            await chunkField.MarkHaveAsync(chunkIndex, CancellationToken.None);
+            chunkField.MarkHave(chunkIndex);
 
             offset = (int)Math.Pow(2, 14);
             extra = offset / blockLength;
             chunkIndex = 2105 * chunksPerFullPiece + extra;
-            await chunkField.MarkHaveAsync(chunkIndex, CancellationToken.None);
+            chunkField.MarkHave(chunkIndex);
 
             offset = (int)Math.Pow(2, 14) * 2;
             extra = offset / blockLength;
             chunkIndex = 2105 * chunksPerFullPiece + extra;
-            await chunkField.MarkHaveAsync(chunkIndex, CancellationToken.None);
+            chunkField.MarkHave(chunkIndex);
 
 
             var hasAll = HasAllBlocksForPiece(chunkField, 2105, chunksInThisPiece, chunksPerFullPiece);
             Assert.True(hasAll);
         }
 
-        public bool HasAllBlocksForPiece(AsyncBitfield chunkField, int pieceIndex, int chunksInThisPiece, int chunksInFullPiece)
+        public bool HasAllBlocksForPiece(Bitfield chunkField, int pieceIndex, int chunksInThisPiece, int chunksInFullPiece)
         {
             var blockIndex = pieceIndex * chunksInFullPiece;
             for (int i = 0; i < chunksInThisPiece; i++)

@@ -4,13 +4,14 @@ using Torrential.Torrents;
 
 namespace Torrential.Extensions.SignalR
 {
-    public sealed class TorrentHubMessageDispatcher(IHubContext<TorrentHub, ITorrentClient> hubContext)
+    public sealed class TorrentHubMessageDispatcher(
+        IHubContext<TorrentHub, ITorrentClient> hubContext,
+        PieceVerifiedBatchService pieceVerifiedBatch)
         : IConsumer<TorrentAddedEvent>,
         IConsumer<TorrentStartedEvent>,
         IConsumer<TorrentStoppedEvent>,
         IConsumer<TorrentCompleteEvent>,
         IConsumer<TorrentRemovedEvent>,
-        //IConsumer<TorrentPieceDownloadedEvent>,
         IConsumer<TorrentPieceVerifiedEvent>,
         IConsumer<PeerConnectedEvent>,
         IConsumer<PeerDisconnectedEvent>,
@@ -32,11 +33,17 @@ namespace Torrential.Extensions.SignalR
         public async Task Consume(ConsumeContext<TorrentRemovedEvent> context) =>
             await hubContext.Clients.All.TorrentRemoved(context.Message);
 
-        //public async Task Consume(ConsumeContext<TorrentPieceDownloadedEvent> context) =>
-        //    await hubContext.Clients.All.PieceDownloaded(context.Message);
-
-        public async Task Consume(ConsumeContext<TorrentPieceVerifiedEvent> context) =>
-            await hubContext.Clients.All.PieceVerified(context.Message);
+        /// <summary>
+        /// Instead of forwarding every piece verification to SignalR immediately,
+        /// record the latest progress. The PieceVerifiedBatchService flushes to
+        /// SignalR every 250ms -- collapsing hundreds of events into ~4/sec.
+        /// Zero allocation: just a dictionary write of a value-type key + float.
+        /// </summary>
+        public Task Consume(ConsumeContext<TorrentPieceVerifiedEvent> context)
+        {
+            pieceVerifiedBatch.RecordProgress(context.Message.InfoHash, context.Message.Progress);
+            return Task.CompletedTask;
+        }
 
         public async Task Consume(ConsumeContext<PeerConnectedEvent> context) =>
             await hubContext.Clients.All.PeerConnected(context.Message);

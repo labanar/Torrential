@@ -61,6 +61,13 @@ public sealed class PeerWireClient : IAsyncDisposable
 
     public DateTimeOffset LastMessageTimestamp { get; private set; }
 
+    /// <summary>
+    /// Optional callback invoked when the peer sends a Have message for a piece.
+    /// Used by PeerSwarm to update piece availability counters.
+    /// Set once after construction, before ProcessMessages is called.
+    /// </summary>
+    public Action<int>? OnPeerHave { get; set; }
+
     public PeerWireClient(IPeerWireConnection connection, TorrentMetadataCache metaCache, IBlockSaveService blockSaveService, ILogger logger, CancellationToken torrentStoppingToken)
     {
         if (!connection.PeerId.HasValue)
@@ -331,6 +338,7 @@ public sealed class PeerWireClient : IAsyncDisposable
             return false;
 
         _state.PeerBitfield?.MarkHave(index);
+        OnPeerHave?.Invoke(index);
         return true;
     }
     private bool HandleBitfield(ReadOnlySequence<byte> payload)

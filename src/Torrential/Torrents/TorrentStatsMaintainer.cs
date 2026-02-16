@@ -6,21 +6,6 @@ using Torrential.Peers;
 
 namespace Torrential.Torrents
 {
-    public class TorrentStatsMaintainer(TorrentStats rates) :
-        IConsumer<TorrentBlockDownloaded>,
-        IConsumer<TorrentBlockUploadedEvent>
-    {
-        public async Task Consume(ConsumeContext<TorrentBlockDownloaded> context)
-        {
-            await rates.QueueDownloadRate(context.Message.InfoHash, context.Message.Length);
-        }
-
-        public async Task Consume(ConsumeContext<TorrentBlockUploadedEvent> context)
-        {
-            await rates.QueueUploadRate(context.Message.InfoHash, context.Message.Length);
-        }
-    }
-
     public class TorrentStats
     {
         private readonly ConcurrentDictionary<InfoHash, TorrentStatsCalculator> _ingressRates = [];

@@ -1,4 +1,4 @@
-﻿using MassTransit;
+using MassTransit;
 using Microsoft.Extensions.Logging;
 using Torrential.Peers;
 using Torrential.Torrents;
@@ -10,7 +10,13 @@ namespace Torrential.Files
         Task SaveBlock(PooledBlock block);
     }
 
-    internal class BlockSaveService(IFileHandleProvider fileHandleProvider, TorrentMetadataCache metaCache, ILogger<BlockSaveService> logger, BitfieldManager bitfieldManager, IBus bus)
+    internal class BlockSaveService(
+        IFileHandleProvider fileHandleProvider,
+        TorrentMetadataCache metaCache,
+        ILogger<BlockSaveService> logger,
+        BitfieldManager bitfieldManager,
+        IBus bus,
+        TorrentStats torrentStats)
         : IBlockSaveService
     {
         private static readonly int BLOCK_LENGTH = (int)Math.Pow(2, 14);
@@ -50,18 +56,21 @@ namespace Torrential.Files
                 var fileHandle = await fileHandleProvider.GetPartFileHandle(block.InfoHash);
                 var fileOffset = (block.PieceIndex * meta.PieceSize) + block.Offset;
                 RandomAccess.Write(fileHandle, block.Buffer, fileOffset);
-                await bus.Publish(new TorrentBlockDownloaded { InfoHash = meta.InfoHash, Length = block.Buffer.Length });
+
+                // Record download bytes directly -- no MassTransit event allocation.
+                // QueueDownloadRate writes to an unbounded channel (completes synchronously).
+                await torrentStats.QueueDownloadRate(meta.InfoHash, block.Buffer.Length);
 
                 var chunksPerFullPiece = (int)(meta.PieceSize / BLOCK_LENGTH);
                 var pieceLength = (int)(block.PieceIndex == meta.NumberOfPieces - 1 ? meta.FinalPieceSize : meta.PieceSize);
                 var chunksInThisPiece = (int)Math.Ceiling((decimal)pieceLength / BLOCK_LENGTH);
                 var extra = block.Offset / BLOCK_LENGTH;
                 var blockIndex = block.PieceIndex * chunksPerFullPiece + extra;
-                await blockBitfield.MarkHaveAsync(blockIndex, CancellationToken.None);
+                blockBitfield.MarkHave(blockIndex);
 
                 if (HasAllBlocksForPiece(blockBitfield, block.PieceIndex, chunksInThisPiece, chunksPerFullPiece))
                 {
-                    await downloadBitfield.MarkHaveAsync(block.PieceIndex, CancellationToken.None);
+                    downloadBitfield.MarkHave(block.PieceIndex);
                     await bus.Publish(new PieceValidationRequest { InfoHash = block.InfoHash, PieceIndex = block.PieceIndex });
                     await bus.Publish(new TorrentPieceDownloadedEvent { InfoHash = block.InfoHash, PieceIndex = block.PieceIndex });
                 }
@@ -69,7 +78,7 @@ namespace Torrential.Files
         }
 
 
-        public bool HasAllBlocksForPiece(AsyncBitfield chunkField, int pieceIndex, int chunksInThisPiece, int chunksInFullPiece)
+        public bool HasAllBlocksForPiece(Bitfield chunkField, int pieceIndex, int chunksInThisPiece, int chunksInFullPiece)
         {
             var blockIndex = pieceIndex * chunksInFullPiece;
             for (int i = 0; i < chunksInThisPiece; i++)

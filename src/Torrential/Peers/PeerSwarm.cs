@@ -177,9 +177,30 @@ namespace Torrential.Peers
 
             logger.LogDebug("Peer bitfield received");
 
+            // Update piece availability counts from the peer's full bitfield
+            if (bitfieldManager.TryGetPieceAvailability(connection.InfoHash, out var availability) && availability != null)
+            {
+                availability.IncrementFromBitfield(
+                    peerClient.State.PeerBitfield.Bytes,
+                    peerClient.State.PeerBitfield.NumberOfPieces);
+
+                // Wire up the Have callback so individual Have messages also update availability
+                peerClient.OnPeerHave = availability.IncrementPiece;
+            }
+
             if (verificationBitfield.HasAll() && peerClient.State.PeerBitfield.HasAll())
             {
                 logger.LogDebug("Both self and peer are seeds, denying entry to swarm");
+
+                // Undo the availability increment since this peer is being rejected
+                if (availability != null)
+                {
+                    availability.DecrementFromBitfield(
+                        peerClient.State.PeerBitfield.Bytes,
+                        peerClient.State.PeerBitfield.NumberOfPieces);
+                    peerClient.OnPeerHave = null;
+                }
+
                 processTasks.TryRemove(connection.PeerId.Value, out _);
                 await peerClient.DisposeAsync();
                 return;
@@ -300,6 +321,17 @@ namespace Torrential.Peers
             {
                 if (peerClients.TryRemove(peerId, out var peerClient))
                 {
+                    // Decrement piece availability for all pieces this peer had
+                    if (peerClient.State.PeerBitfield != null
+                        && bitfieldManager.TryGetPieceAvailability(infoHash, out var peerAvailability)
+                        && peerAvailability != null)
+                    {
+                        peerAvailability.DecrementFromBitfield(
+                            peerClient.State.PeerBitfield.Bytes,
+                            peerClient.State.PeerBitfield.NumberOfPieces);
+                        peerClient.OnPeerHave = null;
+                    }
+
                     logger.LogInformation("Disposing peer client");
                     await peerClient.DisposeAsync();
                 }

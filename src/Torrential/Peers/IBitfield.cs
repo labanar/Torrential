@@ -1,4 +1,4 @@
-﻿namespace Torrential.Peers
+namespace Torrential.Peers
 {
     public interface IBitfield
     {
@@ -16,13 +16,18 @@
 
         bool HasPiece(int index);
 
+        /// <summary>
+        /// Atomically sets the bit for the given piece index.
+        /// Thread-safe, lock-free, zero heap allocations.
+        /// </summary>
+        void MarkHave(int index);
+
+        /// <summary>
+        /// Atomically clears the bit for the given piece index.
+        /// Thread-safe, lock-free, zero heap allocations.
+        /// </summary>
+        void UnmarkHave(int index);
+
         PieceSuggestionResult SuggestPieceToDownload(IBitfield peerBitfield);
-
-    }
-
-
-    public abstract class BitfieldBase
-    {
-
     }
 }

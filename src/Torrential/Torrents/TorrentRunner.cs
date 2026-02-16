@@ -10,7 +10,8 @@ namespace Torrential.Torrents
                                BitfieldManager bitfieldMgr,
                                IFileHandleProvider fileHandleProvider,
                                IBus bus,
-                               PieceSelector pieceSelector)
+                               PieceSelector pieceSelector,
+                               TorrentStats torrentStats)
     {
 
         public async Task StartSharing(TorrentMetadata meta, PeerWireClient peer, CancellationToken canellationToken)
@@ -133,7 +134,8 @@ namespace Torrential.Torrents
                     var pak = MessagePacker.Pack(request.PieceIndex, request.Begin, buffer.AsSpan().Slice(0, request.Length));
                     await peer.SendPiece(pak);
 
-                    await bus.Publish(new TorrentBlockUploadedEvent { InfoHash = meta.InfoHash, Length = request.Length });
+                    // Record upload bytes directly -- no MassTransit event allocation.
+                    await torrentStats.QueueUploadRate(meta.InfoHash, request.Length);
 
                     logger.LogDebug("Sent piece {@Request} to peer", request);
                 }
