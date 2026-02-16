@@ -69,9 +69,14 @@ namespace Torrential.Files
 
                 if (HasAllBlocksForPiece(blockBitfield, block.PieceIndex, chunksInThisPiece, chunksPerFullPiece))
                 {
-                    downloadBitfield.MarkHave(block.PieceIndex);
-                    await eventBus.PublishPieceValidationRequest(new PieceValidationRequest { InfoHash = block.InfoHash, PieceIndex = block.PieceIndex });
-                    await eventBus.PublishPieceDownloaded(new TorrentPieceDownloadedEvent { InfoHash = block.InfoHash, PieceIndex = block.PieceIndex });
+                    // MarkHave returns true only if this thread was the first to set the bit.
+                    // This prevents duplicate PieceValidationRequests when multiple peers
+                    // download the same piece (e.g. after a reservation expires).
+                    if (downloadBitfield.MarkHave(block.PieceIndex))
+                    {
+                        await eventBus.PublishPieceValidationRequest(new PieceValidationRequest { InfoHash = block.InfoHash, PieceIndex = block.PieceIndex });
+                        await eventBus.PublishPieceDownloaded(new TorrentPieceDownloadedEvent { InfoHash = block.InfoHash, PieceIndex = block.PieceIndex });
+                    }
                 }
             }
         }

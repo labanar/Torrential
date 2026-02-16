@@ -37,7 +37,7 @@ namespace Torrential.Files
 
             if (verificationBitfield.HasPiece(request.PieceIndex))
             {
-                logger.LogInformation("Already verified piece {Piece} - ignoring", request.PieceIndex);
+                logger.LogDebug("Already verified piece {Piece} - ignoring", request.PieceIndex);
                 return;
             }
 

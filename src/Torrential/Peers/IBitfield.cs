@@ -19,8 +19,9 @@ namespace Torrential.Peers
         /// <summary>
         /// Atomically sets the bit for the given piece index.
         /// Thread-safe, lock-free, zero heap allocations.
+        /// Returns true if the bit was newly set, false if it was already set.
         /// </summary>
-        void MarkHave(int index);
+        bool MarkHave(int index);
 
         /// <summary>
         /// Atomically clears the bit for the given piece index.

@@ -165,7 +165,7 @@ namespace Torrential.Peers
         /// same int element (covering 32 pieces) is rare.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void MarkHave(int index)
+        public bool MarkHave(int index)
         {
             if ((uint)index >= (uint)_numOfPieces)
                 throw new ArgumentOutOfRangeException(nameof(index));
@@ -190,8 +190,9 @@ namespace Torrential.Peers
                 oldVal = Volatile.Read(ref _data[intIndex]);
                 newVal = oldVal | mask;
                 if (oldVal == newVal)
-                    return; // Bit already set
+                    return false; // Bit already set
             } while (Interlocked.CompareExchange(ref _data[intIndex], newVal, oldVal) != oldVal);
+            return true; // Bit was newly set
         }
 
         /// <summary>
