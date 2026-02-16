@@ -1,4 +1,6 @@
-﻿namespace Torrential.Torrents;
+using System.Text.Json.Serialization;
+
+namespace Torrential.Torrents;
 
 public class TorrentMetadata
 {
@@ -14,7 +16,14 @@ public class TorrentMetadata
     private byte[] _pieceHashesConcat = Array.Empty<byte>();
     private int _numberOfPieces = 0;
 
+    [JsonIgnore]
+    private HashSet<int>? _wantedPieces;
+
     public int NumberOfPieces => _numberOfPieces;
+
+    [JsonIgnore]
+    public IReadOnlySet<int> WantedPieces => _wantedPieces ??= BuildWantedPieceSet();
+
     public required byte[] PieceHashesConcatenated
     {
         get
@@ -55,6 +64,32 @@ public class TorrentMetadata
     {
         var offset = pieceIndex * 20;
         return _pieceHashesConcat.AsSpan().Slice(offset, 20);
+    }
+
+    public bool IsPieceWanted(int pieceIndex)
+    {
+        return WantedPieces.Contains(pieceIndex);
+    }
+
+    private HashSet<int> BuildWantedPieceSet()
+    {
+        var wanted = new HashSet<int>();
+        if (PieceSize <= 0 || NumberOfPieces <= 0)
+            return wanted;
+
+        foreach (var file in Files.Where(static f => f.IsSelected && f.FileSize > 0))
+        {
+            var startPiece = (int)(file.FileStartByte / PieceSize);
+            var endByteInclusive = file.FileStartByte + file.FileSize - 1;
+            var endPiece = (int)(endByteInclusive / PieceSize);
+            startPiece = Math.Clamp(startPiece, 0, NumberOfPieces - 1);
+            endPiece = Math.Clamp(endPiece, 0, NumberOfPieces - 1);
+
+            for (var pieceIndex = startPiece; pieceIndex <= endPiece; pieceIndex++)
+                wanted.Add(pieceIndex);
+        }
+
+        return wanted;
     }
 }
 

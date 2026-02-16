@@ -61,9 +61,10 @@ namespace Torrential.Files
             if (result)
             {
                 verificationBitfield.MarkHave(request.PieceIndex);
-                await eventBus.PublishPieceVerified(new TorrentPieceVerifiedEvent { InfoHash = request.InfoHash, PieceIndex = request.PieceIndex, Progress = verificationBitfield.CompletionRatio });
+                var progress = bitfieldMgr.GetWantedCompletionRatio(request.InfoHash, verificationBitfield);
+                await eventBus.PublishPieceVerified(new TorrentPieceVerifiedEvent { InfoHash = request.InfoHash, PieceIndex = request.PieceIndex, Progress = progress });
 
-                if (verificationBitfield.HasAll())
+                if (bitfieldMgr.HasAllWantedPieces(request.InfoHash, verificationBitfield))
                 {
                     // Atomic guard: TryAdd returns true only for the first thread that inserts the key.
                     // All concurrent threads that also see HasAll() == true will get false from TryAdd
