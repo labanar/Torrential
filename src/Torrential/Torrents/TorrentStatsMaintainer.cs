@@ -1,4 +1,3 @@
-﻿using MassTransit;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -68,7 +67,7 @@ namespace Torrential.Torrents
     }
 
 
-    public class TorrentThroughputRatesNotifier(IBus bus, PeerSwarm peerSwarm, TorrentStats rates, ILogger<TorrentThroughputRatesNotifier> logger) : BackgroundService
+    public class TorrentThroughputRatesNotifier(TorrentEventBus eventBus, PeerSwarm peerSwarm, TorrentStats rates, ILogger<TorrentThroughputRatesNotifier> logger) : BackgroundService
     {
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -85,7 +84,7 @@ namespace Torrential.Torrents
                     var totalUploaded = rates.GetTotalUploaded(infoHash);
 
                     logger.LogDebug("Publishing throughput rates for {InfoHash} - Ingress: {IngressRate} Egress: {EgressRate}", infoHash.AsString(), ingressRate, egressRate);
-                    await bus.Publish(new TorrentStatsEvent
+                    await eventBus.PublishTorrentStats(new TorrentStatsEvent
                     {
                         InfoHash = infoHash,
                         DownloadRate = ingressRate,

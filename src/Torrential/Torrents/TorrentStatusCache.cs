@@ -1,4 +1,3 @@
-﻿using MassTransit;
 using System.Collections.Concurrent;
 
 namespace Torrential.Torrents
@@ -25,31 +24,27 @@ namespace Torrential.Torrents
         }
     }
 
-
-
+    /// <summary>
+    /// Handles torrent lifecycle events to keep the status cache in sync.
+    /// Registered as direct handlers on TorrentEventBus during DI setup.
+    /// </summary>
     public sealed class TorrentStatusCacheMaintainer(TorrentStatusCache torrentStatus)
-        : IConsumer<TorrentStartedEvent>,
-          IConsumer<TorrentStoppedEvent>,
-          IConsumer<TorrentRemovedEvent>
     {
-        public Task Consume(ConsumeContext<TorrentStartedEvent> context)
+        public Task HandleTorrentStarted(TorrentStartedEvent evt)
         {
-            var @event = context.Message;
-            torrentStatus.UpdateStatus(@event.InfoHash, TorrentStatus.Running);
+            torrentStatus.UpdateStatus(evt.InfoHash, TorrentStatus.Running);
             return Task.CompletedTask;
         }
 
-        public Task Consume(ConsumeContext<TorrentStoppedEvent> context)
+        public Task HandleTorrentStopped(TorrentStoppedEvent evt)
         {
-            var @event = context.Message;
-            torrentStatus.UpdateStatus(@event.InfoHash, TorrentStatus.Stopped);
+            torrentStatus.UpdateStatus(evt.InfoHash, TorrentStatus.Stopped);
             return Task.CompletedTask;
         }
 
-        public Task Consume(ConsumeContext<TorrentRemovedEvent> context)
+        public Task HandleTorrentRemoved(TorrentRemovedEvent evt)
         {
-            var @event = context.Message;
-            torrentStatus.RemoveStatus(@event.InfoHash);
+            torrentStatus.RemoveStatus(evt.InfoHash);
             return Task.CompletedTask;
         }
     }

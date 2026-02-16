@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Torrential.Peers
 {
@@ -16,10 +16,12 @@ namespace Torrential.Peers
             bitfieldManager.TryGetPieceReservationBitfield(infohash, out var reservationBitfield);
             bitfieldManager.TryGetPieceAvailability(infohash, out var availability);
 
-            // Jitter to reduce herding when many peers call this at the same instant
-            await Task.Delay(Random.Shared.Next(0, 250));
+            // Yield to prevent herding when many peers call this at the same instant.
+            // Previous: Task.Delay(Random.Shared.Next(0, 250)) allocated a Timer + Task per call.
+            // Task.Yield() is zero-allocation on the hot path (just reschedules the continuation).
+            await Task.Yield();
 
-            // The new suggestion algorithm considers:
+            // The suggestion algorithm considers:
             //   - peer bitfield (only suggest pieces the peer has)
             //   - reservation bitfield (skip already-reserved pieces)
             //   - availability counts (prefer rarest pieces)

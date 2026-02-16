@@ -18,7 +18,7 @@ public sealed class PieceVerifiedBatchService : BackgroundService
 {
     private readonly IHubContext<TorrentHub, ITorrentClient> _hubContext;
 
-    // Latest progress snapshot per torrent. Written by MassTransit consumer thread,
+    // Latest progress snapshot per torrent. Written by event bus handler thread,
     // drained by the flush timer thread. ConcurrentDictionary handles the concurrency.
     private readonly ConcurrentDictionary<InfoHash, float> _pendingProgress = new();
 
@@ -30,7 +30,7 @@ public sealed class PieceVerifiedBatchService : BackgroundService
     }
 
     /// <summary>
-    /// Called by the MassTransit consumer to record the latest progress.
+    /// Called by the event bus handler to record the latest progress.
     /// This is a cheap dictionary write -- no SignalR, no serialization, no async.
     /// </summary>
     public void RecordProgress(InfoHash infoHash, float progress)

@@ -1,4 +1,3 @@
-﻿using MassTransit;
 using Microsoft.Extensions.Logging;
 using System.Buffers;
 using Torrential.Files;
@@ -9,7 +8,7 @@ namespace Torrential.Torrents
     public class TorrentRunner(ILogger<TorrentRunner> logger,
                                BitfieldManager bitfieldMgr,
                                IFileHandleProvider fileHandleProvider,
-                               IBus bus,
+                               TorrentEventBus eventBus,
                                PieceSelector pieceSelector,
                                TorrentStats torrentStats)
     {
@@ -29,7 +28,7 @@ namespace Torrential.Torrents
                 return;
             }
 
-            await bus.Publish(new PeerBitfieldReceivedEvent
+            await eventBus.PublishPeerBitfieldReceived(new PeerBitfieldReceivedEvent
             {
                 HasAllPieces = peer.State.PeerBitfield.HasAll(),
                 InfoHash = meta.InfoHash,
@@ -134,7 +133,7 @@ namespace Torrential.Torrents
                     var pak = MessagePacker.Pack(request.PieceIndex, request.Begin, buffer.AsSpan().Slice(0, request.Length));
                     await peer.SendPiece(pak);
 
-                    // Record upload bytes directly -- no MassTransit event allocation.
+                    // Record upload bytes directly -- no event allocation.
                     await torrentStats.QueueUploadRate(meta.InfoHash, request.Length);
 
                     logger.LogDebug("Sent piece {@Request} to peer", request);

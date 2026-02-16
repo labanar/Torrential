@@ -1,11 +1,10 @@
-using MassTransit;
 using System.Collections.Concurrent;
 using Torrential.Files;
 using Torrential.Torrents;
 
 namespace Torrential.Peers
 {
-    public class BitfieldManager(TorrentFileService fileService, IBus bus, TorrentMetadataCache metaCache)
+    public class BitfieldManager(TorrentFileService fileService, TorrentEventBus eventBus, TorrentMetadataCache metaCache)
     {
         private ConcurrentDictionary<InfoHash, Bitfield> _downloadBitfields = [];
         private ConcurrentDictionary<InfoHash, Bitfield> _verificationBitfields = [];
@@ -55,7 +54,7 @@ namespace Torrential.Peers
             for (var i = 0; i < numPieces; i++)
             {
                 if (downloadBitfield.HasPiece(i) && !verificationBitfield.HasPiece(i))
-                    await bus.Publish(new PieceValidationRequest { InfoHash = infoHash, PieceIndex = i });
+                    await eventBus.PublishPieceValidationRequest(new PieceValidationRequest { InfoHash = infoHash, PieceIndex = i });
             }
         }
 

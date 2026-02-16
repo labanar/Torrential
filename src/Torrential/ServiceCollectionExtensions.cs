@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Torrential.Commands;
 using Torrential.Files;
@@ -43,6 +43,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<TorrentStats>();
         services.AddSingleton<PeerConnectionManager>();
         services.AddSingleton<GeoIpService>();
+
+        // Event bus and handler types
+        services.AddSingleton<TorrentEventBus>();
+        services.AddSingleton<PieceValidator>();
+        services.AddSingleton<PeerSwarmMessageDispatcher>();
+        services.AddSingleton<TorrentStatusCacheMaintainer>();
+        services.AddSingleton<AnnounceServiceEventHandler>();
+        services.AddSingleton<PostDownloadActionExecutor>();
 
         //TODO - add service extension that scans the provided assemblies for implementations of ICommandHandler<,>
         services.AddCommandHandler<TorrentAddCommand, TorrentAddResponse, TorrentAddCommandHandler>();

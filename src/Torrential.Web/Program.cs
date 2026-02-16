@@ -1,5 +1,3 @@
-using MassTransit;
-using MassTransit.Initializers;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Metrics;
 using Serilog;
@@ -10,6 +8,7 @@ using Torrential.Commands;
 using Torrential.Extensions.SignalR;
 using Torrential.Files;
 using Torrential.Peers;
+using Torrential.Pipelines;
 using Torrential.Settings;
 using Torrential.Torrents;
 using Torrential.Trackers;
@@ -29,6 +28,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<PieceVerifiedBatchService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PieceVerifiedBatchService>());
+builder.Services.AddSingleton<TorrentHubMessageDispatcher>();
 builder.Services.AddOpenTelemetry()
     .WithMetrics(b =>
     {
@@ -48,14 +48,6 @@ builder.Services.AddCors(options =>
             .WithOrigins("http://localhost:3000", "http://localhost:5142", "http://192.168.10.49:5142", "http://localhost:5173", "http://192.168.10.30:5142"));
 });
 
-builder.Services.AddMassTransit(x =>
-{
-    x.AddConsumers(typeof(TorrentHubMessageDispatcher).Assembly, typeof(PieceValidator).Assembly);
-    x.UsingInMemory((context, cfg) =>
-    {
-        cfg.ConfigureEndpoints(context);
-    });
-});
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
@@ -63,6 +55,15 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddSingleton<InitializationService>();
 
 var app = builder.Build();
+
+// ---------------------------------------------------------------------------
+// Wire up TorrentEventBus handlers.
+// All services are singletons so we resolve once and register handler delegates.
+// This replaces all MassTransit IConsumer<T> registrations with zero-allocation
+// direct method dispatch.
+// ---------------------------------------------------------------------------
+WireEventBus(app.Services);
+
 app.UseStaticFiles();
 app.MapFallbackToFile("index.html");
 app.UseOpenTelemetryPrometheusScrapingEndpoint();
@@ -233,6 +234,57 @@ var initService = app.Services.GetRequiredService<InitializationService>();
 await initService.Initialize(CancellationToken.None);
 
 await app.RunAsync();
+
+
+static void WireEventBus(IServiceProvider services)
+{
+    var bus = services.GetRequiredService<TorrentEventBus>();
+
+    // --- Hot path: piece validation (channel-based, sequential) ---
+    var validator = services.GetRequiredService<PieceValidator>();
+    bus.OnPieceValidationRequest(validator.ValidateAsync);
+
+    // --- Hot path: piece verified -> broadcast Have to peers + SignalR batch ---
+    var swarmDispatcher = services.GetRequiredService<PeerSwarmMessageDispatcher>();
+    bus.OnPieceVerified(swarmDispatcher.HandlePieceVerified);
+
+    var hubDispatcher = services.GetRequiredService<TorrentHubMessageDispatcher>();
+    bus.OnPieceVerified(hubDispatcher.HandlePieceVerified);
+
+    // --- Torrent complete -> post-download actions + SignalR ---
+    var postDownload = services.GetRequiredService<PostDownloadActionExecutor>();
+    bus.OnTorrentComplete(postDownload.HandleTorrentComplete);
+    bus.OnTorrentComplete(hubDispatcher.HandleTorrentComplete);
+
+    // --- Lifecycle events -> status cache + announce service + SignalR ---
+    var statusMaintainer = services.GetRequiredService<TorrentStatusCacheMaintainer>();
+    var announceHandler = services.GetRequiredService<AnnounceServiceEventHandler>();
+
+    bus.OnTorrentAdded(hubDispatcher.HandleTorrentAdded);
+
+    bus.OnTorrentStarted(statusMaintainer.HandleTorrentStarted);
+    bus.OnTorrentStarted(announceHandler.HandleTorrentStarted);
+    bus.OnTorrentStarted(hubDispatcher.HandleTorrentStarted);
+
+    bus.OnTorrentStopped(statusMaintainer.HandleTorrentStopped);
+    bus.OnTorrentStopped(announceHandler.HandleTorrentStopped);
+    bus.OnTorrentStopped(hubDispatcher.HandleTorrentStopped);
+
+    bus.OnTorrentRemoved(statusMaintainer.HandleTorrentRemoved);
+    bus.OnTorrentRemoved(announceHandler.HandleTorrentRemoved);
+    bus.OnTorrentRemoved(hubDispatcher.HandleTorrentRemoved);
+
+    // --- Peer events -> SignalR only ---
+    bus.OnPeerConnected(hubDispatcher.HandlePeerConnected);
+    bus.OnPeerDisconnected(hubDispatcher.HandlePeerDisconnected);
+    bus.OnPeerBitfieldReceived(hubDispatcher.HandlePeerBitfieldReceived);
+
+    // --- Stats -> SignalR ---
+    bus.OnTorrentStats(hubDispatcher.HandleTorrentStats);
+
+    // Start the validation channel background reader
+    bus.Start();
+}
 
 
 static Logger BuildLogger(IConfiguration configuration)

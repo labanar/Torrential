@@ -1,4 +1,3 @@
-using MassTransit;
 using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
@@ -7,7 +6,7 @@ using Torrential.Torrents;
 
 namespace Torrential.Pipelines
 {
-    public class FileCopyPostDownloadAction(TorrentMetadataCache metaCache, IFileHandleProvider fileHandleProvider, IBus bus, ILogger<FileCopyPostDownloadAction> logger)
+    public class FileCopyPostDownloadAction(TorrentMetadataCache metaCache, IFileHandleProvider fileHandleProvider, TorrentEventBus eventBus, ILogger<FileCopyPostDownloadAction> logger)
             : IPostDownloadAction
     {
         // 1 MB copy buffer — large enough to amortize syscall overhead and leverage OS read-ahead,
@@ -63,7 +62,7 @@ namespace Torrential.Pipelines
                     var destinationHandle = await fileHandleProvider.GetCompletedFileHandle(infoHash, fileInfo);
                     try
                     {
-                        await bus.Publish(new TorrentFileCopyStartedEvent { InfoHash = infoHash, FileName = fileInfo.Filename }, cancellationToken);
+                        await eventBus.PublishFileCopyStarted(new TorrentFileCopyStartedEvent { InfoHash = infoHash, FileName = fileInfo.Filename });
 
                         while (readOffset < fileEnd)
                         {
@@ -87,7 +86,7 @@ namespace Torrential.Pipelines
                         // The rented buffer may be larger than requested, so the final read/write could
                         // overshoot. Truncate to exact file size.
                         RandomAccess.SetLength(destinationHandle, fileInfo.FileSize);
-                        await bus.Publish(new TorrentFileCopyCompletedEvent { InfoHash = infoHash, FileName = fileInfo.Filename }, cancellationToken);
+                        await eventBus.PublishFileCopyCompleted(new TorrentFileCopyCompletedEvent { InfoHash = infoHash, FileName = fileInfo.Filename });
                     }
                     finally
                     {

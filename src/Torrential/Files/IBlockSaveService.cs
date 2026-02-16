@@ -1,4 +1,3 @@
-using MassTransit;
 using Microsoft.Extensions.Logging;
 using Torrential.Peers;
 using Torrential.Torrents;
@@ -15,7 +14,7 @@ namespace Torrential.Files
         TorrentMetadataCache metaCache,
         ILogger<BlockSaveService> logger,
         BitfieldManager bitfieldManager,
-        IBus bus,
+        TorrentEventBus eventBus,
         TorrentStats torrentStats)
         : IBlockSaveService
     {
@@ -57,7 +56,7 @@ namespace Torrential.Files
                 var fileOffset = (block.PieceIndex * meta.PieceSize) + block.Offset;
                 RandomAccess.Write(fileHandle, block.Buffer, fileOffset);
 
-                // Record download bytes directly -- no MassTransit event allocation.
+                // Record download bytes directly -- no event allocation.
                 // QueueDownloadRate writes to an unbounded channel (completes synchronously).
                 await torrentStats.QueueDownloadRate(meta.InfoHash, block.Buffer.Length);
 
@@ -71,8 +70,8 @@ namespace Torrential.Files
                 if (HasAllBlocksForPiece(blockBitfield, block.PieceIndex, chunksInThisPiece, chunksPerFullPiece))
                 {
                     downloadBitfield.MarkHave(block.PieceIndex);
-                    await bus.Publish(new PieceValidationRequest { InfoHash = block.InfoHash, PieceIndex = block.PieceIndex });
-                    await bus.Publish(new TorrentPieceDownloadedEvent { InfoHash = block.InfoHash, PieceIndex = block.PieceIndex });
+                    await eventBus.PublishPieceValidationRequest(new PieceValidationRequest { InfoHash = block.InfoHash, PieceIndex = block.PieceIndex });
+                    await eventBus.PublishPieceDownloaded(new TorrentPieceDownloadedEvent { InfoHash = block.InfoHash, PieceIndex = block.PieceIndex });
                 }
             }
         }

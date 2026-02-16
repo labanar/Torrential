@@ -1,5 +1,4 @@
-﻿using MassTransit;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
 using Torrential.Files;
@@ -16,7 +15,7 @@ namespace Torrential.Peers
         SettingsManager settingsManager,
         TorrentStatusCache statusCache,
         BitfieldManager bitfieldManager,
-        IBus bus,
+        TorrentEventBus eventBus,
         IBlockSaveService blockSaveService,
         ILogger<PeerSwarm> logger,
         ILoggerFactory loggerFactory)
@@ -54,6 +53,10 @@ namespace Torrential.Peers
             }
         }
 
+        /// <summary>
+        /// Sends a Have message to all peers for the given piece.
+        /// Uses ArrayPool to avoid List&lt;Task&gt; allocation on every verified piece.
+        /// </summary>
         public async Task BroadcastHaveMessage(InfoHash infoHash, int pieceIndex)
         {
             if (!_peerClients.TryGetValue(infoHash, out var peerClients))
@@ -62,17 +65,31 @@ namespace Torrential.Peers
                 return;
             }
 
-            var tasks = new List<Task>();
+            var peers = peerClients.Values;
+            var count = peers.Count;
+            if (count == 0) return;
+
+            // Rent from ArrayPool instead of allocating a new List<Task> per call.
+            // Each verified piece triggers this, so the savings compound fast.
+            var taskBuffer = System.Buffers.ArrayPool<Task>.Shared.Rent(count);
             try
             {
-                foreach (var peer in peerClients.Values)
-                    tasks.Add(peer.SendHave(pieceIndex));
+                int i = 0;
+                foreach (var peer in peers)
+                {
+                    if (i < taskBuffer.Length)
+                        taskBuffer[i++] = peer.SendHave(pieceIndex);
+                }
 
-                await Task.WhenAll(tasks);
+                // Task.WhenAll with an array segment -- no allocation beyond the rented buffer
+                for (int j = 0; j < i; j++)
+                    await taskBuffer[j];
+
+                logger.LogDebug("Broadcasted have message for {PieceIndex} to {Count} peers", pieceIndex, i);
             }
             finally
             {
-                logger.LogDebug("Broadcasted have message for {PieceIndex} to {Count} peers", pieceIndex, tasks.Count);
+                System.Buffers.ArrayPool<Task>.Shared.Return(taskBuffer, clearArray: true);
             }
         }
 
@@ -210,7 +227,7 @@ namespace Torrential.Peers
 
             var peerSwarmTasks = _peerUploadDownloadTasks.GetOrAdd(connection.InfoHash, (_) => new ConcurrentDictionary<PeerId, Task>());
             peerSwarmTasks.TryAdd(connection.PeerId.Value, torrentRunner.StartSharing(metadata, peerClient, peerCts.Token));
-            await bus.Publish(new PeerConnectedEvent
+            await eventBus.PublishPeerConnected(new PeerConnectedEvent
             {
                 InfoHash = metadata.InfoHash,
                 Ip = connection.PeerInfo.Ip.ToString(),
@@ -338,7 +355,7 @@ namespace Torrential.Peers
             }
 
             //Notify that the peer has been removed
-            await bus.Publish(new PeerDisconnectedEvent
+            await eventBus.PublishPeerDisconnected(new PeerDisconnectedEvent
             {
                 InfoHash = infoHash,
                 PeerId = peerId

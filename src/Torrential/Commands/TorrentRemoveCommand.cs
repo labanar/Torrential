@@ -1,4 +1,3 @@
-﻿using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Torrential.Files;
@@ -23,7 +22,7 @@ namespace Torrential.Commands
         TorrentMetadataCache metaCache,
         TorrentTaskManager mgr,
         TorrentialDb db,
-        IBus bus,
+        TorrentEventBus eventBus,
         TorrentFileService fileService,
         IFileHandleProvider fileHandleProvider,
         TorrentStats stats,
@@ -50,7 +49,7 @@ namespace Torrential.Commands
             }
 
             //await fileService.ClearData(command.InfoHash);
-            await bus.Publish(new TorrentRemovedEvent { InfoHash = command.InfoHash });
+            await eventBus.PublishTorrentRemoved(new TorrentRemovedEvent { InfoHash = command.InfoHash });
             return new() { };
         }
     }

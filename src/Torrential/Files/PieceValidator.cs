@@ -1,4 +1,3 @@
-using MassTransit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32.SafeHandles;
 using System.Buffers;
@@ -16,17 +15,14 @@ namespace Torrential.Files
         public required int PieceIndex { get; init; }
     }
 
-    public class PieceValidator(ILogger<PieceValidator> logger, TorrentMetadataCache metaCache, IFileHandleProvider fileHandleProvider, BitfieldManager bitfieldMgr, IBus bus)
-        : IConsumer<PieceValidationRequest>
+    public class PieceValidator(ILogger<PieceValidator> logger, TorrentMetadataCache metaCache, IFileHandleProvider fileHandleProvider, BitfieldManager bitfieldMgr, TorrentEventBus eventBus)
     {
         // Tracks whether TorrentCompleteEvent has already been published for each torrent.
         // TryAdd is atomic: only the first caller to add the key succeeds, guaranteeing exactly-once publish.
         private static readonly ConcurrentDictionary<InfoHash, byte> _completionPublished = new();
 
-        public async Task Consume(ConsumeContext<PieceValidationRequest> context)
+        public async Task ValidateAsync(PieceValidationRequest request)
         {
-            var request = context.Message;
-
             if (!metaCache.TryGet(request.InfoHash, out var meta))
             {
                 logger.LogError("Could not find torrent metadata");
@@ -65,7 +61,7 @@ namespace Torrential.Files
             if (result)
             {
                 verificationBitfield.MarkHave(request.PieceIndex);
-                await bus.Publish(new TorrentPieceVerifiedEvent { InfoHash = request.InfoHash, PieceIndex = request.PieceIndex, Progress = verificationBitfield.CompletionRatio });
+                await eventBus.PublishPieceVerified(new TorrentPieceVerifiedEvent { InfoHash = request.InfoHash, PieceIndex = request.PieceIndex, Progress = verificationBitfield.CompletionRatio });
 
                 if (verificationBitfield.HasAll())
                 {
@@ -75,7 +71,7 @@ namespace Torrential.Files
                     if (_completionPublished.TryAdd(request.InfoHash, 1))
                     {
                         logger.LogInformation("All pieces verified");
-                        await bus.Publish(new TorrentCompleteEvent { InfoHash = request.InfoHash });
+                        await eventBus.PublishTorrentComplete(new TorrentCompleteEvent { InfoHash = request.InfoHash });
                     }
                     else
                     {

@@ -1,4 +1,3 @@
-﻿using MassTransit;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -128,17 +127,17 @@ namespace Torrential.Trackers
     }
 
 
-    public sealed class AnnounceServiceEventHandler(AnnounceServiceState state, TorrentMetadataCache metaCache, ILogger<AnnounceServiceEventHandler> logger) :
-        IConsumer<TorrentStartedEvent>,
-        IConsumer<TorrentStoppedEvent>,
-        IConsumer<TorrentRemovedEvent>
+    /// <summary>
+    /// Handles torrent lifecycle events for the announce service.
+    /// Registered as direct handlers on TorrentEventBus during DI setup.
+    /// </summary>
+    public sealed class AnnounceServiceEventHandler(AnnounceServiceState state, TorrentMetadataCache metaCache, ILogger<AnnounceServiceEventHandler> logger)
     {
-        public Task Consume(ConsumeContext<TorrentStartedEvent> context)
+        public Task HandleTorrentStarted(TorrentStartedEvent evt)
         {
-            var @event = context.Message;
-            if (!metaCache.TryGet(@event.InfoHash, out var metaData))
+            if (!metaCache.TryGet(evt.InfoHash, out var metaData))
             {
-                logger.LogInformation("Could not find metadata for {InfoHash}", @event.InfoHash);
+                logger.LogInformation("Could not find metadata for {InfoHash}", evt.InfoHash);
                 return Task.CompletedTask;
             }
 
@@ -146,17 +145,15 @@ namespace Torrential.Trackers
             return Task.CompletedTask;
         }
 
-        public Task Consume(ConsumeContext<TorrentStoppedEvent> context)
+        public Task HandleTorrentStopped(TorrentStoppedEvent evt)
         {
-            var @event = context.Message;
-            state.RemoveTorrent(@event.InfoHash);
+            state.RemoveTorrent(evt.InfoHash);
             return Task.CompletedTask;
         }
 
-        public Task Consume(ConsumeContext<TorrentRemovedEvent> context)
+        public Task HandleTorrentRemoved(TorrentRemovedEvent evt)
         {
-            var @event = context.Message;
-            state.RemoveTorrent(@event.InfoHash);
+            state.RemoveTorrent(evt.InfoHash);
             return Task.CompletedTask;
         }
     }

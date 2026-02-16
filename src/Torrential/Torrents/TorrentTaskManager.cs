@@ -1,11 +1,10 @@
-﻿using MassTransit;
 using System.Collections.Concurrent;
 using Torrential.Peers;
 using Torrential.Utilities;
 
 namespace Torrential.Torrents
 {
-    public class TorrentTaskManager(TorrentMetadataCache metaCache, PeerSwarm swarms, IBus bus, BitfieldManager bitfieldManager)
+    public class TorrentTaskManager(TorrentMetadataCache metaCache, PeerSwarm swarms, TorrentEventBus eventBus, BitfieldManager bitfieldManager)
     {
         private ConcurrentDictionary<InfoHash, string> Torrents = [];
         private ConcurrentDictionary<InfoHash, Task> TorrentTasks = [];
@@ -25,7 +24,7 @@ namespace Torrential.Torrents
             metaCache.Add(torrentMetadata);
             await bitfieldManager.Initialize(torrentMetadata);
 
-            await bus.Publish(new TorrentAddedEvent
+            await eventBus.PublishTorrentAdded(new TorrentAddedEvent
             {
                 InfoHash = torrentMetadata.InfoHash,
                 AnnounceList = torrentMetadata.AnnounceList,
@@ -62,7 +61,7 @@ namespace Torrential.Torrents
             }
 
             TorrentTasks[infoHash] = swarms.MaintainSwarm(infoHash);
-            await bus.Publish(new TorrentStartedEvent { InfoHash = infoHash });
+            await eventBus.PublishTorrentStarted(new TorrentStartedEvent { InfoHash = infoHash });
             return new()
             {
                 InfoHash = infoHash,
@@ -96,7 +95,7 @@ namespace Torrential.Torrents
             while (torrentTask.InProgress())
                 await Task.Delay(500);
 
-            await bus.Publish(new TorrentStoppedEvent { InfoHash = infoHash });
+            await eventBus.PublishTorrentStopped(new TorrentStoppedEvent { InfoHash = infoHash });
 
             return new()
             {
@@ -131,7 +130,7 @@ namespace Torrential.Torrents
             while (torrentTask.InProgress())
                 await Task.Delay(500);
 
-            await bus.Publish(new TorrentRemovedEvent { InfoHash = infoHash });
+            await eventBus.PublishTorrentRemoved(new TorrentRemovedEvent { InfoHash = infoHash });
             return new() { InfoHash = infoHash, Success = true };
         }
     }
