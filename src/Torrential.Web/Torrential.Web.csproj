@@ -46,4 +46,17 @@
 	<ItemGroup>
 	  <Folder Include="wwwroot\" />
 	</ItemGroup>
+
+	<!-- Build the Vite frontend and output to wwwroot -->
+	<PropertyGroup>
+		<ViteProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\torrential-ui-vite'))</ViteProjectDir>
+	</PropertyGroup>
+
+	<Target Name="NpmInstall" BeforeTargets="ViteBuild" Inputs="$(ViteProjectDir)\package.json" Outputs="$(ViteProjectDir)\node_modules\.package-lock.json">
+		<Exec Command="npm install" WorkingDirectory="$(ViteProjectDir)" />
+	</Target>
+
+	<Target Name="ViteBuild" BeforeTargets="Build" Condition="'$(SKIP_VITE_BUILD)' != 'true'">
+		<Exec Command="npm run build" WorkingDirectory="$(ViteProjectDir)" />
+	</Target>
 </Project>
