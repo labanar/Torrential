@@ -6,6 +6,7 @@ public interface IPeerConnectionManager
 {
     IReadOnlyList<ConnectedPeer> GetConnectedPeers(InfoHash infoHash);
     int GetConnectedPeerCount(InfoHash infoHash);
+    PeerWireClient? GetPeerClient(InfoHash infoHash, PeerInfo peerInfo);
 }
 
 public sealed class ConnectedPeer
