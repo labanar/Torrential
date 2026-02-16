@@ -1,8 +1,23 @@
 .root {
     display: flex;
     flex-direction: column;
+    height: 100%;
   }
-  
+
+  .topPane {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .bottomPane {
+    flex: 0 0 auto;
+    max-height: 50%;
+    overflow-y: auto;
+  }
+
   .torrentList {
     display: flex;
     flex-direction: column;

@@ -20,6 +20,11 @@ import { PeerSummary } from "../types";
 import { removeTorrent, updateTorrent } from "../store/slices/torrentsSlice";
 import { queueNotification } from "../store/slices/notificationsSlice";
 import {
+  updateDetailBitfield,
+  updateDetailFiles,
+} from "../store/slices/torrentDetailSlice";
+import { fetchTorrentDetail } from "./api";
+import {
   faCheckCircle,
   faPlayCircle,
   faPlusCircle,
@@ -72,13 +77,27 @@ export class SignalRService {
       }
     );
 
-    this.connection.on(`PieceVerified`, (event: PieceVerifiedEvent) => {
+    this.connection.on(`PieceVerified`, async (event: PieceVerifiedEvent) => {
       const { infoHash, progress } = event;
       const payload = {
         infoHash,
         update: { progress: Number(progress.toFixed(3)) },
       };
       store.dispatch(updateTorrent(payload));
+
+      // Refresh bitfield in detail pane if this torrent is selected
+      const { torrentDetail } = store.getState();
+      if (torrentDetail.selectedInfoHash === infoHash) {
+        const detail = await fetchTorrentDetail(infoHash);
+        if (detail) {
+          store.dispatch(
+            updateDetailBitfield({
+              haveCount: detail.bitfield.haveCount,
+              bitfield: detail.bitfield.bitfield,
+            })
+          );
+        }
+      }
     });
 
     this.connection.on("TorrentStarted", (event: TorrentStartedEvent) => {
@@ -206,9 +225,13 @@ export class SignalRService {
 
     this.connection.on(
       "FileSelectionChanged",
-      (_event: FileSelectionChangedEvent) => {
-        // The detail pane re-fetches on this event via its own subscription.
-        // No global store update needed; event is available for component-level listeners.
+      (event: FileSelectionChangedEvent) => {
+        const { torrentDetail } = store.getState();
+        if (torrentDetail.selectedInfoHash === event.infoHash) {
+          store.dispatch(
+            updateDetailFiles({ selectedFileIds: event.selectedFileIds })
+          );
+        }
       }
     );
   }

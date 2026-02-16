@@ -2,6 +2,7 @@ import { configureStore, createSelector } from "@reduxjs/toolkit";
 import torrentsReducer from "./slices/torrentsSlice";
 import peersReducer from "./slices/peersSlice";
 import notificationsReducer from "./slices/notificationsSlice";
+import torrentDetailReducer from "./slices/torrentDetailSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { TorrentSummary } from "../types";
 
@@ -10,6 +11,7 @@ const store = configureStore({
     torrents: torrentsReducer,
     peers: peersReducer,
     notifications: notificationsReducer,
+    torrentDetail: torrentDetailReducer,
   },
 });
 

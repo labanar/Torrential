@@ -80,3 +80,57 @@ export interface TorrentAddedEvent {
   totalSize: number;
   name: string;
 }
+
+export interface TorrentDetailApiModel {
+  infoHash: string;
+  name: string;
+  status: string;
+  progress: number;
+  totalSizeBytes: number;
+  bytesDownloaded: number;
+  bytesUploaded: number;
+  downloadRate: number;
+  uploadRate: number;
+  peers: PeerApiModel[];
+  bitfield: BitfieldApiModel;
+  files: TorrentFileApiModel[];
+}
+
+export interface BitfieldApiModel {
+  pieceCount: number;
+  haveCount: number;
+  bitfield: string;
+}
+
+export interface TorrentFileApiModel {
+  id: number;
+  filename: string;
+  size: number;
+  isSelected: boolean;
+}
+
+export async function fetchTorrentDetail(infoHash: string): Promise<TorrentDetailApiModel | null> {
+  const response = await fetch(
+    `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/detail`
+  );
+  if (!response.ok) return null;
+  const result = await response.json();
+  return result.data ?? null;
+}
+
+export async function updateFileSelection(
+  infoHash: string,
+  fileIds: number[]
+): Promise<boolean> {
+  const response = await fetch(
+    `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/files/select`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileIds }),
+    }
+  );
+  if (!response.ok) return false;
+  const result = await response.json();
+  return result.data?.success ?? false;
+}
