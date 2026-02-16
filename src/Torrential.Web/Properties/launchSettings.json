@@ -4,7 +4,8 @@
       "commandName": "Project",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "DOTNET_gcServer": "0"
+        "DOTNET_gcServer": "0",
+        "APP_DATA_PATH": "E:\\torrential"
       },
       "dotnetRunMessages": true,
       "applicationUrl": "http://0.0.0.0:5142"

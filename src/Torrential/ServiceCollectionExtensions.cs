@@ -44,7 +44,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<PeerConnectionManager>();
         services.AddSingleton<GeoIpService>();
 
-
         //TODO - add service extension that scans the provided assemblies for implementations of ICommandHandler<,>
         services.AddCommandHandler<TorrentAddCommand, TorrentAddResponse, TorrentAddCommandHandler>();
         services.AddCommandHandler<TorrentStartCommand, TorrentStartResponse, TorrentStartCommandHandler>();

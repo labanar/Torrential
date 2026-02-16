@@ -11,6 +11,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Torrential.Web", "src\Torre
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Torrential.Extensions.SignalR", "src\Torrential.Extensions.SignalR\Torrential.Extensions.SignalR.csproj", "{4609E6CF-4AD1-4D7C-8E94-F50ED41EE8A9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Torrential.Core", "src\Torrential.Core\Torrential.Core.csproj", "{CC2D68E5-B83D-4766-9ADF-CB6648C25407}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Torrential.Sample", "src\Torrential.Sample\Torrential.Sample.csproj", "{2A85B1A8-0879-4769-8628-1D142BDFB7AA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Torrential.Core.Tests", "test\Torrential.Core.Tests\Torrential.Core.Tests.csproj", "{EEDA8090-DC3C-4247-BE97-C9ACED34B4C7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +39,18 @@ Global
 		{4609E6CF-4AD1-4D7C-8E94-F50ED41EE8A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4609E6CF-4AD1-4D7C-8E94-F50ED41EE8A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4609E6CF-4AD1-4D7C-8E94-F50ED41EE8A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC2D68E5-B83D-4766-9ADF-CB6648C25407}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC2D68E5-B83D-4766-9ADF-CB6648C25407}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC2D68E5-B83D-4766-9ADF-CB6648C25407}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC2D68E5-B83D-4766-9ADF-CB6648C25407}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2A85B1A8-0879-4769-8628-1D142BDFB7AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A85B1A8-0879-4769-8628-1D142BDFB7AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A85B1A8-0879-4769-8628-1D142BDFB7AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A85B1A8-0879-4769-8628-1D142BDFB7AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EEDA8090-DC3C-4247-BE97-C9ACED34B4C7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EEDA8090-DC3C-4247-BE97-C9ACED34B4C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EEDA8090-DC3C-4247-BE97-C9ACED34B4C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EEDA8090-DC3C-4247-BE97-C9ACED34B4C7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
