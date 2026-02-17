@@ -158,6 +158,13 @@ export interface TorrentPreviewApiModel {
   files: TorrentPreviewFileApiModel[];
 }
 
+export interface DirectoryBrowseApiModel {
+  currentPath: string;
+  parentPath?: string | null;
+  canNavigateUp: boolean;
+  directories: string[];
+}
+
 export async function previewTorrent(file: File): Promise<TorrentPreviewApiModel> {
   const formData = new FormData();
   formData.append("file", file);
@@ -198,4 +205,20 @@ export async function addTorrent(file: File, selectedFileIds: number[], complete
   if (!response.ok) {
     throw new Error("Failed to add torrent");
   }
+}
+
+export async function browseDirectories(path?: string): Promise<DirectoryBrowseApiModel> {
+  const query = path ? `?path=${encodeURIComponent(path)}` : "";
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/filesystem/directories${query}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to browse directories");
+  }
+
+  const result: ApiResponse<DirectoryBrowseApiModel> = await response.json();
+  if (!result.data) {
+    throw new Error("Directory browser endpoint returned no data");
+  }
+
+  return result.data;
 }

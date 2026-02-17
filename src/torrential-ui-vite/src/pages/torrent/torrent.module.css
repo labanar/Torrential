@@ -181,3 +181,33 @@
   margin-top: 4px;
 }
 
+.completedPathInputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pathPickerBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pathPickerTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pathPickerList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 45vh;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 8px;
+}
+
