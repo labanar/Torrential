@@ -93,6 +93,17 @@ namespace Torrential.Peers
                 logger.LogInformation("Recovery scan complete for {InfoHash}: {Queued} pieces queued for validation, {Skipped} already verified",
                     infoHash, queuedCount, skippedAlreadyVerified);
             }
+
+            // Recovery add-path: if the part file already contains the full torrent and every wanted piece
+            // was already verified from persisted state, validation will not emit completion.
+            if (recoveryResult is { HasRecoverableData: true } &&
+                recoveryResult.PartFileLength >= meta.TotalSize &&
+                queuedCount == 0 &&
+                HasAllWantedPieces(infoHash, verificationBitfield))
+            {
+                logger.LogInformation("Recovered torrent {InfoHash} is already fully verified; publishing completion event", infoHash);
+                await eventBus.PublishTorrentComplete(new TorrentCompleteEvent { InfoHash = infoHash });
+            }
         }
 
         /// <summary>

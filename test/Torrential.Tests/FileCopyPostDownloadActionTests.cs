@@ -216,6 +216,35 @@ public sealed class FileCopyPostDownloadActionTests
         Assert.False(File.Exists(outputPath));
     }
 
+    [Fact]
+    public async Task Torrent_configuration_completed_path_is_used_for_materialization()
+    {
+        await using var harness = await FileCopyTestHarness.CreateAsync();
+        var metadata = CreateMetadata(
+            name: "copy-custom-completed",
+            infoHash: "7777777777777777777777777777777777777777",
+            files:
+            [
+                new TorrentMetadataFile { Id = 0, Filename = "payload/custom.txt", FileStartByte = 0, FileSize = 11, IsSelected = true }
+            ]);
+
+        harness.MetadataCache.Add(metadata);
+        var customCompletedRoot = Path.Combine(harness.TempRoot, "completed-custom");
+        await harness.UpsertTorrentConfigurationAsync(metadata.InfoHash, harness.DefaultDownloadRoot, customCompletedRoot);
+
+        await harness.WritePartFileAsync(metadata.InfoHash, "custom-path"u8.ToArray());
+        var result = await harness.Action.ExecuteAsync(metadata.InfoHash, CancellationToken.None);
+
+        Assert.True(result.Success);
+
+        var expectedOutput = Path.Combine(customCompletedRoot, metadata.Name, "payload", "custom.txt");
+        var defaultOutput = Path.Combine(harness.DefaultCompletedRoot, metadata.Name, "payload", "custom.txt");
+
+        Assert.True(File.Exists(expectedOutput));
+        Assert.Equal("custom-path"u8.ToArray(), await File.ReadAllBytesAsync(expectedOutput));
+        Assert.False(File.Exists(defaultOutput));
+    }
+
     private static TorrentMetadata CreateMetadata(string name, string infoHash, TorrentMetadataFile[] files)
     {
         var totalSize = files.Sum(static file => file.FileSize);
@@ -318,6 +347,9 @@ public sealed class FileCopyPostDownloadActionTests
         public IFileHandleProvider FileHandleProvider { get; }
         public TorrentEventBus EventBus { get; }
         public FileCopyPostDownloadAction Action { get; }
+        public string TempRoot => _tempRoot;
+        public string DefaultDownloadRoot => Path.Combine(_tempRoot, "download");
+        public string DefaultCompletedRoot => Path.Combine(_tempRoot, "completed");
 
         public static async Task<FileCopyTestHarness> CreateAsync()
         {
@@ -347,7 +379,10 @@ public sealed class FileCopyPostDownloadActionTests
             });
 
             var metadataCache = new TorrentMetadataCache();
-            var torrentFileService = new TorrentFileService(metadataCache, settingsManager);
+            var torrentFileService = new TorrentFileService(
+                metadataCache,
+                settingsManager,
+                serviceProvider.GetRequiredService<IServiceScopeFactory>());
 
             var fileHandleProviderType = typeof(TorrentFileService).Assembly.GetType("Torrential.Files.FileHandleProvider", throwOnError: true)!;
             var internalFileHandleProvider = Activator.CreateInstance(fileHandleProviderType, metadataCache, torrentFileService)
@@ -388,6 +423,34 @@ public sealed class FileCopyPostDownloadActionTests
             var partPath = await TorrentFileService.GetPartFilePath(infoHash);
             Directory.CreateDirectory(Path.GetDirectoryName(partPath)!);
             await File.WriteAllBytesAsync(partPath, content);
+        }
+
+        public async Task UpsertTorrentConfigurationAsync(InfoHash infoHash, string downloadPath, string completedPath)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
+            var config = await db.Torrents.FirstOrDefaultAsync(x => x.InfoHash == infoHash.AsString());
+
+            if (config == null)
+            {
+                config = new TorrentConfiguration
+                {
+                    InfoHash = infoHash,
+                    DownloadPath = downloadPath,
+                    CompletedPath = completedPath,
+                    DateAdded = DateTimeOffset.UtcNow,
+                    Status = TorrentStatus.Idle
+                };
+
+                await db.Torrents.AddAsync(config);
+            }
+            else
+            {
+                config.DownloadPath = downloadPath;
+                config.CompletedPath = completedPath;
+            }
+
+            await db.SaveChangesAsync();
         }
 
         public async ValueTask DisposeAsync()
