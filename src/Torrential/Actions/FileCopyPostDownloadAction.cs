@@ -48,24 +48,7 @@ namespace Torrential.Pipelines
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     await eventBus.PublishFileCopyStarted(new TorrentFileCopyStartedEvent { InfoHash = infoHash, FileName = fileInfo.Filename });
-
-                    await using var sourceSegmentStream = await fileHandleProvider.OpenPartFileSegmentReadStream(infoHash, fileInfo);
-                    var detection = await archiveExtractionService.DetectArchiveAsync(fileInfo, sourceSegmentStream, cancellationToken);
-                    if (detection.ShouldExtract)
-                    {
-                        var extractionResult = await archiveExtractionService.TryExtractAsync(infoHash, fileInfo, sourceSegmentStream, cancellationToken);
-                        if (extractionResult.Status == ArchiveExtractionStatus.Extracted)
-                        {
-                            await eventBus.PublishFileCopyCompleted(new TorrentFileCopyCompletedEvent { InfoHash = infoHash, FileName = fileInfo.Filename });
-                            continue;
-                        }
-
-                        logger.LogInformation("Archive extraction fallback engaged for {FileName} due to {Reason}; copying raw archive", fileInfo.Filename, extractionResult.Reason);
-                        if (sourceSegmentStream.CanSeek)
-                            sourceSegmentStream.Seek(0, SeekOrigin.Begin);
-                    }
-
-                    await CopyFileSegmentToCompletedFileAsync(infoHash, fileInfo, sourceSegmentStream, buffer, cancellationToken);
+                    await MaterializeFileAsync(infoHash, fileInfo, buffer, cancellationToken);
                     await eventBus.PublishFileCopyCompleted(new TorrentFileCopyCompletedEvent { InfoHash = infoHash, FileName = fileInfo.Filename });
                 }
             }
@@ -85,6 +68,51 @@ namespace Torrential.Pipelines
             }
 
             return new PostDownloadActionResult { Success = true };
+        }
+
+        private async Task MaterializeFileAsync(InfoHash infoHash, TorrentMetadataFile fileInfo, byte[] buffer, CancellationToken cancellationToken)
+        {
+            await using var sourceSegmentStream = await fileHandleProvider.OpenPartFileSegmentReadStream(infoHash, fileInfo);
+            var detection = await archiveExtractionService.DetectArchiveAsync(fileInfo, sourceSegmentStream, cancellationToken);
+            logger.LogInformation(
+                "Archive detection for {FileName}: ShouldExtract={ShouldExtract}, Reason={Reason}, ContentType={ContentType}",
+                fileInfo.Filename,
+                detection.ShouldExtract,
+                detection.Reason,
+                detection.ContentType ?? "unknown");
+
+            if (!detection.ShouldExtract)
+            {
+                await CopyFileSegmentToCompletedFileAsync(infoHash, fileInfo, sourceSegmentStream, buffer, cancellationToken);
+                return;
+            }
+
+            logger.LogInformation("Starting archive extraction for {FileName}", fileInfo.Filename);
+            var extractionResult = await archiveExtractionService.TryExtractAsync(infoHash, fileInfo, sourceSegmentStream, cancellationToken);
+            if (extractionResult.Status == ArchiveExtractionStatus.Extracted)
+            {
+                logger.LogInformation("Completed archive extraction for {FileName}", fileInfo.Filename);
+                return;
+            }
+
+            logger.LogInformation(
+                "Archive extraction fallback engaged for {FileName} due to {Reason}; copying raw archive",
+                fileInfo.Filename,
+                extractionResult.Reason);
+
+            if (sourceSegmentStream.CanSeek)
+            {
+                sourceSegmentStream.Seek(0, SeekOrigin.Begin);
+            }
+            else
+            {
+                logger.LogWarning("Cannot seek source stream for {FileName}; reopening part segment for fallback copy", fileInfo.Filename);
+                await using var reopenedSourceSegmentStream = await fileHandleProvider.OpenPartFileSegmentReadStream(infoHash, fileInfo);
+                await CopyFileSegmentToCompletedFileAsync(infoHash, fileInfo, reopenedSourceSegmentStream, buffer, cancellationToken);
+                return;
+            }
+
+            await CopyFileSegmentToCompletedFileAsync(infoHash, fileInfo, sourceSegmentStream, buffer, cancellationToken);
         }
 
         private async Task CopyFileSegmentToCompletedFileAsync(InfoHash infoHash, TorrentMetadataFile fileInfo, Stream sourceSegmentStream, byte[] buffer, CancellationToken cancellationToken)
