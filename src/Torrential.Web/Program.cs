@@ -109,16 +109,33 @@ app.MapPost(
 
 app.MapPost(
     "/torrents/add",
-    async ([FromForm] TorrentAddRequest request, ICommandHandler<TorrentAddCommand, TorrentAddResponse> handler) =>
+    ([FromForm] TorrentAddRequest request, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory) =>
     {
         var meta = TorrentMetadataParser.FromStream(request.File.OpenReadStream());
-        return await handler.Execute(new()
+        var selectedFileIds = request.SelectedFileIds;
+        var logger = loggerFactory.CreateLogger("TorrentAddEndpoint");
+
+        _ = Task.Run(async () =>
         {
-            Metadata = meta,
-            DownloadPath = "",
-            CompletedPath = "",
-            SelectedFileIds = request.SelectedFileIds
+            try
+            {
+                using var scope = scopeFactory.CreateScope();
+                var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<TorrentAddCommand, TorrentAddResponse>>();
+                await handler.Execute(new()
+                {
+                    Metadata = meta,
+                    DownloadPath = "",
+                    CompletedPath = "",
+                    SelectedFileIds = selectedFileIds
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to add torrent {InfoHash} in background task", meta.InfoHash);
+            }
         });
+
+        return Results.Accepted($"/torrents/{meta.InfoHash}", new { infoHash = meta.InfoHash });
     })
     .DisableAntiforgery();
 
@@ -371,15 +388,22 @@ static void WireEventBus(IServiceProvider services)
     bus.OnPieceVerified(swarmDispatcher.HandlePieceVerified);
 
     var hubDispatcher = services.GetRequiredService<TorrentHubMessageDispatcher>();
+    var statusMaintainer = services.GetRequiredService<TorrentStatusCacheMaintainer>();
+    var verificationTracker = services.GetRequiredService<TorrentVerificationTracker>();
     bus.OnPieceVerified(hubDispatcher.HandlePieceVerified);
 
     // --- Torrent complete -> post-download actions + SignalR ---
     var postDownload = services.GetRequiredService<PostDownloadActionExecutor>();
     bus.OnTorrentComplete(postDownload.HandleTorrentComplete);
     bus.OnTorrentComplete(hubDispatcher.HandleTorrentComplete);
+    bus.OnTorrentVerificationStarted(statusMaintainer.HandleVerificationStarted);
+    bus.OnTorrentVerificationStarted(hubDispatcher.HandleTorrentVerificationStarted);
+    bus.OnTorrentVerificationCompleted(statusMaintainer.HandleVerificationCompleted);
+    bus.OnTorrentVerificationCompleted(hubDispatcher.HandleTorrentVerificationCompleted);
+    bus.OnFileCopyStarted(statusMaintainer.HandleFileCopyStarted);
+    bus.OnFileCopyCompleted(statusMaintainer.HandleFileCopyCompleted);
 
     // --- Lifecycle events -> status cache + announce service + SignalR ---
-    var statusMaintainer = services.GetRequiredService<TorrentStatusCacheMaintainer>();
     var announceHandler = services.GetRequiredService<AnnounceServiceEventHandler>();
 
     bus.OnTorrentAdded(hubDispatcher.HandleTorrentAdded);
@@ -395,6 +419,7 @@ static void WireEventBus(IServiceProvider services)
     bus.OnTorrentRemoved(statusMaintainer.HandleTorrentRemoved);
     bus.OnTorrentRemoved(announceHandler.HandleTorrentRemoved);
     bus.OnTorrentRemoved(hubDispatcher.HandleTorrentRemoved);
+    bus.OnTorrentRemoved(verificationTracker.HandleTorrentRemoved);
 
     // --- Peer events -> SignalR only ---
     bus.OnPeerConnected(hubDispatcher.HandlePeerConnected);

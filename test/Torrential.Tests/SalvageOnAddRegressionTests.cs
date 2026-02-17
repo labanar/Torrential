@@ -45,8 +45,9 @@ public class SalvageOnAddRegressionTests
 
             var fileService = new TorrentFileService(metadataCache, settingsManager);
             await using var eventBus = new TorrentEventBus();
+            var verificationTracker = new TorrentVerificationTracker(eventBus, NullLogger<TorrentVerificationTracker>.Instance);
 
-            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, NullLogger<BitfieldManager>.Instance);
+            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, verificationTracker, NullLogger<BitfieldManager>.Instance);
 
             var recoveryResult = new RecoverableDataResult
             {
@@ -102,8 +103,9 @@ public class SalvageOnAddRegressionTests
 
             var fileService = new TorrentFileService(metadataCache, settingsManager);
             await using var eventBus = new TorrentEventBus();
+            var verificationTracker = new TorrentVerificationTracker(eventBus, NullLogger<TorrentVerificationTracker>.Instance);
 
-            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, NullLogger<BitfieldManager>.Instance);
+            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, verificationTracker, NullLogger<BitfieldManager>.Instance);
 
             // No recovery result (null) - brand new torrent
             await bitfieldManager.Initialize(metadata, (RecoverableDataResult?)null);
@@ -148,8 +150,9 @@ public class SalvageOnAddRegressionTests
 
             var fileService = new TorrentFileService(metadataCache, settingsManager);
             await using var eventBus = new TorrentEventBus();
+            var verificationTracker = new TorrentVerificationTracker(eventBus, NullLogger<TorrentVerificationTracker>.Instance);
 
-            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, NullLogger<BitfieldManager>.Instance);
+            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, verificationTracker, NullLogger<BitfieldManager>.Instance);
 
             var recoveryResult = new RecoverableDataResult
             {
@@ -208,8 +211,9 @@ public class SalvageOnAddRegressionTests
             await WriteBitfieldFile(vbfPath, numPieces, [0]);
 
             await using var eventBus = new TorrentEventBus();
+            var verificationTracker = new TorrentVerificationTracker(eventBus, NullLogger<TorrentVerificationTracker>.Instance);
 
-            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, NullLogger<BitfieldManager>.Instance);
+            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, verificationTracker, NullLogger<BitfieldManager>.Instance);
 
             // Pass recovery result - but persisted bitfield has data, so recovery skip should kick in
             var recoveryResult = new RecoverableDataResult
@@ -274,8 +278,9 @@ public class SalvageOnAddRegressionTests
 
             var fileService = new TorrentFileService(metadataCache, settingsManager);
             await using var eventBus = new TorrentEventBus();
+            var verificationTracker = new TorrentVerificationTracker(eventBus, NullLogger<TorrentVerificationTracker>.Instance);
 
-            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, NullLogger<BitfieldManager>.Instance);
+            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, verificationTracker, NullLogger<BitfieldManager>.Instance);
 
             var recoveryResult = new RecoverableDataResult
             {

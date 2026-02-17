@@ -147,7 +147,8 @@ public class FileSelectionRegressionTests
 
             var fileService = new TorrentFileService(metadataCache, settingsManager);
             await using var eventBus = new TorrentEventBus();
-            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, NullLogger<BitfieldManager>.Instance);
+            var verificationTracker = new TorrentVerificationTracker(eventBus, NullLogger<TorrentVerificationTracker>.Instance);
+            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, verificationTracker, NullLogger<BitfieldManager>.Instance);
             await bitfieldManager.Initialize(metadata);
 
             Assert.True(bitfieldManager.TryGetVerificationBitfield(metadata.InfoHash, out var verificationBitfield));

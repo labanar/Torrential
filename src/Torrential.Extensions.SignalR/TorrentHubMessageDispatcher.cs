@@ -24,6 +24,12 @@ namespace Torrential.Extensions.SignalR
         public async Task HandleTorrentComplete(TorrentCompleteEvent evt) =>
             await hubContext.Clients.All.TorrentCompleted(evt);
 
+        public async Task HandleTorrentVerificationStarted(TorrentVerificationStartedEvent evt) =>
+            await hubContext.Clients.All.TorrentVerificationStarted(evt);
+
+        public async Task HandleTorrentVerificationCompleted(TorrentVerificationCompletedEvent evt) =>
+            await hubContext.Clients.All.TorrentVerificationCompleted(evt);
+
         public async Task HandleTorrentRemoved(TorrentRemovedEvent evt) =>
             await hubContext.Clients.All.TorrentRemoved(evt);
 

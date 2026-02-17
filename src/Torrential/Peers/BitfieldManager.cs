@@ -5,7 +5,7 @@ using Torrential.Torrents;
 
 namespace Torrential.Peers
 {
-    public class BitfieldManager(TorrentFileService fileService, TorrentEventBus eventBus, TorrentMetadataCache metaCache, ILogger<BitfieldManager> logger)
+    public class BitfieldManager(TorrentFileService fileService, TorrentEventBus eventBus, TorrentMetadataCache metaCache, TorrentVerificationTracker verificationTracker, ILogger<BitfieldManager> logger)
     {
         private ConcurrentDictionary<InfoHash, Bitfield> _downloadBitfields = [];
         private ConcurrentDictionary<InfoHash, Bitfield> _verificationBitfields = [];
@@ -71,7 +71,7 @@ namespace Torrential.Peers
             _wantedPieceBitfields[infoHash] = wantedPieceBitfield;
 
             //Determine which pieces are downloaded but not verified and request verification
-            var queuedCount = 0;
+            var piecesToQueueForValidation = new List<int>();
             var skippedAlreadyVerified = 0;
             for (var i = 0; i < numPieces; i++)
             {
@@ -84,9 +84,13 @@ namespace Torrential.Peers
                     continue;
                 }
 
-                await eventBus.PublishPieceValidationRequest(new PieceValidationRequest { InfoHash = infoHash, PieceIndex = i });
-                queuedCount++;
+                piecesToQueueForValidation.Add(i);
             }
+
+            var queuedCount = piecesToQueueForValidation.Count;
+            await verificationTracker.BeginTracking(infoHash, queuedCount);
+            foreach (var pieceIndex in piecesToQueueForValidation)
+                await eventBus.PublishPieceValidationRequest(new PieceValidationRequest { InfoHash = infoHash, PieceIndex = pieceIndex });
 
             if (queuedCount > 0 || skippedAlreadyVerified > 0)
             {

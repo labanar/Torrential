@@ -80,6 +80,14 @@ export interface TorrentCompletedEvent {
   infoHash: string;
 }
 
+export interface TorrentVerificationStartedEvent {
+  infoHash: string;
+}
+
+export interface TorrentVerificationCompletedEvent {
+  infoHash: string;
+}
+
 export interface TorrentRemovedEvent {
   infoHash: string;
 }

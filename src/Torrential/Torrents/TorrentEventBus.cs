@@ -46,6 +46,8 @@ public sealed class TorrentEventBus : IAsyncDisposable
     // Hot path
     private readonly List<Func<TorrentPieceVerifiedEvent, Task>> _pieceVerifiedHandlers = [];
     private readonly List<Func<TorrentCompleteEvent, Task>> _completeHandlers = [];
+    private readonly List<Func<TorrentVerificationStartedEvent, Task>> _verificationStartedHandlers = [];
+    private readonly List<Func<TorrentVerificationCompletedEvent, Task>> _verificationCompletedHandlers = [];
     private readonly List<Func<TorrentPieceDownloadedEvent, Task>> _pieceDownloadedHandlers = [];
 
     // Cold path - lifecycle
@@ -80,6 +82,8 @@ public sealed class TorrentEventBus : IAsyncDisposable
 
     public void OnPieceVerified(Func<TorrentPieceVerifiedEvent, Task> handler) => _pieceVerifiedHandlers.Add(handler);
     public void OnTorrentComplete(Func<TorrentCompleteEvent, Task> handler) => _completeHandlers.Add(handler);
+    public void OnTorrentVerificationStarted(Func<TorrentVerificationStartedEvent, Task> handler) => _verificationStartedHandlers.Add(handler);
+    public void OnTorrentVerificationCompleted(Func<TorrentVerificationCompletedEvent, Task> handler) => _verificationCompletedHandlers.Add(handler);
     public void OnPieceDownloaded(Func<TorrentPieceDownloadedEvent, Task> handler) => _pieceDownloadedHandlers.Add(handler);
 
     public void OnTorrentAdded(Func<TorrentAddedEvent, Task> handler) => _addedHandlers.Add(handler);
@@ -123,6 +127,8 @@ public sealed class TorrentEventBus : IAsyncDisposable
 
     public Task PublishPieceVerified(TorrentPieceVerifiedEvent evt) => InvokeAll(_pieceVerifiedHandlers, evt);
     public Task PublishTorrentComplete(TorrentCompleteEvent evt) => InvokeAll(_completeHandlers, evt);
+    public Task PublishTorrentVerificationStarted(TorrentVerificationStartedEvent evt) => InvokeAll(_verificationStartedHandlers, evt);
+    public Task PublishTorrentVerificationCompleted(TorrentVerificationCompletedEvent evt) => InvokeAll(_verificationCompletedHandlers, evt);
     public Task PublishPieceDownloaded(TorrentPieceDownloadedEvent evt) => InvokeAll(_pieceDownloadedHandlers, evt);
 
     public Task PublishTorrentAdded(TorrentAddedEvent evt) => InvokeAll(_addedHandlers, evt);

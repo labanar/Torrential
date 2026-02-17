@@ -13,6 +13,8 @@ import {
   TorrentAddedEvent,
   TorrentRemovedEvent,
   TorrentStartedEvent,
+  TorrentVerificationCompletedEvent,
+  TorrentVerificationStartedEvent,
   TorrentStatsEvent,
   TorrentStoppedEvent,
 } from "./api";
@@ -130,6 +132,34 @@ export class SignalRService {
       );
     });
 
+    this.connection.on(
+      "TorrentVerificationStarted",
+      (event: TorrentVerificationStartedEvent) => {
+        store.dispatch(
+          updateTorrent({
+            infoHash: event.infoHash,
+            update: { status: "Verifying" },
+          })
+        );
+      }
+    );
+
+    this.connection.on(
+      "TorrentVerificationCompleted",
+      (event: TorrentVerificationCompletedEvent) => {
+        const { torrents } = store.getState();
+        const currentStatus = torrents[event.infoHash]?.status;
+        if (currentStatus === "Verifying") {
+          store.dispatch(
+            updateTorrent({
+              infoHash: event.infoHash,
+              update: { status: "Idle" },
+            })
+          );
+        }
+      }
+    );
+
     this.connection.on("TorrentStopped", (event: TorrentStoppedEvent) => {
       const { infoHash } = event;
       const payload = {
@@ -202,6 +232,7 @@ export class SignalRService {
 
     this.connection.on("TorrentAdded", (event: TorrentAddedEvent) => {
       const { infoHash, name, totalSize } = event;
+      const existingStatus = store.getState().torrents[infoHash]?.status;
 
       const payload = {
         infoHash,
@@ -210,7 +241,7 @@ export class SignalRService {
           name,
           sizeInBytes: totalSize,
           progress: 0,
-          status: "Idle",
+          status: existingStatus ?? "Idle",
           bytesDownloaded: 0,
           bytesUploaded: 0,
           downloadRate: 0,
