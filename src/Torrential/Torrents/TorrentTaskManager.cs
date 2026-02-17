@@ -9,7 +9,7 @@ namespace Torrential.Torrents
         private ConcurrentDictionary<InfoHash, string> Torrents = [];
         private ConcurrentDictionary<InfoHash, Task> TorrentTasks = [];
 
-        public async Task<TorrentManagerResponse> Add(TorrentMetadata torrentMetadata)
+        public async Task<TorrentManagerResponse> Add(TorrentMetadata torrentMetadata, bool hasRecoverableData = false)
         {
             if (Torrents.ContainsKey(torrentMetadata.InfoHash))
             {
@@ -22,7 +22,7 @@ namespace Torrential.Torrents
             }
 
             metaCache.Add(torrentMetadata);
-            await bitfieldManager.Initialize(torrentMetadata);
+            await bitfieldManager.Initialize(torrentMetadata, hasRecoverableData);
 
             await eventBus.PublishTorrentAdded(new TorrentAddedEvent
             {

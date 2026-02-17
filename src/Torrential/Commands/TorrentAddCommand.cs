@@ -17,13 +17,16 @@ namespace Torrential.Commands
         public InfoHash InfoHash { get; init; }
     }
 
-    public class TorrentAddCommandHandler(TorrentialDb db, TorrentTaskManager mgr, IMetadataFileService metaFileService, IFileSelectionService fileSelectionService, SettingsManager settingsManager)
+    public class TorrentAddCommandHandler(TorrentialDb db, TorrentTaskManager mgr, IMetadataFileService metaFileService, IFileSelectionService fileSelectionService, SettingsManager settingsManager, RecoverableDataDetector recoveryDetector)
         : ICommandHandler<TorrentAddCommand, TorrentAddResponse>
     {
         public async Task<TorrentAddResponse> Execute(TorrentAddCommand command)
         {
             var fileSettings = await settingsManager.GetFileSettings();
             ApplyFileSelection(command.Metadata, command.SelectedFileIds);
+
+            // Detect pre-existing incomplete data BEFORE metadata save creates the directory
+            var recoveryResult = await recoveryDetector.Detect(command.Metadata);
 
             await db.AddAsync(new TorrentConfiguration
             {
@@ -42,7 +45,7 @@ namespace Torrential.Commands
             await fileSelectionService.SetSelectedFileIds(command.Metadata.InfoHash, allFileIds);
 
             await db.SaveChangesAsync();
-            await mgr.Add(command.Metadata);
+            await mgr.Add(command.Metadata, recoveryResult.HasRecoverableData);
             return new() { InfoHash = command.Metadata.InfoHash };
         }
 

@@ -26,7 +26,7 @@ namespace Torrential.Peers
             _pieceAvailability.TryRemove(infoHash, out _);
         }
 
-        public async Task Initialize(TorrentMetadata meta)
+        public async Task Initialize(TorrentMetadata meta, bool hasRecoverableData = false)
         {
             var numPieces = meta.NumberOfPieces;
             var infoHash = meta.InfoHash;
@@ -38,6 +38,14 @@ namespace Torrential.Peers
 
             await LoadDownloadBitfieldData(infoHash, downloadBitfield);
             await LoadVerificationBitfieldData(infoHash, verificationBitfield);
+
+            // When we detected a pre-existing part file but have no download bitfield on disk,
+            // optimistically mark all pieces as downloaded so they get queued for SHA1 validation.
+            if (hasRecoverableData && downloadBitfield.HasNone())
+            {
+                for (var i = 0; i < numPieces; i++)
+                    downloadBitfield.MarkHave(i);
+            }
 
             //We have pieces to download and verify
             if (!verificationBitfield.HasAll(wantedPieceBitfield.Bytes))

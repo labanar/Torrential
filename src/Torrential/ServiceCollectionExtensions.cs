@@ -35,6 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<TorrentRunner>();
         services.AddSingleton<TorrentTaskManager>();
 
+        services.AddSingleton<RecoverableDataDetector>();
         services.AddSingleton<TorrentFileService>();
         services.AddSingleton<PieceReservationService>();
         services.AddSingleton<BitfieldManager>();
