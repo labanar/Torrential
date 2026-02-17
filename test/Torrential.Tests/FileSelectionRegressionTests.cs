@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Torrential.Commands;
 using Torrential.Files;
 using Torrential.Peers;
@@ -146,7 +147,7 @@ public class FileSelectionRegressionTests
 
             var fileService = new TorrentFileService(metadataCache, settingsManager);
             await using var eventBus = new TorrentEventBus();
-            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache);
+            var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, NullLogger<BitfieldManager>.Instance);
             await bitfieldManager.Initialize(metadata);
 
             Assert.True(bitfieldManager.TryGetVerificationBitfield(metadata.InfoHash, out var verificationBitfield));

@@ -45,7 +45,7 @@ namespace Torrential.Commands
             await fileSelectionService.SetSelectedFileIds(command.Metadata.InfoHash, allFileIds);
 
             await db.SaveChangesAsync();
-            await mgr.Add(command.Metadata, recoveryResult.HasRecoverableData);
+            await mgr.Add(command.Metadata, recoveryResult);
             return new() { InfoHash = command.Metadata.InfoHash };
         }
 

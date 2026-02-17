@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Torrential.Files;
 using Torrential.Peers;
 using Torrential.Utilities;
 
@@ -9,7 +10,7 @@ namespace Torrential.Torrents
         private ConcurrentDictionary<InfoHash, string> Torrents = [];
         private ConcurrentDictionary<InfoHash, Task> TorrentTasks = [];
 
-        public async Task<TorrentManagerResponse> Add(TorrentMetadata torrentMetadata, bool hasRecoverableData = false)
+        public async Task<TorrentManagerResponse> Add(TorrentMetadata torrentMetadata, RecoverableDataResult? recoveryResult = null)
         {
             if (Torrents.ContainsKey(torrentMetadata.InfoHash))
             {
@@ -22,7 +23,7 @@ namespace Torrential.Torrents
             }
 
             metaCache.Add(torrentMetadata);
-            await bitfieldManager.Initialize(torrentMetadata, hasRecoverableData);
+            await bitfieldManager.Initialize(torrentMetadata, recoveryResult);
 
             await eventBus.PublishTorrentAdded(new TorrentAddedEvent
             {
