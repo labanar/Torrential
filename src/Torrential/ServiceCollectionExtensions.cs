@@ -25,6 +25,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITrackerClient, UdpTrackerClient>();
 
         services.AddSingleton<IFileHandleProvider, FileHandleProvider>();
+        services.AddSingleton<IArchiveExtractionService, ArchiveExtractionService>();
         services.AddSingleton<IMetadataFileService, MetadataFileService>();
         services.AddSingleton<FileSelectionService>();
         services.AddSingleton<IFileSelectionService>(sp => sp.GetRequiredService<FileSelectionService>());

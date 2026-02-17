@@ -6,7 +6,9 @@ namespace Torrential.Files
     public interface IFileHandleProvider
     {
         public ValueTask<SafeFileHandle> GetPartFileHandle(InfoHash infoHash);
+        public ValueTask<Stream> OpenPartFileSegmentReadStream(InfoHash infoHash, TorrentMetadataFile file, bool leaveOpen = true);
         public ValueTask<SafeFileHandle> GetCompletedFileHandle(InfoHash infoHash, TorrentMetadataFile fileName);
+        public Task<string> GetCompletedTorrentPath(InfoHash infoHash);
         void RemovePartFileHandle(InfoHash hash);
     }
 }

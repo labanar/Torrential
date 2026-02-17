@@ -99,6 +99,8 @@ public class TorrentMetadataFile
 {
     public required long Id { get; set; }
     public required string Filename { get; set; }
+    [JsonIgnore]
+    public string Extension => Path.GetExtension(Filename);
     public required long FileStartByte { get; set; }
     public required long FileSize { get; set; }
     public bool IsSelected { get; set; } = true;
