@@ -45,6 +45,7 @@ import {
 import { TorrentsState, setTorrents } from "../../store/slices/torrentsSlice";
 import {
   addTorrent,
+  browseDirectories,
   PeerApiModel,
   previewTorrent,
   TorrentApiModel,
@@ -297,6 +298,7 @@ const ActionsRow = ({
   const [isAddLoading, setIsAddLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
+  const [completedPathOverride, setCompletedPathOverride] = useState("");
 
   const resetPreviewState = () => {
     setSelectedFile(null);
@@ -305,6 +307,7 @@ const ActionsRow = ({
     setPreviewModalOpen(false);
     setIsAddLoading(false);
     setAddError(null);
+    setCompletedPathOverride("");
   };
 
   const mapPreview = (model: TorrentPreviewApiModel): TorrentPreviewSummary => {
@@ -446,7 +449,7 @@ const ActionsRow = ({
     setIsAddLoading(true);
 
     try {
-      await addTorrent(selectedFile, selectedFileIds);
+      await addTorrent(selectedFile, selectedFileIds, completedPathOverride.trim() || undefined);
       resetPreviewState();
     } catch (e) {
       console.error("Error adding torrent:", e);
@@ -481,6 +484,8 @@ const ActionsRow = ({
         selectedFileIds={selectedFileIds}
         isAddLoading={isAddLoading}
         addError={addError}
+        completedPathOverride={completedPathOverride}
+        onCompletedPathChange={setCompletedPathOverride}
         onClose={closePreviewModal}
         onConfirm={confirmAddTorrent}
         onToggleFile={toggleFileSelection}
@@ -554,6 +559,8 @@ interface TorrentFilePreviewModalProps {
   selectedFileIds: number[];
   isAddLoading: boolean;
   addError: string | null;
+  completedPathOverride: string;
+  onCompletedPathChange: (value: string) => void;
   onToggleFile: (id: number) => void;
   onToggleAllFiles: () => void;
   onConfirm: () => void;
@@ -566,6 +573,8 @@ function TorrentFilePreviewModal({
   selectedFileIds,
   isAddLoading,
   addError,
+  completedPathOverride,
+  onCompletedPathChange,
   onToggleFile,
   onToggleAllFiles,
   onConfirm,
@@ -582,6 +591,48 @@ function TorrentFilePreviewModal({
   const totalFiles = preview?.files.length ?? 0;
   const hasSomeSelected = selectedFileIds.length > 0;
   const hasAllSelected = totalFiles > 0 && selectedFileIds.length === totalFiles;
+  const [isPathPickerOpen, setIsPathPickerOpen] = useState(false);
+  const [isPathPickerLoading, setIsPathPickerLoading] = useState(false);
+  const [pathPickerError, setPathPickerError] = useState<string | null>(null);
+  const [pathPickerCurrentPath, setPathPickerCurrentPath] = useState("");
+  const [pathPickerParentPath, setPathPickerParentPath] = useState<string | null>(null);
+  const [pathPickerDirectories, setPathPickerDirectories] = useState<string[]>([]);
+  const [pathPickerSelection, setPathPickerSelection] = useState("");
+
+  const loadDirectories = useCallback(
+    async (path?: string) => {
+      setIsPathPickerLoading(true);
+      setPathPickerError(null);
+
+      try {
+        const result = await browseDirectories(path);
+        setPathPickerCurrentPath(result.currentPath);
+        setPathPickerParentPath(result.parentPath ?? null);
+        setPathPickerDirectories(result.directories);
+        setPathPickerSelection(result.currentPath || "");
+      } catch (error) {
+        console.error("Error browsing directories:", error);
+        setPathPickerError("Failed to load directories.");
+      } finally {
+        setIsPathPickerLoading(false);
+      }
+    },
+    []
+  );
+
+  const openPathPicker = async () => {
+    setIsPathPickerOpen(true);
+    await loadDirectories(completedPathOverride.trim() || undefined);
+  };
+
+  const applySelectedPath = () => {
+    if (!pathPickerSelection) {
+      return;
+    }
+
+    onCompletedPathChange(pathPickerSelection);
+    setIsPathPickerOpen(false);
+  };
 
   return (
     <Modal isOpen={open} onClose={onClose} size={"xl"}>
@@ -620,11 +671,96 @@ function TorrentFilePreviewModal({
               </div>
             ))}
           </div>
+          <div className={styles.completedPathSection}>
+            <Text fontSize={"sm"} fontWeight={500}>
+              Completed Path
+            </Text>
+            <div className={styles.completedPathInputRow}>
+              <Input
+                placeholder="Leave empty to use default"
+                value={completedPathOverride}
+                onChange={(e) => onCompletedPathChange(e.target.value)}
+                size={"sm"}
+              />
+              <Button size={"sm"} onClick={openPathPicker}>
+                Browse
+              </Button>
+            </div>
+            <Text fontSize={"xs"} color={"gray.500"}>
+              Override where files are moved after download completes.
+            </Text>
+          </div>
           {addError && (
             <Text className={styles.uploadError} color={"red.300"} fontSize={"sm"}>
               {addError}
             </Text>
           )}
+
+          <Modal isOpen={isPathPickerOpen} onClose={() => setIsPathPickerOpen(false)} size={"xl"}>
+            <ModalOverlay />
+            <ModalContent>
+              <ModalHeader>Select Completed Path</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody className={styles.pathPickerBody}>
+                <div className={styles.pathPickerTopRow}>
+                  <Text fontSize={"sm"} noOfLines={1}>
+                    {pathPickerCurrentPath || "Choose a root folder"}
+                  </Text>
+                  <Button
+                    size={"sm"}
+                    onClick={() => loadDirectories(pathPickerParentPath ?? undefined)}
+                    isDisabled={!pathPickerParentPath || isPathPickerLoading}
+                  >
+                    Up
+                  </Button>
+                </div>
+                <div className={styles.pathPickerList}>
+                  {isPathPickerLoading && <Text fontSize={"sm"}>Loading directories...</Text>}
+                  {!isPathPickerLoading && pathPickerDirectories.length === 0 && (
+                    <Text fontSize={"sm"} color={"gray.400"}>
+                      No child directories.
+                    </Text>
+                  )}
+                  {!isPathPickerLoading &&
+                    pathPickerDirectories.map((directory) => (
+                      <Button
+                        key={directory}
+                        justifyContent={"flex-start"}
+                        variant={pathPickerSelection === directory ? "solid" : "ghost"}
+                        colorScheme={pathPickerSelection === directory ? "blue" : undefined}
+                        onClick={() => setPathPickerSelection(directory)}
+                        onDoubleClick={() => loadDirectories(directory)}
+                      >
+                        {directory}
+                      </Button>
+                    ))}
+                </div>
+                {pathPickerError && (
+                  <Text color={"red.300"} fontSize={"sm"}>
+                    {pathPickerError}
+                  </Text>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  mr={3}
+                  onClick={() => loadDirectories(pathPickerSelection || undefined)}
+                  isDisabled={!pathPickerSelection || isPathPickerLoading}
+                >
+                  Open
+                </Button>
+                <Button
+                  colorScheme="blue"
+                  mr={3}
+                  onClick={applySelectedPath}
+                  isDisabled={!pathPickerSelection}
+                >
+                  Use Selected
+                </Button>
+                <Button onClick={() => setIsPathPickerOpen(false)}>Cancel</Button>
+              </ModalFooter>
+            </ModalContent>
+          </Modal>
         </ModalBody>
         <ModalFooter>
           <Button

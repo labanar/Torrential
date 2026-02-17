@@ -179,6 +179,13 @@ export interface TorrentPreviewApiModel {
   files: TorrentPreviewFileApiModel[];
 }
 
+export interface DirectoryBrowseApiModel {
+  currentPath: string;
+  parentPath?: string | null;
+  canNavigateUp: boolean;
+  directories: string[];
+}
+
 export async function previewTorrent(file: File): Promise<TorrentPreviewApiModel> {
   const formData = new FormData();
   formData.append("file", file);
@@ -201,12 +208,15 @@ export async function previewTorrent(file: File): Promise<TorrentPreviewApiModel
   return result.data;
 }
 
-export async function addTorrent(file: File, selectedFileIds: number[]): Promise<void> {
+export async function addTorrent(file: File, selectedFileIds: number[], completedPath?: string): Promise<void> {
   const formData = new FormData();
   formData.append("file", file);
   selectedFileIds.forEach((id) => {
     formData.append("SelectedFileIds", `${id}`);
   });
+  if (completedPath) {
+    formData.append("CompletedPath", completedPath);
+  }
 
   const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/add`, {
     method: "POST",
@@ -216,4 +226,20 @@ export async function addTorrent(file: File, selectedFileIds: number[]): Promise
   if (!response.ok) {
     throw new Error("Failed to add torrent");
   }
+}
+
+export async function browseDirectories(path?: string): Promise<DirectoryBrowseApiModel> {
+  const query = path ? `?path=${encodeURIComponent(path)}` : "";
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/filesystem/directories${query}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to browse directories");
+  }
+
+  const result: ApiResponse<DirectoryBrowseApiModel> = await response.json();
+  if (!result.data) {
+    throw new Error("Directory browser endpoint returned no data");
+  }
+
+  return result.data;
 }

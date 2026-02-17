@@ -123,10 +123,10 @@ app.MapPost(
                 var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<TorrentAddCommand, TorrentAddResponse>>();
                 await handler.Execute(new()
                 {
-                    Metadata = meta,
-                    DownloadPath = "",
-                    CompletedPath = "",
-                    SelectedFileIds = selectedFileIds
+                  Metadata = meta,
+                  DownloadPath = "",
+                  CompletedPath = request.CompletedPath ?? "",
+                  SelectedFileIds = request.SelectedFileIds
                 });
             }
             catch (Exception ex)
@@ -368,6 +368,36 @@ app.MapPost("settings/connection", async (ConnectionSettingsUpdateRequest reques
     return ActionResponse.SuccessResponse;
 });
 
+app.MapGet("filesystem/directories", (string? path) =>
+{
+    try
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return Results.Ok(new { Data = BuildRootDirectoryBrowseVm() });
+
+        var fullPath = Path.GetFullPath(path);
+        if (!Directory.Exists(fullPath))
+            return Results.Ok(new { Data = BuildRootDirectoryBrowseVm() });
+
+        var parentPath = Directory.GetParent(fullPath)?.FullName;
+        var directories = GetDirectoryChildren(fullPath);
+        return Results.Ok(new
+        {
+            Data = new DirectoryBrowseVm
+            {
+                CurrentPath = fullPath,
+                ParentPath = parentPath,
+                CanNavigateUp = !string.IsNullOrWhiteSpace(parentPath),
+                Directories = directories
+            }
+        });
+    }
+    catch
+    {
+        return Results.Ok(new { Data = BuildRootDirectoryBrowseVm() });
+    }
+});
+
 
 var initService = app.Services.GetRequiredService<InitializationService>();
 await initService.Initialize(CancellationToken.None);
@@ -456,6 +486,50 @@ static Logger BuildLogger(IConfiguration configuration)
         });
 
     return config.CreateLogger();
+}
+
+static DirectoryBrowseVm BuildRootDirectoryBrowseVm()
+{
+    var roots = OperatingSystem.IsWindows()
+        ? Directory.GetLogicalDrives()
+        : [Path.GetPathRoot(Environment.CurrentDirectory) ?? Path.DirectorySeparatorChar.ToString()];
+
+    return new DirectoryBrowseVm
+    {
+        CurrentPath = string.Empty,
+        ParentPath = null,
+        CanNavigateUp = false,
+        Directories = roots
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+    };
+}
+
+static string[] GetDirectoryChildren(string fullPath)
+{
+    try
+    {
+        return Directory.GetDirectories(fullPath)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return [];
+    }
+    catch (DirectoryNotFoundException)
+    {
+        return [];
+    }
+}
+
+sealed class DirectoryBrowseVm
+{
+    public required string CurrentPath { get; init; }
+    public required string[] Directories { get; init; }
+    public string? ParentPath { get; init; }
+    public bool CanNavigateUp { get; init; }
 }
 
 internal class InitializationService(

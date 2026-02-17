@@ -383,7 +383,6 @@ public sealed class FileCopyPostDownloadActionTests
                 metadataCache,
                 settingsManager,
                 serviceProvider.GetRequiredService<IServiceScopeFactory>());
-
             var fileHandleProviderType = typeof(TorrentFileService).Assembly.GetType("Torrential.Files.FileHandleProvider", throwOnError: true)!;
             var internalFileHandleProvider = Activator.CreateInstance(fileHandleProviderType, metadataCache, torrentFileService)
                 ?? throw new InvalidOperationException("Failed to create FileHandleProvider.");

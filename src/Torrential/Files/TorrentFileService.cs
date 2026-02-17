@@ -80,6 +80,31 @@ public sealed class TorrentFileService(TorrentMetadataCache metaCache, SettingsM
         path = Path.Combine(downloadRoot, torrentName);
         _downloadPaths.TryAdd(infoHash, path);
         _completedPaths.TryAdd(infoHash, Path.Combine(completedRoot, torrentName));
+        var settings = await settingsManager.GetFileSettings();
+
+        var downloadBase = settings.DownloadPath;
+        var completedBase = settings.CompletedPath;
+
+        using (var scope = scopeFactory.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
+            var config = await db.Torrents.AsNoTracking()
+                .FirstOrDefaultAsync(t => t.InfoHash == infoHash.AsString());
+
+            if (config != null)
+            {
+                if (!string.IsNullOrWhiteSpace(config.DownloadPath))
+                    downloadBase = config.DownloadPath;
+
+                if (!string.IsNullOrWhiteSpace(config.CompletedPath))
+                    completedBase = config.CompletedPath;
+            }
+        }
+
+        var torrentName = Path.GetFileNameWithoutExtension(FileUtilities.GetPathSafeFileName(metaData.Name));
+        path = Path.Combine(downloadBase, torrentName);
+        _downloadPaths.TryAdd(infoHash, path);
+        _completedPaths.TryAdd(infoHash, Path.Combine(completedBase, torrentName));
 
         var partPath = Path.Combine(path, infoHash.AsString() + ".part");
         _partPaths.TryAdd(infoHash, partPath);

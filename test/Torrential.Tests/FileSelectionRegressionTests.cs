@@ -145,7 +145,7 @@ public class FileSelectionRegressionTests
             var metadataCache = new TorrentMetadataCache();
             metadataCache.Add(metadata);
 
-            var fileService = new TorrentFileService(metadataCache, settingsManager);
+            var fileService = new TorrentFileService(metadataCache, settingsManager, serviceProvider.GetRequiredService<IServiceScopeFactory>());
             await using var eventBus = new TorrentEventBus();
             var verificationTracker = new TorrentVerificationTracker(eventBus, NullLogger<TorrentVerificationTracker>.Instance);
             var bitfieldManager = new BitfieldManager(fileService, eventBus, metadataCache, verificationTracker, NullLogger<BitfieldManager>.Instance);
