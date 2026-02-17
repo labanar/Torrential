@@ -73,6 +73,50 @@ public sealed class FileCopyPostDownloadActionTests
     }
 
     [Fact]
+    public async Task Multipart_rar_extracts_from_primary_volume_and_skips_raw_volume_copy()
+    {
+        await using var harness = await FileCopyTestHarness.CreateAsync();
+
+        var volumeBytes = Enumerable.Range(1, 6)
+            .Select(index => ReadRarFixtureBytes($"Rar.multi.part0{index}.rar"))
+            .ToArray();
+
+        var files = new List<TorrentMetadataFile>();
+        var start = 0L;
+        for (var index = 0; index < volumeBytes.Length; index++)
+        {
+            var payload = volumeBytes[index];
+            files.Add(new TorrentMetadataFile
+            {
+                Id = index,
+                Filename = $"release/Rar.multi.part0{index + 1}.rar",
+                FileStartByte = start,
+                FileSize = payload.Length,
+                IsSelected = true
+            });
+            start += payload.Length;
+        }
+
+        var metadata = CreateMetadata(
+            name: "extract-rar-multipart",
+            infoHash: "5555555555555555555555555555555555555555",
+            files: files.ToArray());
+
+        harness.MetadataCache.Add(metadata);
+        await harness.WritePartFileAsync(metadata.InfoHash, CombineSegments(volumeBytes));
+
+        var result = await harness.Action.ExecuteAsync(metadata.InfoHash, CancellationToken.None);
+        Assert.True(result.Success);
+
+        var completedTorrentPath = await harness.FileHandleProvider.GetCompletedTorrentPath(metadata.InfoHash);
+        Assert.True(File.Exists(Path.Combine(completedTorrentPath, "release", "exe", "test.exe")));
+        Assert.True(File.Exists(Path.Combine(completedTorrentPath, "release", "jpg", "test.jpg")));
+
+        for (var index = 1; index <= volumeBytes.Length; index++)
+            Assert.False(File.Exists(Path.Combine(completedTorrentPath, "release", $"Rar.multi.part0{index}.rar")));
+    }
+
+    [Fact]
     public async Task Corrupt_archive_falls_back_to_raw_copy()
     {
         await using var harness = await FileCopyTestHarness.CreateAsync();
@@ -173,6 +217,27 @@ public sealed class FileCopyPostDownloadActionTests
         return stream.ToArray();
     }
 
+    private static byte[] ReadRarFixtureBytes(string fileName)
+    {
+        var root = ResolveSolutionRoot();
+        var fixturePath = Path.Combine(root, "test", "Torrential.Tests", "Fixtures", "RarMulti", fileName);
+        return File.ReadAllBytes(fixturePath);
+    }
+
+    private static string ResolveSolutionRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "Torrential.sln")))
+                return current.FullName;
+
+            current = current.Parent;
+        }
+
+        throw new InvalidOperationException("Could not locate solution root from test base directory.");
+    }
+
     private sealed class FileCopyTestHarness : IAsyncDisposable
     {
         private readonly ServiceProvider _serviceProvider;
@@ -250,7 +315,8 @@ public sealed class FileCopyPostDownloadActionTests
             var archiveExtractionService = (IArchiveExtractionService)(Activator.CreateInstance(
                 archiveExtractionServiceType,
                 archiveLogger,
-                fileHandleProvider) ?? throw new InvalidOperationException("Failed to create ArchiveExtractionService."));
+                fileHandleProvider,
+                metadataCache) ?? throw new InvalidOperationException("Failed to create ArchiveExtractionService."));
 
             var eventBus = new TorrentEventBus();
             var action = new FileCopyPostDownloadAction(

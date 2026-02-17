@@ -1,13 +1,18 @@
 using Microsoft.Extensions.Logging;
 using SharpCompress.Common;
 using SharpCompress.Readers;
+using SharpCompress.Readers.Rar;
+using System.Text.RegularExpressions;
 using Torrential.Torrents;
 
 namespace Torrential.Files;
 
-internal sealed class ArchiveExtractionService(ILogger<ArchiveExtractionService> logger, IFileHandleProvider fileHandleProvider)
+internal sealed partial class ArchiveExtractionService(ILogger<ArchiveExtractionService> logger, IFileHandleProvider fileHandleProvider, TorrentMetadataCache metadataCache)
     : IArchiveExtractionService
 {
+    [GeneratedRegex(@"^(?<prefix>.+)\.part(?<index>\d+)\.rar$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex RarMultipartRegex();
+
     private static readonly Dictionary<string, string> SupportedArchiveContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         [".zip"] = "application/zip",
@@ -35,8 +40,12 @@ internal sealed class ArchiveExtractionService(ILogger<ArchiveExtractionService>
         ArgumentNullException.ThrowIfNull(sourceFile);
         ArgumentNullException.ThrowIfNull(sourceStream);
 
-        if (sourceStream.CanSeek)
-            sourceStream.Seek(0, SeekOrigin.Begin);
+        var rarVolumeSet = TryGetRarMultipartSet(infoHash, sourceFile);
+        if (rarVolumeSet is { IsPrimary: false })
+        {
+            logger.LogInformation("Skipping secondary RAR volume {ArchivePath}; extraction handled by primary volume", sourceFile.Filename);
+            return new ArchiveExtractionResult(ArchiveExtractionStatus.Extracted, "rar-secondary-volume");
+        }
 
         var completedRoot = await fileHandleProvider.GetCompletedTorrentPath(infoHash);
         var archiveParent = Path.GetDirectoryName(FileUtilities.GetSafeRelativePath(sourceFile.Filename));
@@ -44,7 +53,8 @@ internal sealed class ArchiveExtractionService(ILogger<ArchiveExtractionService>
         try
         {
             var extractedFiles = 0;
-            using var reader = ReaderFactory.Open(sourceStream, new ReaderOptions { LeaveStreamOpen = true });
+            await using var readerLease = await OpenReaderAsync(infoHash, sourceFile, sourceStream, rarVolumeSet, cancellationToken);
+            var reader = readerLease.Reader;
             while (reader.MoveToNextEntry())
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -119,6 +129,111 @@ internal sealed class ArchiveExtractionService(ILogger<ArchiveExtractionService>
             return new ArchiveExtractionResult(ArchiveExtractionStatus.FallbackToCopy, "unsupported");
         }
     }
+
+    private async ValueTask<ReaderLease> OpenReaderAsync(
+        InfoHash infoHash,
+        TorrentMetadataFile sourceFile,
+        Stream sourceStream,
+        RarMultipartSet? rarVolumeSet,
+        CancellationToken cancellationToken)
+    {
+        if (rarVolumeSet is { Volumes.Count: > 1 })
+        {
+            var volumeStreams = new List<Stream>(rarVolumeSet.Volumes.Count);
+            try
+            {
+                foreach (var volume in rarVolumeSet.Volumes)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var stream = await fileHandleProvider.OpenPartFileSegmentReadStream(infoHash, volume);
+                    volumeStreams.Add(stream);
+                }
+
+                var reader = RarReader.Open(volumeStreams, new ReaderOptions { LeaveStreamOpen = true });
+                return new ReaderLease(reader, volumeStreams);
+            }
+            catch
+            {
+                foreach (var stream in volumeStreams)
+                    await stream.DisposeAsync();
+
+                throw;
+            }
+        }
+
+        if (sourceStream.CanSeek)
+            sourceStream.Seek(0, SeekOrigin.Begin);
+
+        return new ReaderLease(ReaderFactory.Open(sourceStream, new ReaderOptions { LeaveStreamOpen = true }), null);
+    }
+
+    private RarMultipartSet? TryGetRarMultipartSet(InfoHash infoHash, TorrentMetadataFile sourceFile)
+    {
+        if (!sourceFile.Extension.Equals(".rar", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (!metadataCache.TryGet(infoHash, out var metadata))
+            return null;
+
+        var sourceSafePath = FileUtilities.GetSafeRelativePath(sourceFile.Filename);
+        var match = RarMultipartRegex().Match(sourceSafePath);
+        if (!match.Success)
+            return null;
+
+        var prefix = match.Groups["prefix"].Value;
+        var sourceIndex = int.Parse(match.Groups["index"].Value);
+
+        var matchingVolumes = new List<(TorrentMetadataFile File, int Index)>();
+        foreach (var file in metadata.Files.Where(static file => file.IsSelected))
+        {
+            var fileSafePath = FileUtilities.GetSafeRelativePath(file.Filename);
+            var fileMatch = RarMultipartRegex().Match(fileSafePath);
+            if (!fileMatch.Success)
+                continue;
+
+            var filePrefix = fileMatch.Groups["prefix"].Value;
+            if (!filePrefix.Equals(prefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var fileIndex = int.Parse(fileMatch.Groups["index"].Value);
+            matchingVolumes.Add((file, fileIndex));
+        }
+
+        matchingVolumes.Sort(static (left, right) => left.Index.CompareTo(right.Index));
+
+        if (matchingVolumes.Count <= 1)
+            return null;
+
+        var firstIndex = matchingVolumes[0].Index;
+        return new RarMultipartSet(
+            sourceIndex == firstIndex,
+            matchingVolumes.Select(static item => item.File).ToArray());
+    }
+
+    private sealed class ReaderLease : IAsyncDisposable
+    {
+        private readonly IReadOnlyList<Stream>? _ownedStreams;
+
+        public ReaderLease(IReader reader, IReadOnlyList<Stream>? ownedStreams)
+        {
+            Reader = reader;
+            _ownedStreams = ownedStreams;
+        }
+
+        public IReader Reader { get; }
+
+        public async ValueTask DisposeAsync()
+        {
+            Reader.Dispose();
+            if (_ownedStreams is null)
+                return;
+
+            foreach (var stream in _ownedStreams)
+                await stream.DisposeAsync();
+        }
+    }
+
+    private sealed record RarMultipartSet(bool IsPrimary, IReadOnlyList<TorrentMetadataFile> Volumes);
 
     private static async Task<bool> MatchesArchiveSignatureAsync(Stream sourceStream, CancellationToken cancellationToken)
     {
