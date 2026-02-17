@@ -347,7 +347,7 @@ public sealed class FileCopyPostDownloadActionTests
             });
 
             var metadataCache = new TorrentMetadataCache();
-            var torrentFileService = new TorrentFileService(metadataCache, settingsManager);
+            var torrentFileService = new TorrentFileService(metadataCache, settingsManager, serviceProvider.GetRequiredService<IServiceScopeFactory>());
 
             var fileHandleProviderType = typeof(TorrentFileService).Assembly.GetType("Torrential.Files.FileHandleProvider", throwOnError: true)!;
             var internalFileHandleProvider = Activator.CreateInstance(fileHandleProviderType, metadataCache, torrentFileService)
