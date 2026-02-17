@@ -10,6 +10,8 @@ namespace Torrential.Extensions.SignalR
         Task TorrentCompleted(TorrentCompleteEvent @event);
         Task TorrentVerificationStarted(TorrentVerificationStartedEvent @event);
         Task TorrentVerificationCompleted(TorrentVerificationCompletedEvent @event);
+        Task TorrentFileCopyStarted(TorrentFileCopyStartedEvent @event);
+        Task TorrentFileCopyCompleted(TorrentFileCopyCompletedEvent @event);
         Task TorrentStarted(TorrentStartedEvent @event);
 
         Task TorrentStopped(TorrentStoppedEvent @event);
@@ -45,6 +47,12 @@ namespace Torrential.Extensions.SignalR
 
         public async Task TorrentVerificationCompleted(TorrentVerificationCompletedEvent @event)
             => await Clients.All.TorrentVerificationCompleted(@event);
+
+        public async Task TorrentFileCopyStarted(TorrentFileCopyStartedEvent @event)
+            => await Clients.All.TorrentFileCopyStarted(@event);
+
+        public async Task TorrentFileCopyCompleted(TorrentFileCopyCompletedEvent @event)
+            => await Clients.All.TorrentFileCopyCompleted(@event);
 
         public async Task TorrentStarted(TorrentStartedEvent @event)
             => await Clients.All.TorrentStarted(@event);

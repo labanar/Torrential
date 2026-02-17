@@ -23,8 +23,6 @@ namespace Torrential.Torrents
             }
 
             metaCache.Add(torrentMetadata);
-            await bitfieldManager.Initialize(torrentMetadata, recoveryResult);
-
             await eventBus.PublishTorrentAdded(new TorrentAddedEvent
             {
                 InfoHash = torrentMetadata.InfoHash,
@@ -35,6 +33,8 @@ namespace Torrential.Torrents
                 NumberOfPieces = torrentMetadata.NumberOfPieces,
                 PieceSize = torrentMetadata.PieceSize
             });
+
+            await bitfieldManager.Initialize(torrentMetadata, recoveryResult);
             Torrents[torrentMetadata.InfoHash] = "Idle";
             return new() { InfoHash = torrentMetadata.InfoHash, Success = true };
         }

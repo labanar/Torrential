@@ -401,7 +401,9 @@ static void WireEventBus(IServiceProvider services)
     bus.OnTorrentVerificationCompleted(statusMaintainer.HandleVerificationCompleted);
     bus.OnTorrentVerificationCompleted(hubDispatcher.HandleTorrentVerificationCompleted);
     bus.OnFileCopyStarted(statusMaintainer.HandleFileCopyStarted);
+    bus.OnFileCopyStarted(hubDispatcher.HandleTorrentFileCopyStarted);
     bus.OnFileCopyCompleted(statusMaintainer.HandleFileCopyCompleted);
+    bus.OnFileCopyCompleted(hubDispatcher.HandleTorrentFileCopyCompleted);
 
     // --- Lifecycle events -> status cache + announce service + SignalR ---
     var announceHandler = services.GetRequiredService<AnnounceServiceEventHandler>();

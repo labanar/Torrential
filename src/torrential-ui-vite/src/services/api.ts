@@ -88,6 +88,16 @@ export interface TorrentVerificationCompletedEvent {
   infoHash: string;
 }
 
+export interface TorrentFileCopyStartedEvent {
+  infoHash: string;
+  fileName: string;
+}
+
+export interface TorrentFileCopyCompletedEvent {
+  infoHash: string;
+  fileName: string;
+}
+
 export interface TorrentRemovedEvent {
   infoHash: string;
 }
