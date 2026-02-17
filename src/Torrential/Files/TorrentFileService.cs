@@ -1,10 +1,12 @@
 ﻿using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Torrential.Settings;
 using Torrential.Torrents;
 
 namespace Torrential.Files;
 
-public sealed class TorrentFileService(TorrentMetadataCache metaCache, SettingsManager settingsManager)
+public sealed class TorrentFileService(TorrentMetadataCache metaCache, SettingsManager settingsManager, IServiceScopeFactory scopeFactory)
 {
     private ConcurrentDictionary<InfoHash, string> _downloadPaths = [];
     private ConcurrentDictionary<InfoHash, string> _completedPaths = [];
@@ -74,10 +76,29 @@ public sealed class TorrentFileService(TorrentMetadataCache metaCache, SettingsM
 
         var settings = await settingsManager.GetFileSettings();
 
+        var downloadBase = settings.DownloadPath;
+        var completedBase = settings.CompletedPath;
+
+        using (var scope = scopeFactory.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
+            var config = await db.Torrents.AsNoTracking()
+                .FirstOrDefaultAsync(t => t.InfoHash == infoHash.AsString());
+
+            if (config != null)
+            {
+                if (!string.IsNullOrWhiteSpace(config.DownloadPath))
+                    downloadBase = config.DownloadPath;
+
+                if (!string.IsNullOrWhiteSpace(config.CompletedPath))
+                    completedBase = config.CompletedPath;
+            }
+        }
+
         var torrentName = Path.GetFileNameWithoutExtension(FileUtilities.GetPathSafeFileName(metaData.Name));
-        path = Path.Combine(settings.DownloadPath, torrentName);
+        path = Path.Combine(downloadBase, torrentName);
         _downloadPaths.TryAdd(infoHash, path);
-        _completedPaths.TryAdd(infoHash, Path.Combine(settings.CompletedPath, torrentName));
+        _completedPaths.TryAdd(infoHash, Path.Combine(completedBase, torrentName));
 
         var partPath = Path.Combine(path, infoHash.AsString() + ".part");
         _partPaths.TryAdd(infoHash, partPath);

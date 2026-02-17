@@ -116,7 +116,7 @@ app.MapPost(
         {
             Metadata = meta,
             DownloadPath = "",
-            CompletedPath = "",
+            CompletedPath = request.CompletedPath ?? "",
             SelectedFileIds = request.SelectedFileIds
         });
     })
