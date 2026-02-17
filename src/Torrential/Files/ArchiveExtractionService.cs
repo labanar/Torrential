@@ -12,6 +12,10 @@ internal sealed partial class ArchiveExtractionService(ILogger<ArchiveExtraction
 {
     [GeneratedRegex(@"^(?<prefix>.+)\.part(?<index>\d+)\.rar$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex RarMultipartRegex();
+    [GeneratedRegex(@"^(?<prefix>.+)\.r(?<index>\d{2})$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex RarLegacyVolumeRegex();
+    [GeneratedRegex(@"^\.r\d{2}$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex RarLegacyVolumeExtensionRegex();
 
     private static readonly Dictionary<string, string> SupportedArchiveContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -26,7 +30,7 @@ internal sealed partial class ArchiveExtractionService(ILogger<ArchiveExtraction
         ArgumentNullException.ThrowIfNull(sourceStream);
 
         var extension = sourceFile.Extension;
-        var extensionMatch = SupportedArchiveContentTypes.TryGetValue(extension, out var contentType);
+        var extensionMatch = TryGetSupportedArchiveContentType(extension, out var contentType);
 
         var signatureMatch = await MatchesArchiveSignatureAsync(sourceStream, cancellationToken);
         if (extensionMatch || signatureMatch)
@@ -169,44 +173,37 @@ internal sealed partial class ArchiveExtractionService(ILogger<ArchiveExtraction
 
     private RarMultipartSet? TryGetRarMultipartSet(InfoHash infoHash, TorrentMetadataFile sourceFile)
     {
-        if (!sourceFile.Extension.Equals(".rar", StringComparison.OrdinalIgnoreCase))
-            return null;
-
         if (!metadataCache.TryGet(infoHash, out var metadata))
             return null;
 
         var sourceSafePath = FileUtilities.GetSafeRelativePath(sourceFile.Filename);
-        var match = RarMultipartRegex().Match(sourceSafePath);
-        if (!match.Success)
+        if (!TryGetRarVolumeDescriptor(sourceSafePath, out var sourceDescriptor))
             return null;
 
-        var prefix = match.Groups["prefix"].Value;
-        var sourceIndex = int.Parse(match.Groups["index"].Value);
-
-        var matchingVolumes = new List<(TorrentMetadataFile File, int Index)>();
+        var matchingVolumes = new List<(TorrentMetadataFile File, int SortOrder)>();
         foreach (var file in metadata.Files.Where(static file => file.IsSelected))
         {
             var fileSafePath = FileUtilities.GetSafeRelativePath(file.Filename);
-            var fileMatch = RarMultipartRegex().Match(fileSafePath);
-            if (!fileMatch.Success)
+            if (!TryGetRarVolumeDescriptor(fileSafePath, out var fileDescriptor))
                 continue;
 
-            var filePrefix = fileMatch.Groups["prefix"].Value;
-            if (!filePrefix.Equals(prefix, StringComparison.OrdinalIgnoreCase))
+            if (fileDescriptor.Style != sourceDescriptor.Style)
                 continue;
 
-            var fileIndex = int.Parse(fileMatch.Groups["index"].Value);
-            matchingVolumes.Add((file, fileIndex));
+            if (!fileDescriptor.Prefix.Equals(sourceDescriptor.Prefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            matchingVolumes.Add((file, fileDescriptor.SortOrder));
         }
 
-        matchingVolumes.Sort(static (left, right) => left.Index.CompareTo(right.Index));
+        matchingVolumes.Sort(static (left, right) => left.SortOrder.CompareTo(right.SortOrder));
 
         if (matchingVolumes.Count <= 1)
             return null;
 
-        var firstIndex = matchingVolumes[0].Index;
+        var firstIndex = matchingVolumes[0].SortOrder;
         return new RarMultipartSet(
-            sourceIndex == firstIndex,
+            sourceDescriptor.SortOrder == firstIndex,
             matchingVolumes.Select(static item => item.File).ToArray());
     }
 
@@ -293,4 +290,65 @@ internal sealed partial class ArchiveExtractionService(ILogger<ArchiveExtraction
                || ex is EndOfStreamException
                || ex is IOException;
     }
+
+    private static bool TryGetSupportedArchiveContentType(string extension, out string? contentType)
+    {
+        if (SupportedArchiveContentTypes.TryGetValue(extension, out var mappedContentType))
+        {
+            contentType = mappedContentType;
+            return true;
+        }
+
+        if (RarLegacyVolumeExtensionRegex().IsMatch(extension))
+        {
+            contentType = "application/vnd.rar";
+            return true;
+        }
+
+        contentType = null;
+        return false;
+    }
+
+    private static bool TryGetRarVolumeDescriptor(string safeRelativePath, out RarVolumeDescriptor descriptor)
+    {
+        var multipartMatch = RarMultipartRegex().Match(safeRelativePath);
+        if (multipartMatch.Success)
+        {
+            descriptor = new RarVolumeDescriptor(
+                multipartMatch.Groups["prefix"].Value,
+                int.Parse(multipartMatch.Groups["index"].Value),
+                RarVolumeStyle.PartNumbered);
+            return true;
+        }
+
+        var legacySecondaryMatch = RarLegacyVolumeRegex().Match(safeRelativePath);
+        if (legacySecondaryMatch.Success)
+        {
+            descriptor = new RarVolumeDescriptor(
+                legacySecondaryMatch.Groups["prefix"].Value,
+                int.Parse(legacySecondaryMatch.Groups["index"].Value) + 1,
+                RarVolumeStyle.LegacyNumbered);
+            return true;
+        }
+
+        if (safeRelativePath.EndsWith(".rar", StringComparison.OrdinalIgnoreCase))
+        {
+            descriptor = new RarVolumeDescriptor(
+                safeRelativePath[..^4],
+                0,
+                RarVolumeStyle.LegacyNumbered);
+            return true;
+        }
+
+        descriptor = default;
+        return false;
+    }
+
+    private enum RarVolumeStyle
+    {
+        PartNumbered,
+        LegacyNumbered
+    }
+
+    private readonly record struct RarVolumeDescriptor(string Prefix, int SortOrder, RarVolumeStyle Style);
 }

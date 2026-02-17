@@ -117,6 +117,51 @@ public sealed class FileCopyPostDownloadActionTests
     }
 
     [Fact]
+    public async Task Legacy_multipart_rar_extracts_from_rar_and_skips_r00_r01_volumes()
+    {
+        await using var harness = await FileCopyTestHarness.CreateAsync();
+
+        var volumeBytes = Enumerable.Range(1, 6)
+            .Select(index => ReadRarFixtureBytes($"Rar.multi.part0{index}.rar"))
+            .ToArray();
+
+        var volumeNames = new[] { "Rar.multi.rar", "Rar.multi.r00", "Rar.multi.r01", "Rar.multi.r02", "Rar.multi.r03", "Rar.multi.r04" };
+        var files = new List<TorrentMetadataFile>();
+        var start = 0L;
+        for (var index = 0; index < volumeBytes.Length; index++)
+        {
+            var payload = volumeBytes[index];
+            files.Add(new TorrentMetadataFile
+            {
+                Id = index,
+                Filename = $"release/{volumeNames[index]}",
+                FileStartByte = start,
+                FileSize = payload.Length,
+                IsSelected = true
+            });
+            start += payload.Length;
+        }
+
+        var metadata = CreateMetadata(
+            name: "extract-rar-legacy-multipart",
+            infoHash: "6666666666666666666666666666666666666666",
+            files: files.ToArray());
+
+        harness.MetadataCache.Add(metadata);
+        await harness.WritePartFileAsync(metadata.InfoHash, CombineSegments(volumeBytes));
+
+        var result = await harness.Action.ExecuteAsync(metadata.InfoHash, CancellationToken.None);
+        Assert.True(result.Success);
+
+        var completedTorrentPath = await harness.FileHandleProvider.GetCompletedTorrentPath(metadata.InfoHash);
+        Assert.True(File.Exists(Path.Combine(completedTorrentPath, "release", "exe", "test.exe")));
+        Assert.True(File.Exists(Path.Combine(completedTorrentPath, "release", "jpg", "test.jpg")));
+
+        foreach (var volumeName in volumeNames)
+            Assert.False(File.Exists(Path.Combine(completedTorrentPath, "release", volumeName)));
+    }
+
+    [Fact]
     public async Task Corrupt_archive_falls_back_to_raw_copy()
     {
         await using var harness = await FileCopyTestHarness.CreateAsync();
