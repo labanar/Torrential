@@ -296,6 +296,7 @@ const ActionsRow = ({
   const [isAddLoading, setIsAddLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
+  const [completedPathOverride, setCompletedPathOverride] = useState("");
 
   const resetPreviewState = () => {
     setSelectedFile(null);
@@ -304,6 +305,7 @@ const ActionsRow = ({
     setPreviewModalOpen(false);
     setIsAddLoading(false);
     setAddError(null);
+    setCompletedPathOverride("");
   };
 
   const mapPreview = (model: TorrentPreviewApiModel): TorrentPreviewSummary => {
@@ -445,7 +447,7 @@ const ActionsRow = ({
     setIsAddLoading(true);
 
     try {
-      await addTorrent(selectedFile, selectedFileIds);
+      await addTorrent(selectedFile, selectedFileIds, completedPathOverride.trim() || undefined);
       resetPreviewState();
     } catch (e) {
       console.error("Error adding torrent:", e);
@@ -480,6 +482,8 @@ const ActionsRow = ({
         selectedFileIds={selectedFileIds}
         isAddLoading={isAddLoading}
         addError={addError}
+        completedPathOverride={completedPathOverride}
+        onCompletedPathChange={setCompletedPathOverride}
         onClose={closePreviewModal}
         onConfirm={confirmAddTorrent}
         onToggleFile={toggleFileSelection}
@@ -553,6 +557,8 @@ interface TorrentFilePreviewModalProps {
   selectedFileIds: number[];
   isAddLoading: boolean;
   addError: string | null;
+  completedPathOverride: string;
+  onCompletedPathChange: (value: string) => void;
   onToggleFile: (id: number) => void;
   onToggleAllFiles: () => void;
   onConfirm: () => void;
@@ -565,6 +571,8 @@ function TorrentFilePreviewModal({
   selectedFileIds,
   isAddLoading,
   addError,
+  completedPathOverride,
+  onCompletedPathChange,
   onToggleFile,
   onToggleAllFiles,
   onConfirm,
@@ -618,6 +626,20 @@ function TorrentFilePreviewModal({
                 </Text>
               </div>
             ))}
+          </div>
+          <div className={styles.completedPathSection}>
+            <Text fontSize={"sm"} fontWeight={500}>
+              Completed Path
+            </Text>
+            <Input
+              placeholder="Leave empty to use default"
+              value={completedPathOverride}
+              onChange={(e) => onCompletedPathChange(e.target.value)}
+              size={"sm"}
+            />
+            <Text fontSize={"xs"} color={"gray.500"}>
+              Override where files are moved after download completes.
+            </Text>
           </div>
           {addError && (
             <Text className={styles.uploadError} color={"red.300"} fontSize={"sm"}>

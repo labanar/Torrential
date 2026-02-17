@@ -173,4 +173,11 @@
   justify-content: space-between;
   gap: 8px;
 }
-  
+
+.completedPathSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+

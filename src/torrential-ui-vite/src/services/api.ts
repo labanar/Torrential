@@ -180,12 +180,15 @@ export async function previewTorrent(file: File): Promise<TorrentPreviewApiModel
   return result.data;
 }
 
-export async function addTorrent(file: File, selectedFileIds: number[]): Promise<void> {
+export async function addTorrent(file: File, selectedFileIds: number[], completedPath?: string): Promise<void> {
   const formData = new FormData();
   formData.append("file", file);
   selectedFileIds.forEach((id) => {
     formData.append("SelectedFileIds", `${id}`);
   });
+  if (completedPath) {
+    formData.append("CompletedPath", completedPath);
+  }
 
   const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/add`, {
     method: "POST",
