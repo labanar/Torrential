@@ -101,11 +101,6 @@ public sealed class TorrentFileService(TorrentMetadataCache metaCache, SettingsM
             }
         }
 
-        var torrentName = Path.GetFileNameWithoutExtension(FileUtilities.GetPathSafeFileName(metaData.Name));
-        path = Path.Combine(downloadBase, torrentName);
-        _downloadPaths.TryAdd(infoHash, path);
-        _completedPaths.TryAdd(infoHash, Path.Combine(completedBase, torrentName));
-
         var partPath = Path.Combine(path, infoHash.AsString() + ".part");
         _partPaths.TryAdd(infoHash, partPath);
 
