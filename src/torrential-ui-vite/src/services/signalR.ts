@@ -11,8 +11,12 @@ import {
   PeerDisconnectedEvent,
   PieceVerifiedEvent,
   TorrentAddedEvent,
+  TorrentFileCopyCompletedEvent,
+  TorrentFileCopyStartedEvent,
   TorrentRemovedEvent,
   TorrentStartedEvent,
+  TorrentVerificationCompletedEvent,
+  TorrentVerificationStartedEvent,
   TorrentStatsEvent,
   TorrentStoppedEvent,
 } from "./api";
@@ -35,6 +39,8 @@ import store from "../store";
 
 export class SignalRService {
   private connection: HubConnection;
+  private fileCopyInFlightByTorrent: Record<string, number> = {};
+  private preCopyStatusByTorrent: Record<string, string> = {};
 
   constructor(private url: string) {
     this.connection = new HubConnectionBuilder()
@@ -130,6 +136,104 @@ export class SignalRService {
       );
     });
 
+    this.connection.on(
+      "TorrentVerificationStarted",
+      (event: TorrentVerificationStartedEvent) => {
+        store.dispatch(
+          updateTorrent({
+            infoHash: event.infoHash,
+            update: { status: "Verifying" },
+          })
+        );
+      }
+    );
+
+    this.connection.on(
+      "TorrentVerificationCompleted",
+      (event: TorrentVerificationCompletedEvent) => {
+        if (typeof event.progress === "number") {
+          store.dispatch(
+            updateTorrent({
+              infoHash: event.infoHash,
+              update: { progress: Number(event.progress.toFixed(3)) },
+            })
+          );
+        }
+
+        const { torrents } = store.getState();
+        const currentStatus = torrents[event.infoHash]?.status;
+        if (currentStatus === "Verifying") {
+          store.dispatch(
+            updateTorrent({
+              infoHash: event.infoHash,
+              update: { status: "Idle" },
+            })
+          );
+        }
+      }
+    );
+
+    this.connection.on(
+      "TorrentFileCopyStarted",
+      (event: TorrentFileCopyStartedEvent) => {
+        const { torrents } = store.getState();
+        const currentStatus = torrents[event.infoHash]?.status ?? "Idle";
+
+        const inFlightCopies = this.fileCopyInFlightByTorrent[event.infoHash] ?? 0;
+        this.fileCopyInFlightByTorrent[event.infoHash] = inFlightCopies + 1;
+
+        if (inFlightCopies === 0) {
+          this.preCopyStatusByTorrent[event.infoHash] = currentStatus;
+        }
+
+        store.dispatch(
+          updateTorrent({
+            infoHash: event.infoHash,
+            update: { status: "Copying" },
+          })
+        );
+      }
+    );
+
+    this.connection.on(
+      "TorrentFileCopyCompleted",
+      (event: TorrentFileCopyCompletedEvent) => {
+        if (typeof event.progress === "number") {
+          store.dispatch(
+            updateTorrent({
+              infoHash: event.infoHash,
+              update: { progress: Number(event.progress.toFixed(3)) },
+            })
+          );
+        }
+
+        const inFlightCopies = this.fileCopyInFlightByTorrent[event.infoHash] ?? 0;
+        if (inFlightCopies <= 0) return;
+
+        const remainingCopies = inFlightCopies - 1;
+        this.fileCopyInFlightByTorrent[event.infoHash] = remainingCopies;
+        if (remainingCopies > 0) return;
+
+        delete this.fileCopyInFlightByTorrent[event.infoHash];
+
+        const { torrents } = store.getState();
+        if (torrents[event.infoHash]?.status !== "Copying") {
+          delete this.preCopyStatusByTorrent[event.infoHash];
+          return;
+        }
+
+        const restoreStatus = this.preCopyStatusByTorrent[event.infoHash] ?? "Idle";
+        delete this.preCopyStatusByTorrent[event.infoHash];
+
+        store.dispatch(
+          updateTorrent({
+            infoHash: event.infoHash,
+            update: { status: restoreStatus },
+          })
+        );
+      }
+    );
+
     this.connection.on("TorrentStopped", (event: TorrentStoppedEvent) => {
       const { infoHash } = event;
       const payload = {
@@ -157,6 +261,8 @@ export class SignalRService {
       const payload = {
         infoHash,
       };
+      delete this.fileCopyInFlightByTorrent[infoHash];
+      delete this.preCopyStatusByTorrent[infoHash];
 
       const { torrents } = store.getState();
       const { name } = torrents[infoHash];
@@ -202,6 +308,7 @@ export class SignalRService {
 
     this.connection.on("TorrentAdded", (event: TorrentAddedEvent) => {
       const { infoHash, name, totalSize } = event;
+      const existingStatus = store.getState().torrents[infoHash]?.status;
 
       const payload = {
         infoHash,
@@ -209,8 +316,8 @@ export class SignalRService {
           infoHash,
           name,
           sizeInBytes: totalSize,
-          progress: 0,
-          status: "Idle",
+          progress: typeof event.progress === "number" ? event.progress : 0,
+          status: existingStatus ?? "Idle",
           bytesDownloaded: 0,
           bytesUploaded: 0,
           downloadRate: 0,

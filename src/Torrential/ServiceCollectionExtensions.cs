@@ -35,6 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<TorrentRunner>();
         services.AddSingleton<TorrentTaskManager>();
 
+        services.AddSingleton<RecoverableDataDetector>();
         services.AddSingleton<TorrentFileService>();
         services.AddSingleton<PieceReservationService>();
         services.AddSingleton<BitfieldManager>();
@@ -50,6 +51,7 @@ public static class ServiceCollectionExtensions
 
         // Event bus and handler types
         services.AddSingleton<TorrentEventBus>();
+        services.AddSingleton<TorrentVerificationTracker>();
         services.AddSingleton<PieceValidator>();
         services.AddSingleton<PeerSwarmMessageDispatcher>();
         services.AddSingleton<TorrentStatusCacheMaintainer>();

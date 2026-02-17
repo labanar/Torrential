@@ -80,6 +80,26 @@ export interface TorrentCompletedEvent {
   infoHash: string;
 }
 
+export interface TorrentVerificationStartedEvent {
+  infoHash: string;
+}
+
+export interface TorrentVerificationCompletedEvent {
+  infoHash: string;
+  progress?: number;
+}
+
+export interface TorrentFileCopyStartedEvent {
+  infoHash: string;
+  fileName: string;
+}
+
+export interface TorrentFileCopyCompletedEvent {
+  infoHash: string;
+  fileName: string;
+  progress?: number;
+}
+
 export interface TorrentRemovedEvent {
   infoHash: string;
 }
@@ -88,6 +108,7 @@ export interface TorrentAddedEvent {
   infoHash: string;
   totalSize: number;
   name: string;
+  progress?: number;
 }
 
 export interface TorrentDetailApiModel {

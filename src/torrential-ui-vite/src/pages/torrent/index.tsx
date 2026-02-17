@@ -22,6 +22,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCircleArrowDown,
   faCircleArrowUp,
+  faCircleNotch,
   faCirclePause,
   faDownLong,
   faPause,
@@ -811,6 +812,8 @@ function TorrentRow({
   const color = useMemo(() => {
     if (status === "Stopped" || status === "Idle") return "orange";
     if (status === "Running") return "green";
+    if (status === "Verifying" || status === "Copying") return "blue";
+    return "gray";
   }, [status]);
 
   function prettyPrintBytes(bytes: number) {
@@ -872,6 +875,18 @@ function TorrentRow({
                   }}
                 />
               )}
+              {(status === "Verifying" || status === "Copying") && (
+                <FontAwesomeIcon
+                  icon={faCircleNotch}
+                  spin
+                  size={"1x"}
+                  style={{
+                    paddingRight: "0.8em",
+                    paddingLeft: "0.4em",
+                    color,
+                  }}
+                />
+              )}
             </div>
             <Text className={styles.title} fontSize={"md"} noOfLines={1}>
               {title}
@@ -890,6 +905,8 @@ function TorrentRow({
             height={"1em"}
           />
           <Text className={styles.progressDetails} fontSize={"xs"}>
+            <span>{status}</span>
+            {` • `}
             <Tooltip label={`${seeders + leechers} peers`}>
               <span>
                 <FontAwesomeIcon
