@@ -151,6 +151,15 @@ export class SignalRService {
     this.connection.on(
       "TorrentVerificationCompleted",
       (event: TorrentVerificationCompletedEvent) => {
+        if (typeof event.progress === "number") {
+          store.dispatch(
+            updateTorrent({
+              infoHash: event.infoHash,
+              update: { progress: Number(event.progress.toFixed(3)) },
+            })
+          );
+        }
+
         const { torrents } = store.getState();
         const currentStatus = torrents[event.infoHash]?.status;
         if (currentStatus === "Verifying") {
@@ -189,6 +198,15 @@ export class SignalRService {
     this.connection.on(
       "TorrentFileCopyCompleted",
       (event: TorrentFileCopyCompletedEvent) => {
+        if (typeof event.progress === "number") {
+          store.dispatch(
+            updateTorrent({
+              infoHash: event.infoHash,
+              update: { progress: Number(event.progress.toFixed(3)) },
+            })
+          );
+        }
+
         const inFlightCopies = this.fileCopyInFlightByTorrent[event.infoHash] ?? 0;
         if (inFlightCopies <= 0) return;
 
@@ -298,7 +316,7 @@ export class SignalRService {
           infoHash,
           name,
           sizeInBytes: totalSize,
-          progress: 0,
+          progress: typeof event.progress === "number" ? event.progress : 0,
           status: existingStatus ?? "Idle",
           bytesDownloaded: 0,
           bytesUploaded: 0,

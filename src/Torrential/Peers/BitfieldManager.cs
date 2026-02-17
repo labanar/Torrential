@@ -105,6 +105,12 @@ namespace Torrential.Peers
                 queuedCount == 0 &&
                 HasAllWantedPieces(infoHash, verificationBitfield))
             {
+                await eventBus.PublishTorrentVerificationCompleted(new TorrentVerificationCompletedEvent
+                {
+                    InfoHash = infoHash,
+                    Progress = GetWantedCompletionRatio(infoHash, verificationBitfield)
+                });
+
                 logger.LogInformation("Recovered torrent {InfoHash} is already fully verified; publishing completion event", infoHash);
                 await eventBus.PublishTorrentComplete(new TorrentCompleteEvent { InfoHash = infoHash });
             }

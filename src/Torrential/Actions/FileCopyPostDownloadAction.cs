@@ -49,7 +49,7 @@ namespace Torrential.Pipelines
                     cancellationToken.ThrowIfCancellationRequested();
                     await eventBus.PublishFileCopyStarted(new TorrentFileCopyStartedEvent { InfoHash = infoHash, FileName = fileInfo.Filename });
                     await MaterializeFileAsync(infoHash, fileInfo, buffer, cancellationToken);
-                    await eventBus.PublishFileCopyCompleted(new TorrentFileCopyCompletedEvent { InfoHash = infoHash, FileName = fileInfo.Filename });
+                    await eventBus.PublishFileCopyCompleted(new TorrentFileCopyCompletedEvent { InfoHash = infoHash, FileName = fileInfo.Filename, Progress = 1 });
                 }
             }
             catch (OperationCanceledException)

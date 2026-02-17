@@ -32,6 +32,7 @@ namespace Torrential.Torrents
         public required long PieceSize { get; set; }
         public required int NumberOfPieces { get; set; }
         public required long TotalSize { get; set; }
+        public float? Progress { get; init; }
         public required ICollection<string> AnnounceList { get; set; } = Array.Empty<string>();
         public required ICollection<TorrentMetadataFile> Files { get; set; } = Array.Empty<TorrentMetadataFile>();
     }
@@ -64,6 +65,7 @@ namespace Torrential.Torrents
     public class TorrentVerificationCompletedEvent : ITorrentEvent
     {
         public required InfoHash InfoHash { get; init; }
+        public float? Progress { get; init; }
     }
 
     public class TorrentStatsEvent : ITorrentEvent
@@ -136,6 +138,7 @@ namespace Torrential.Torrents
     {
         public required InfoHash InfoHash { get; init; }
         public required string FileName { get; init; }
+        public float? Progress { get; init; }
     }
 
     public class FileSelectionChangedEvent : ITorrentEvent
