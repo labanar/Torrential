@@ -1,0 +1,354 @@
+using Microsoft.Extensions.Logging;
+using SharpCompress.Common;
+using SharpCompress.Readers;
+using SharpCompress.Readers.Rar;
+using System.Text.RegularExpressions;
+using Torrential.Torrents;
+
+namespace Torrential.Files;
+
+internal sealed partial class ArchiveExtractionService(ILogger<ArchiveExtractionService> logger, IFileHandleProvider fileHandleProvider, TorrentMetadataCache metadataCache)
+    : IArchiveExtractionService
+{
+    [GeneratedRegex(@"^(?<prefix>.+)\.part(?<index>\d+)\.rar$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex RarMultipartRegex();
+    [GeneratedRegex(@"^(?<prefix>.+)\.r(?<index>\d{2})$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex RarLegacyVolumeRegex();
+    [GeneratedRegex(@"^\.r\d{2}$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex RarLegacyVolumeExtensionRegex();
+
+    private static readonly Dictionary<string, string> SupportedArchiveContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".zip"] = "application/zip",
+        [".rar"] = "application/vnd.rar",
+        [".7z"] = "application/x-7z-compressed"
+    };
+
+    public async ValueTask<ArchiveDetectionResult> DetectArchiveAsync(TorrentMetadataFile sourceFile, Stream sourceStream, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(sourceFile);
+        ArgumentNullException.ThrowIfNull(sourceStream);
+
+        var extension = sourceFile.Extension;
+        var extensionMatch = TryGetSupportedArchiveContentType(extension, out var contentType);
+
+        var signatureMatch = await MatchesArchiveSignatureAsync(sourceStream, cancellationToken);
+        if (extensionMatch || signatureMatch)
+            return new ArchiveDetectionResult(true, contentType, extensionMatch ? "supported-extension" : "archive-signature");
+
+        return new ArchiveDetectionResult(false, null, "unsupported-extension");
+    }
+
+    public async Task<ArchiveExtractionResult> TryExtractAsync(InfoHash infoHash, TorrentMetadataFile sourceFile, Stream sourceStream, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(sourceFile);
+        ArgumentNullException.ThrowIfNull(sourceStream);
+
+        var rarVolumeSet = TryGetRarMultipartSet(infoHash, sourceFile);
+        if (rarVolumeSet is { IsPrimary: false })
+        {
+            logger.LogInformation("Skipping secondary RAR volume {ArchivePath}; extraction handled by primary volume", sourceFile.Filename);
+            return new ArchiveExtractionResult(ArchiveExtractionStatus.Extracted, "rar-secondary-volume");
+        }
+
+        var completedRoot = await fileHandleProvider.GetCompletedTorrentPath(infoHash);
+        var archiveParent = Path.GetDirectoryName(FileUtilities.GetSafeRelativePath(sourceFile.Filename));
+
+        try
+        {
+            var extractedFiles = 0;
+            await using var readerLease = await OpenReaderAsync(infoHash, sourceFile, sourceStream, rarVolumeSet, cancellationToken);
+            var reader = readerLease.Reader;
+            while (reader.MoveToNextEntry())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var entry = reader.Entry;
+                if (entry.IsDirectory)
+                    continue;
+
+                if (entry.IsEncrypted)
+                {
+                    logger.LogWarning("Archive {ArchivePath} contains encrypted entries; falling back to raw copy", sourceFile.Filename);
+                    return new ArchiveExtractionResult(ArchiveExtractionStatus.FallbackToCopy, "encrypted");
+                }
+
+                var entryPath = FileUtilities.GetSafeRelativePath(entry.Key ?? string.Empty);
+                if (string.IsNullOrWhiteSpace(entryPath))
+                {
+                    logger.LogWarning("Skipping archive entry with invalid path in {ArchivePath}", sourceFile.Filename);
+                    continue;
+                }
+
+                var relativeDestination = string.IsNullOrWhiteSpace(archiveParent)
+                    ? entryPath
+                    : Path.Combine(archiveParent, entryPath);
+
+                if (!FileUtilities.TryResolvePathUnderRoot(completedRoot, relativeDestination, out var destinationPath))
+                {
+                    logger.LogWarning("Skipping archive entry path traversal attempt in {ArchivePath}: {EntryPath}", sourceFile.Filename, entry.Key);
+                    continue;
+                }
+
+                var destinationDirectory = Path.GetDirectoryName(destinationPath);
+                if (string.IsNullOrWhiteSpace(destinationDirectory))
+                {
+                    logger.LogWarning("Skipping archive entry with unresolved directory in {ArchivePath}: {EntryPath}", sourceFile.Filename, entry.Key);
+                    continue;
+                }
+
+                Directory.CreateDirectory(destinationDirectory);
+                await using var entryStream = reader.OpenEntryStream();
+                await using var output = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.Read, 81920, FileOptions.Asynchronous);
+                await entryStream.CopyToAsync(output, cancellationToken);
+                extractedFiles++;
+            }
+
+            if (extractedFiles == 0)
+            {
+                logger.LogWarning("Archive {ArchivePath} had no extractable entries; falling back to raw copy", sourceFile.Filename);
+                return new ArchiveExtractionResult(ArchiveExtractionStatus.FallbackToCopy, "empty-archive");
+            }
+
+            logger.LogInformation("Extracted {FileCount} entries from archive {ArchivePath}", extractedFiles, sourceFile.Filename);
+            return new ArchiveExtractionResult(ArchiveExtractionStatus.Extracted, "success");
+        }
+        catch (Exception ex) when (IsEncryptedArchiveException(ex))
+        {
+            logger.LogWarning(ex, "Archive {ArchivePath} appears encrypted; falling back to raw copy", sourceFile.Filename);
+            return new ArchiveExtractionResult(ArchiveExtractionStatus.FallbackToCopy, "encrypted");
+        }
+        catch (Exception ex) when (IsCorruptArchiveException(ex))
+        {
+            logger.LogWarning(ex, "Archive {ArchivePath} appears corrupt; falling back to raw copy", sourceFile.Filename);
+            return new ArchiveExtractionResult(ArchiveExtractionStatus.FallbackToCopy, "corrupt");
+        }
+        catch (NotSupportedException ex)
+        {
+            logger.LogWarning(ex, "Archive {ArchivePath} uses an unsupported format; falling back to raw copy", sourceFile.Filename);
+            return new ArchiveExtractionResult(ArchiveExtractionStatus.FallbackToCopy, "unsupported");
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning(ex, "Archive {ArchivePath} cannot be processed; falling back to raw copy", sourceFile.Filename);
+            return new ArchiveExtractionResult(ArchiveExtractionStatus.FallbackToCopy, "unsupported");
+        }
+    }
+
+    private async ValueTask<ReaderLease> OpenReaderAsync(
+        InfoHash infoHash,
+        TorrentMetadataFile sourceFile,
+        Stream sourceStream,
+        RarMultipartSet? rarVolumeSet,
+        CancellationToken cancellationToken)
+    {
+        if (rarVolumeSet is { Volumes.Count: > 1 })
+        {
+            var volumeStreams = new List<Stream>(rarVolumeSet.Volumes.Count);
+            try
+            {
+                foreach (var volume in rarVolumeSet.Volumes)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var stream = await fileHandleProvider.OpenPartFileSegmentReadStream(infoHash, volume);
+                    volumeStreams.Add(stream);
+                }
+
+                var reader = RarReader.Open(volumeStreams, new ReaderOptions { LeaveStreamOpen = true });
+                return new ReaderLease(reader, volumeStreams);
+            }
+            catch
+            {
+                foreach (var stream in volumeStreams)
+                    await stream.DisposeAsync();
+
+                throw;
+            }
+        }
+
+        if (sourceStream.CanSeek)
+            sourceStream.Seek(0, SeekOrigin.Begin);
+
+        return new ReaderLease(ReaderFactory.Open(sourceStream, new ReaderOptions { LeaveStreamOpen = true }), null);
+    }
+
+    private RarMultipartSet? TryGetRarMultipartSet(InfoHash infoHash, TorrentMetadataFile sourceFile)
+    {
+        if (!metadataCache.TryGet(infoHash, out var metadata))
+            return null;
+
+        var sourceSafePath = FileUtilities.GetSafeRelativePath(sourceFile.Filename);
+        if (!TryGetRarVolumeDescriptor(sourceSafePath, out var sourceDescriptor))
+            return null;
+
+        var matchingVolumes = new List<(TorrentMetadataFile File, int SortOrder)>();
+        foreach (var file in metadata.Files.Where(static file => file.IsSelected))
+        {
+            var fileSafePath = FileUtilities.GetSafeRelativePath(file.Filename);
+            if (!TryGetRarVolumeDescriptor(fileSafePath, out var fileDescriptor))
+                continue;
+
+            if (fileDescriptor.Style != sourceDescriptor.Style)
+                continue;
+
+            if (!fileDescriptor.Prefix.Equals(sourceDescriptor.Prefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            matchingVolumes.Add((file, fileDescriptor.SortOrder));
+        }
+
+        matchingVolumes.Sort(static (left, right) => left.SortOrder.CompareTo(right.SortOrder));
+
+        if (matchingVolumes.Count <= 1)
+            return null;
+
+        var firstIndex = matchingVolumes[0].SortOrder;
+        return new RarMultipartSet(
+            sourceDescriptor.SortOrder == firstIndex,
+            matchingVolumes.Select(static item => item.File).ToArray());
+    }
+
+    private sealed class ReaderLease : IAsyncDisposable
+    {
+        private readonly IReadOnlyList<Stream>? _ownedStreams;
+
+        public ReaderLease(IReader reader, IReadOnlyList<Stream>? ownedStreams)
+        {
+            Reader = reader;
+            _ownedStreams = ownedStreams;
+        }
+
+        public IReader Reader { get; }
+
+        public async ValueTask DisposeAsync()
+        {
+            Reader.Dispose();
+            if (_ownedStreams is null)
+                return;
+
+            foreach (var stream in _ownedStreams)
+                await stream.DisposeAsync();
+        }
+    }
+
+    private sealed record RarMultipartSet(bool IsPrimary, IReadOnlyList<TorrentMetadataFile> Volumes);
+
+    private static async Task<bool> MatchesArchiveSignatureAsync(Stream sourceStream, CancellationToken cancellationToken)
+    {
+        if (!sourceStream.CanSeek)
+            return false;
+
+        var originalPosition = sourceStream.Position;
+        try
+        {
+            sourceStream.Seek(0, SeekOrigin.Begin);
+            var header = new byte[8];
+            var bytesRead = await sourceStream.ReadAsync(header.AsMemory(0, header.Length), cancellationToken);
+            return IsZipSignature(header.AsSpan(0, bytesRead)) || IsRarSignature(header.AsSpan(0, bytesRead)) || IsSevenZipSignature(header.AsSpan(0, bytesRead));
+        }
+        finally
+        {
+            sourceStream.Seek(originalPosition, SeekOrigin.Begin);
+        }
+    }
+
+    private static bool IsZipSignature(ReadOnlySpan<byte> bytes)
+        => bytes.Length >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4B &&
+           (bytes[2], bytes[3]) is (0x03, 0x04) or (0x05, 0x06) or (0x07, 0x08);
+
+    private static bool IsRarSignature(ReadOnlySpan<byte> bytes)
+    {
+        if (bytes.Length < 7)
+            return false;
+
+        return bytes[0] == 0x52 &&
+               bytes[1] == 0x61 &&
+               bytes[2] == 0x72 &&
+               bytes[3] == 0x21 &&
+               bytes[4] == 0x1A &&
+               bytes[5] == 0x07 &&
+               (bytes[6] == 0x00 || (bytes.Length >= 8 && bytes[6] == 0x01 && bytes[7] == 0x00));
+    }
+
+    private static bool IsSevenZipSignature(ReadOnlySpan<byte> bytes)
+        => bytes.Length >= 6 &&
+           bytes[0] == 0x37 &&
+           bytes[1] == 0x7A &&
+           bytes[2] == 0xBC &&
+           bytes[3] == 0xAF &&
+           bytes[4] == 0x27 &&
+           bytes[5] == 0x1C;
+
+    private static bool IsEncryptedArchiveException(Exception ex)
+    {
+        return ex.Message.Contains("encrypt", StringComparison.OrdinalIgnoreCase)
+               || ex.Message.Contains("password", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsCorruptArchiveException(Exception ex)
+    {
+        return ex is InvalidFormatException
+               || ex is EndOfStreamException
+               || ex is IOException;
+    }
+
+    private static bool TryGetSupportedArchiveContentType(string extension, out string? contentType)
+    {
+        if (SupportedArchiveContentTypes.TryGetValue(extension, out var mappedContentType))
+        {
+            contentType = mappedContentType;
+            return true;
+        }
+
+        if (RarLegacyVolumeExtensionRegex().IsMatch(extension))
+        {
+            contentType = "application/vnd.rar";
+            return true;
+        }
+
+        contentType = null;
+        return false;
+    }
+
+    private static bool TryGetRarVolumeDescriptor(string safeRelativePath, out RarVolumeDescriptor descriptor)
+    {
+        var multipartMatch = RarMultipartRegex().Match(safeRelativePath);
+        if (multipartMatch.Success)
+        {
+            descriptor = new RarVolumeDescriptor(
+                multipartMatch.Groups["prefix"].Value,
+                int.Parse(multipartMatch.Groups["index"].Value),
+                RarVolumeStyle.PartNumbered);
+            return true;
+        }
+
+        var legacySecondaryMatch = RarLegacyVolumeRegex().Match(safeRelativePath);
+        if (legacySecondaryMatch.Success)
+        {
+            descriptor = new RarVolumeDescriptor(
+                legacySecondaryMatch.Groups["prefix"].Value,
+                int.Parse(legacySecondaryMatch.Groups["index"].Value) + 1,
+                RarVolumeStyle.LegacyNumbered);
+            return true;
+        }
+
+        if (safeRelativePath.EndsWith(".rar", StringComparison.OrdinalIgnoreCase))
+        {
+            descriptor = new RarVolumeDescriptor(
+                safeRelativePath[..^4],
+                0,
+                RarVolumeStyle.LegacyNumbered);
+            return true;
+        }
+
+        descriptor = default;
+        return false;
+    }
+
+    private enum RarVolumeStyle
+    {
+        PartNumbered,
+        LegacyNumbered
+    }
+
+    private readonly record struct RarVolumeDescriptor(string Prefix, int SortOrder, RarVolumeStyle Style);
+}
