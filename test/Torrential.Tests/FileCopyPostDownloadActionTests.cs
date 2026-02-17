@@ -1,0 +1,324 @@
+using System.IO.Compression;
+using System.Reflection;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Torrential.Files;
+using Torrential.Pipelines;
+using Torrential.Settings;
+using Torrential.Torrents;
+
+namespace Torrential.Tests;
+
+public sealed class FileCopyPostDownloadActionTests
+{
+    [Fact]
+    public async Task Non_archive_selected_file_copies_unchanged_from_part_to_completed_path()
+    {
+        await using var harness = await FileCopyTestHarness.CreateAsync();
+        var metadata = CreateMetadata(
+            name: "copy-raw",
+            infoHash: "1111111111111111111111111111111111111111",
+            files:
+            [
+                new TorrentMetadataFile { Id = 0, Filename = "padding.bin", FileStartByte = 0, FileSize = 5, IsSelected = false },
+                new TorrentMetadataFile { Id = 1, Filename = "media/video.txt", FileStartByte = 5, FileSize = 12, IsSelected = true }
+            ]);
+
+        harness.MetadataCache.Add(metadata);
+
+        var partPayload = CombineSegments(
+            "12345"u8.ToArray(),
+            "hello world!"u8.ToArray());
+
+        await harness.WritePartFileAsync(metadata.InfoHash, partPayload);
+        var result = await harness.Action.ExecuteAsync(metadata.InfoHash, CancellationToken.None);
+
+        Assert.True(result.Success);
+
+        var completedTorrentPath = await harness.FileHandleProvider.GetCompletedTorrentPath(metadata.InfoHash);
+        var outputPath = Path.Combine(completedTorrentPath, "media", "video.txt");
+        Assert.True(File.Exists(outputPath));
+        Assert.Equal("hello world!"u8.ToArray(), await File.ReadAllBytesAsync(outputPath));
+    }
+
+    [Fact]
+    public async Task Archive_selected_file_extracts_directly_without_creating_intermediate_archive()
+    {
+        await using var harness = await FileCopyTestHarness.CreateAsync();
+        var archiveBytes = CreateZipArchive([("album/track.txt", "line-1\nline-2"u8.ToArray())]);
+        var metadata = CreateMetadata(
+            name: "extract-direct",
+            infoHash: "2222222222222222222222222222222222222222",
+            files:
+            [
+                new TorrentMetadataFile { Id = 0, Filename = "seed.bin", FileStartByte = 0, FileSize = 4, IsSelected = false },
+                new TorrentMetadataFile { Id = 1, Filename = "release/archive.zip", FileStartByte = 4, FileSize = archiveBytes.Length, IsSelected = true }
+            ]);
+
+        harness.MetadataCache.Add(metadata);
+        await harness.WritePartFileAsync(metadata.InfoHash, CombineSegments("seed"u8.ToArray(), archiveBytes));
+
+        var result = await harness.Action.ExecuteAsync(metadata.InfoHash, CancellationToken.None);
+        Assert.True(result.Success);
+
+        var completedTorrentPath = await harness.FileHandleProvider.GetCompletedTorrentPath(metadata.InfoHash);
+        var extractedFilePath = Path.Combine(completedTorrentPath, "release", "album", "track.txt");
+        var rawArchivePath = Path.Combine(completedTorrentPath, "release", "archive.zip");
+
+        Assert.True(File.Exists(extractedFilePath));
+        Assert.False(File.Exists(rawArchivePath));
+        Assert.Equal("line-1\nline-2"u8.ToArray(), await File.ReadAllBytesAsync(extractedFilePath));
+    }
+
+    [Fact]
+    public async Task Corrupt_archive_falls_back_to_raw_copy()
+    {
+        await using var harness = await FileCopyTestHarness.CreateAsync();
+        var corruptArchiveBytes = "this is not a valid zip payload"u8.ToArray();
+        var metadata = CreateMetadata(
+            name: "extract-fallback",
+            infoHash: "3333333333333333333333333333333333333333",
+            files:
+            [
+                new TorrentMetadataFile { Id = 0, Filename = "bad/corrupt.zip", FileStartByte = 0, FileSize = corruptArchiveBytes.Length, IsSelected = true }
+            ]);
+
+        harness.MetadataCache.Add(metadata);
+        await harness.WritePartFileAsync(metadata.InfoHash, corruptArchiveBytes);
+
+        var result = await harness.Action.ExecuteAsync(metadata.InfoHash, CancellationToken.None);
+        Assert.True(result.Success);
+
+        var completedTorrentPath = await harness.FileHandleProvider.GetCompletedTorrentPath(metadata.InfoHash);
+        var rawArchivePath = Path.Combine(completedTorrentPath, "bad", "corrupt.zip");
+        var extractedFilePath = Path.Combine(completedTorrentPath, "bad", "corrupt");
+
+        Assert.True(File.Exists(rawArchivePath));
+        Assert.Equal(corruptArchiveBytes, await File.ReadAllBytesAsync(rawArchivePath));
+        Assert.False(File.Exists(extractedFilePath));
+    }
+
+    [Fact]
+    public async Task Cancellation_before_materialization_leaves_no_completed_output()
+    {
+        await using var harness = await FileCopyTestHarness.CreateAsync();
+        var payload = "cancel-me"u8.ToArray();
+        var metadata = CreateMetadata(
+            name: "cancel-copy",
+            infoHash: "4444444444444444444444444444444444444444",
+            files:
+            [
+                new TorrentMetadataFile { Id = 0, Filename = "docs/cancel.txt", FileStartByte = 0, FileSize = payload.Length, IsSelected = true }
+            ]);
+
+        harness.MetadataCache.Add(metadata);
+        await harness.WritePartFileAsync(metadata.InfoHash, payload);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var result = await harness.Action.ExecuteAsync(metadata.InfoHash, cts.Token);
+
+        Assert.False(result.Success);
+
+        var completedTorrentPath = await harness.FileHandleProvider.GetCompletedTorrentPath(metadata.InfoHash);
+        var outputPath = Path.Combine(completedTorrentPath, "docs", "cancel.txt");
+        Assert.False(File.Exists(outputPath));
+    }
+
+    private static TorrentMetadata CreateMetadata(string name, string infoHash, TorrentMetadataFile[] files)
+    {
+        var totalSize = files.Sum(static file => file.FileSize);
+        return new TorrentMetadata
+        {
+            Name = name,
+            UrlList = Array.Empty<string>(),
+            AnnounceList = Array.Empty<string>(),
+            Files = files,
+            PieceSize = 16 * 1024,
+            TotalSize = totalSize,
+            InfoHash = infoHash,
+            PieceHashesConcatenated = new byte[20]
+        };
+    }
+
+    private static byte[] CombineSegments(params byte[][] segments)
+    {
+        var totalLength = segments.Sum(static segment => segment.Length);
+        var output = new byte[totalLength];
+        var offset = 0;
+        foreach (var segment in segments)
+        {
+            Buffer.BlockCopy(segment, 0, output, offset, segment.Length);
+            offset += segment.Length;
+        }
+
+        return output;
+    }
+
+    private static byte[] CreateZipArchive((string Path, byte[] Content)[] entries)
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var entry in entries)
+            {
+                var archiveEntry = archive.CreateEntry(entry.Path, CompressionLevel.NoCompression);
+                using var entryStream = archiveEntry.Open();
+                entryStream.Write(entry.Content, 0, entry.Content.Length);
+            }
+        }
+
+        return stream.ToArray();
+    }
+
+    private sealed class FileCopyTestHarness : IAsyncDisposable
+    {
+        private readonly ServiceProvider _serviceProvider;
+        private readonly string _tempRoot;
+        private readonly object _internalFileHandleProvider;
+        private bool _disposed;
+
+        private FileCopyTestHarness(
+            ServiceProvider serviceProvider,
+            string tempRoot,
+            TorrentMetadataCache metadataCache,
+            TorrentFileService torrentFileService,
+            SettingsManager settingsManager,
+            IFileHandleProvider fileHandleProvider,
+            TorrentEventBus eventBus,
+            FileCopyPostDownloadAction action,
+            object internalFileHandleProvider)
+        {
+            _serviceProvider = serviceProvider;
+            _tempRoot = tempRoot;
+            _internalFileHandleProvider = internalFileHandleProvider;
+            MetadataCache = metadataCache;
+            TorrentFileService = torrentFileService;
+            SettingsManager = settingsManager;
+            FileHandleProvider = fileHandleProvider;
+            EventBus = eventBus;
+            Action = action;
+        }
+
+        public TorrentMetadataCache MetadataCache { get; }
+        public TorrentFileService TorrentFileService { get; }
+        public SettingsManager SettingsManager { get; }
+        public IFileHandleProvider FileHandleProvider { get; }
+        public TorrentEventBus EventBus { get; }
+        public FileCopyPostDownloadAction Action { get; }
+
+        public static async Task<FileCopyTestHarness> CreateAsync()
+        {
+            var tempRoot = Path.Combine(Path.GetTempPath(), $"torrential-postcopy-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempRoot);
+
+            var services = new ServiceCollection();
+            services.AddMemoryCache();
+            services.AddLogging();
+            services.AddDbContext<TorrentialDb>(options => options.UseSqlite($"Data Source={Path.Combine(tempRoot, "settings.db")}"));
+
+            var serviceProvider = services.BuildServiceProvider();
+            using (var scope = serviceProvider.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
+                await db.Database.EnsureCreatedAsync();
+            }
+
+            var settingsManager = new SettingsManager(
+                serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+                serviceProvider.GetRequiredService<IMemoryCache>());
+
+            await settingsManager.SaveFileSettings(new FileSettings
+            {
+                DownloadPath = Path.Combine(tempRoot, "download"),
+                CompletedPath = Path.Combine(tempRoot, "completed")
+            });
+
+            var metadataCache = new TorrentMetadataCache();
+            var torrentFileService = new TorrentFileService(metadataCache, settingsManager);
+
+            var fileHandleProviderType = typeof(TorrentFileService).Assembly.GetType("Torrential.Files.FileHandleProvider", throwOnError: true)!;
+            var internalFileHandleProvider = Activator.CreateInstance(fileHandleProviderType, metadataCache, torrentFileService)
+                ?? throw new InvalidOperationException("Failed to create FileHandleProvider.");
+            var fileHandleProvider = (IFileHandleProvider)internalFileHandleProvider;
+
+            var archiveExtractionServiceType = typeof(TorrentFileService).Assembly.GetType("Torrential.Files.ArchiveExtractionService", throwOnError: true)!;
+            var archiveLoggerType = typeof(Microsoft.Extensions.Logging.ILogger<>).MakeGenericType(archiveExtractionServiceType);
+            var archiveLogger = serviceProvider.GetRequiredService(archiveLoggerType);
+            var archiveExtractionService = (IArchiveExtractionService)(Activator.CreateInstance(
+                archiveExtractionServiceType,
+                archiveLogger,
+                fileHandleProvider) ?? throw new InvalidOperationException("Failed to create ArchiveExtractionService."));
+
+            var eventBus = new TorrentEventBus();
+            var action = new FileCopyPostDownloadAction(
+                metadataCache,
+                fileHandleProvider,
+                archiveExtractionService,
+                eventBus,
+                NullLogger<FileCopyPostDownloadAction>.Instance);
+
+            return new FileCopyTestHarness(
+                serviceProvider,
+                tempRoot,
+                metadataCache,
+                torrentFileService,
+                settingsManager,
+                fileHandleProvider,
+                eventBus,
+                action,
+                internalFileHandleProvider);
+        }
+
+        public async Task WritePartFileAsync(InfoHash infoHash, byte[] content)
+        {
+            var partPath = await TorrentFileService.GetPartFilePath(infoHash);
+            Directory.CreateDirectory(Path.GetDirectoryName(partPath)!);
+            await File.WriteAllBytesAsync(partPath, content);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            await EventBus.DisposeAsync();
+            CloseCachedPartHandles();
+            _serviceProvider.Dispose();
+
+            if (!Directory.Exists(_tempRoot))
+                return;
+
+            try
+            {
+                Directory.Delete(_tempRoot, recursive: true);
+            }
+            catch (IOException)
+            {
+                // Best effort cleanup on Windows when file handles are slow to release.
+            }
+        }
+
+        private void CloseCachedPartHandles()
+        {
+            var field = _internalFileHandleProvider
+                .GetType()
+                .GetField("_partFiles", BindingFlags.Instance | BindingFlags.Public);
+
+            if (field?.GetValue(_internalFileHandleProvider) is not System.Collections.IEnumerable entries)
+                return;
+
+            foreach (var entry in entries)
+            {
+                var value = entry?.GetType().GetProperty("Value", BindingFlags.Instance | BindingFlags.Public)?.GetValue(entry);
+                if (value is Microsoft.Win32.SafeHandles.SafeFileHandle handle)
+                {
+                    handle.Close();
+                }
+            }
+        }
+    }
+}
