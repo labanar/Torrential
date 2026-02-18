@@ -175,3 +175,71 @@ test.describe('Screenshots', () => {
     });
   });
 });
+
+test.describe('Filter input', () => {
+  const torrentRowSelector = '[class*="torrentContainer"]';
+  const filterInputSelector = 'input[placeholder="Filter"]';
+  const emptyStateSelector = '[class*="emptyFilterState"]';
+
+  test.beforeEach(async ({ page, baseURL }) => {
+    // Ensure at least one torrent exists so the list is populated
+    const torrentFile = path.join(fixturesDir, 'debian-12.0.0-amd64-netinst.iso.torrent');
+    await addTorrentViaApi(baseURL!, torrentFile).catch(() => {
+      // Torrent may already exist from a prior test; ignore duplicate errors
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator(torrentRowSelector).first()).toBeVisible();
+  });
+
+  test('matching filter reduces visible rows', async ({ page }) => {
+    const filterInput = page.locator(filterInputSelector);
+    const initialRowCount = await page.locator(torrentRowSelector).count();
+    expect(initialRowCount).toBeGreaterThan(0);
+
+    // Type a term that matches the debian torrent
+    await filterInput.fill('debian');
+    await expect(page.locator(torrentRowSelector).first()).toBeVisible();
+
+    const filteredCount = await page.locator(torrentRowSelector).count();
+    expect(filteredCount).toBeGreaterThan(0);
+    expect(filteredCount).toBeLessThanOrEqual(initialRowCount);
+
+    await assertNoHorizontalOverflow(page);
+  });
+
+  test('non-matching filter shows empty state', async ({ page }) => {
+    const filterInput = page.locator(filterInputSelector);
+
+    // Type a term that matches nothing
+    await filterInput.fill('zzz_no_match_zzz');
+
+    // Torrent rows should disappear
+    await expect(page.locator(torrentRowSelector)).toHaveCount(0);
+
+    // Empty-state message should be visible
+    const emptyState = page.locator(emptyStateSelector);
+    await expect(emptyState).toBeVisible();
+    await expect(emptyState).toContainText('No torrents match');
+
+    await assertNoHorizontalOverflow(page);
+  });
+
+  test('clearing filter restores all rows', async ({ page }) => {
+    const filterInput = page.locator(filterInputSelector);
+    const initialRowCount = await page.locator(torrentRowSelector).count();
+
+    // Filter to non-matching, then clear
+    await filterInput.fill('zzz_no_match_zzz');
+    await expect(page.locator(torrentRowSelector)).toHaveCount(0);
+
+    await filterInput.fill('');
+    await expect(page.locator(torrentRowSelector).first()).toBeVisible();
+
+    const restoredCount = await page.locator(torrentRowSelector).count();
+    expect(restoredCount).toBe(initialRowCount);
+
+    await assertNoHorizontalOverflow(page);
+  });
+});
