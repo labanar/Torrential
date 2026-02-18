@@ -206,71 +206,69 @@ function GeneralSettings() {
         </Button>
       </div>
       <Separator />
-      <SectionHeader name="Files" />
+      <div className={styles.settingsCard}>
+        <SectionHeader name="Files" />
+        <RowComponent label="Download Path">
+          <FormInput
+            fieldName="downloadPath"
+            control={fileSettingsControl}
+            className={styles.pathInput}
+          />
+        </RowComponent>
+        <RowComponent label="Completed Path">
+          <FormInput
+            fieldName="completedPath"
+            control={fileSettingsControl}
+            className={styles.pathInput}
+          />
+        </RowComponent>
+      </div>
 
-      <RowComponent label="Download Path">
-        <FormInput
-          fieldName="downloadPath"
-          control={fileSettingsControl}
-          className={styles.pathInput}
-        />
-      </RowComponent>
-      <RowComponent label="Completed Path">
-        <FormInput
-          fieldName="completedPath"
-          control={fileSettingsControl}
-          className={styles.pathInput}
-        />
-      </RowComponent>
+      <div className={styles.settingsCard}>
+        <SectionHeader name="Connections" />
+        <RowComponent label="Max connections (per torrent)">
+          <FormNumericInput
+            min={0}
+            control={connectionSettingsControl}
+            fieldName="maxConnectionsPerTorrent"
+            className={styles.connectionNumericInput}
+          />
+        </RowComponent>
+        <RowComponent label="Max connections (Global)">
+          <FormNumericInput
+            min={0}
+            control={connectionSettingsControl}
+            fieldName="maxConnectionsGlobal"
+            className={styles.connectionNumericInput}
+          />
+        </RowComponent>
+        <RowComponent label="Max Half-open connections">
+          <FormNumericInput
+            min={0}
+            control={connectionSettingsControl}
+            fieldName="maxHalfOpenConnections"
+            className={styles.connectionNumericInput}
+          />
+        </RowComponent>
+      </div>
 
-      <Separator />
-      <SectionHeader name="Connections" />
-
-      <RowComponent label="Max connections (per torrent)">
-        <FormNumericInput
-          min={0}
-          control={connectionSettingsControl}
-          fieldName="maxConnectionsPerTorrent"
-          className={styles.connectionNumericInput}
-        />
-      </RowComponent>
-
-      <RowComponent label="Max connections (Global)">
-        <FormNumericInput
-          min={0}
-          control={connectionSettingsControl}
-          fieldName="maxConnectionsGlobal"
-          className={styles.connectionNumericInput}
-        />
-      </RowComponent>
-
-      <RowComponent label="Max Half-open connections">
-        <FormNumericInput
-          min={0}
-          control={connectionSettingsControl}
-          fieldName="maxHalfOpenConnections"
-          className={styles.connectionNumericInput}
-        />
-      </RowComponent>
-
-      <Separator />
-      <SectionHeader name="Inbound Connections" />
-
-      <FormCheckbox
-        control={tcpListenerSettingsControl}
-        fieldName="enabled"
-        text="Allow inbound connections"
-        className={styles.tcpInboundCheckbox}
-      />
-
-      <RowComponent label="Port">
-        <FormNumericInput
-          min={0}
+      <div className={styles.settingsCard}>
+        <SectionHeader name="Inbound Connections" />
+        <FormCheckbox
           control={tcpListenerSettingsControl}
-          fieldName="port"
-          className={styles.portInput}
+          fieldName="enabled"
+          text="Allow inbound connections"
+          className={styles.tcpInboundCheckbox}
         />
-      </RowComponent>
+        <RowComponent label="Port">
+          <FormNumericInput
+            min={0}
+            control={tcpListenerSettingsControl}
+            fieldName="port"
+            className={styles.portInput}
+          />
+        </RowComponent>
+      </div>
     </div>
   );
 }

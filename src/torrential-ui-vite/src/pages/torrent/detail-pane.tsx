@@ -117,9 +117,9 @@ export function DetailPane({ infoHash, onClose }: DetailPaneProps) {
         </div>
       </div>
       <div className={styles.tabs}>
-        <TabButton label="PEERS" tab="peers" active={activeTab} onClick={setActiveTab} />
-        <TabButton label="BITFIELD" tab="bitfield" active={activeTab} onClick={setActiveTab} />
-        <TabButton label="FILES" tab="files" active={activeTab} onClick={setActiveTab} />
+        <TabButton label="Peers" tab="peers" active={activeTab} onClick={setActiveTab} />
+        <TabButton label="Bitfield" tab="bitfield" active={activeTab} onClick={setActiveTab} />
+        <TabButton label="Files" tab="files" active={activeTab} onClick={setActiveTab} />
       </div>
       <div className={styles.tabContent}>
         {activeTab === "peers" && <PeersSection peers={detail.peers} />}

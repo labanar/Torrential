@@ -241,8 +241,8 @@
   overflow-y: auto;
   min-height: 0;
   max-height: min(40vh, 18rem);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
   padding: 10px;
 }
 
@@ -321,8 +321,8 @@
   min-height: 0;
   max-height: min(45vh, 18rem);
   overflow-y: auto;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
   padding: 8px;
 }
 
