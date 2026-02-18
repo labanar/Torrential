@@ -52,7 +52,7 @@ namespace Torrential.Torrents
                 return;
             }
 
-            if (verificationBitfield.HasAll())
+            if (bitfieldMgr.HasAllWantedPieces(meta.InfoHash, verificationBitfield))
             {
                 logger.LogDebug("Already have all pieces");
                 await peer.SendNotInterested();

@@ -1,30 +1,65 @@
-# React + TypeScript + Vite
+# Torrential UI (Vite)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the **active** frontend for Torrential, built with React + TypeScript + Vite.
 
-Currently, two official plugins are available:
+> **Source of truth:** `src/torrential-ui-vite` is the only frontend that ships with the app.
+> The other UI directories (`torrential-ui`, `torrential-remix-ui`) are legacy/experimental and are **not** served by `Torrential.Web`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Development
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
-
-- Configure the top-level `parserOptions` property like this:
-
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
+```bash
+cd src/torrential-ui-vite
+npm install
+npm run dev
 ```
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+The Vite dev server runs on `http://localhost:5173` and proxies API calls to the .NET backend.
+
+## Production Build
+
+Vite is configured to output directly into `src/Torrential.Web/wwwroot`. There are two ways to trigger a build:
+
+### Via npm (standalone)
+
+```bash
+cd src/torrential-ui-vite
+npm run build
+```
+
+### Via dotnet (integrated)
+
+```bash
+cd src/Torrential.Web
+dotnet build
+```
+
+The `.csproj` includes MSBuild targets (`NpmInstall` and `ViteBuild`) that automatically run `npm install` and `npm run build` before the .NET build. To skip the frontend build (e.g., during backend-only iteration), set the environment variable:
+
+```bash
+SKIP_VITE_BUILD=true dotnet build
+```
+
+### Build output
+
+The build produces hashed assets in `wwwroot/`:
+
+```
+src/Torrential.Web/wwwroot/
+  index.html          # Entry point (references hashed JS/CSS)
+  vite.svg            # Favicon
+  assets/
+    index-<hash>.js   # Bundled application code
+    index-<hash>.css  # Bundled styles
+```
+
+These files are **not checked into git** (see `.gitignore`). They are generated at build time.
+
+## PR Verification Checklist
+
+Before merging frontend changes, verify:
+
+- [ ] `npm run build` in `src/torrential-ui-vite` succeeds without errors
+- [ ] `dotnet build` in `src/Torrential.Web` succeeds (this runs the Vite build automatically)
+- [ ] Run the app with `dotnet run` and confirm `wwwroot/index.html` loads in the browser
+- [ ] If the change affects the split pane or layout, click a torrent in the list to verify the detail pane renders
+- [ ] Check browser DevTools Network tab: asset requests (JS/CSS) return 200, not 404

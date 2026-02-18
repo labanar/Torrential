@@ -132,6 +132,75 @@ namespace Torrential.Peers
             return true;
         }
 
+        public bool HasAll(ReadOnlySpan<byte> requiredPiecesMask)
+        {
+            if (requiredPiecesMask.IsEmpty)
+                return HasAll();
+
+            var bytes = MemoryMarshal.AsBytes(_data.AsSpan(0, _sizeInInts));
+            for (int i = 0; i < _sizeInBytes; i++)
+            {
+                byte requiredByte = i < requiredPiecesMask.Length
+                    ? requiredPiecesMask[i]
+                    : (byte)0;
+
+                if (i == _sizeInBytes - 1)
+                {
+                    int remainingBits = _numOfPieces % 8;
+                    if (remainingBits > 0)
+                    {
+                        byte validMask = (byte)(0xFF << (8 - remainingBits));
+                        requiredByte &= validMask;
+                    }
+                }
+
+                if (requiredByte == 0)
+                    continue;
+
+                if ((bytes[i] & requiredByte) != requiredByte)
+                    return false;
+            }
+
+            return true;
+        }
+
+        public float GetCompletionRatio(ReadOnlySpan<byte> requiredPiecesMask)
+        {
+            if (requiredPiecesMask.IsEmpty)
+                return CompletionRatio;
+
+            var bytes = MemoryMarshal.AsBytes(_data.AsSpan(0, _sizeInInts));
+            int requiredPieces = 0;
+            int havePieces = 0;
+            for (int i = 0; i < _sizeInBytes; i++)
+            {
+                byte requiredByte = i < requiredPiecesMask.Length
+                    ? requiredPiecesMask[i]
+                    : (byte)0;
+
+                if (i == _sizeInBytes - 1)
+                {
+                    int remainingBits = _numOfPieces % 8;
+                    if (remainingBits > 0)
+                    {
+                        byte validMask = (byte)(0xFF << (8 - remainingBits));
+                        requiredByte &= validMask;
+                    }
+                }
+
+                if (requiredByte == 0)
+                    continue;
+
+                requiredPieces += BitOperations.PopCount((uint)requiredByte);
+                havePieces += BitOperations.PopCount((uint)(bytes[i] & requiredByte));
+            }
+
+            if (requiredPieces == 0)
+                return 1f;
+
+            return havePieces / (float)requiredPieces;
+        }
+
         public bool HasNone()
         {
             for (int i = 0; i < _sizeInInts; i++)
@@ -238,18 +307,45 @@ namespace Torrential.Peers
             IBitfield? reservationBitfield,
             PieceAvailability? availability)
         {
+            return SuggestPieceToDownload(peerBitfield, reservationBitfield, availability, null);
+        }
+
+        public PieceSuggestionResult SuggestPieceToDownload(
+            IBitfield peerBitfield,
+            IBitfield? reservationBitfield,
+            PieceAvailability? availability,
+            IBitfield? wantedBitfield)
+        {
+            return SuggestPieceToDownload(peerBitfield, reservationBitfield, availability, wantedBitfield, null);
+        }
+
+        public PieceSuggestionResult SuggestPieceToDownload(
+            IBitfield peerBitfield,
+            IBitfield? reservationBitfield,
+            PieceAvailability? availability,
+            IBitfield? wantedBitfield,
+            IBitfield? allowedPieces)
+        {
             var resBytes = reservationBitfield != null
                 ? reservationBitfield.Bytes
                 : ReadOnlySpan<byte>.Empty;
             var availCounts = availability != null
                 ? availability.Counts
                 : ReadOnlySpan<int>.Empty;
+            var allowedBytes = allowedPieces != null
+                ? allowedPieces.Bytes
+                : ReadOnlySpan<byte>.Empty;
+            var wantedBytes = wantedBitfield != null
+                ? wantedBitfield.Bytes
+                : ReadOnlySpan<byte>.Empty;
 
             return PieceSuggestion.SuggestPiece(
                 Bytes,
                 peerBitfield.Bytes,
                 resBytes,
                 availCounts,
+                wantedBytes,
+                allowedBytes,
                 _numOfPieces);
         }
 

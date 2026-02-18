@@ -1,8 +1,9 @@
 using Microsoft.Extensions.Logging;
+using Torrential.Files;
 
 namespace Torrential.Peers
 {
-    public class PieceSelector(BitfieldManager bitfieldManager, PieceReservationService pieceReservationService, ILogger<PieceSelector> logger)
+    public class PieceSelector(BitfieldManager bitfieldManager, PieceReservationService pieceReservationService, FileSelectionPieceMap fileSelectionPieceMap, ILogger<PieceSelector> logger)
     {
         private const int RESERVATION_LENGTH_SECONDS = 30;
 
@@ -15,6 +16,11 @@ namespace Torrential.Peers
             // Both are optional --- the algorithm degrades gracefully if either is missing.
             bitfieldManager.TryGetPieceReservationBitfield(infohash, out var reservationBitfield);
             bitfieldManager.TryGetPieceAvailability(infohash, out var availability);
+            bitfieldManager.TryGetWantedPieceBitfield(infohash, out var wantedBitfield);
+
+            // Retrieve allowed-pieces mask from file selection.
+            // When null, all pieces are allowed (no file filtering).
+            var allowedPieces = fileSelectionPieceMap.GetAllowedPieces(infohash);
 
             // Yield to prevent herding when many peers call this at the same instant.
             // Previous: Task.Delay(Random.Shared.Next(0, 250)) allocated a Timer + Task per call.
@@ -23,10 +29,12 @@ namespace Torrential.Peers
 
             // The suggestion algorithm considers:
             //   - peer bitfield (only suggest pieces the peer has)
+            //   - wanted bitfield (only suggest pieces selected by the user)
             //   - reservation bitfield (skip already-reserved pieces)
             //   - availability counts (prefer rarest pieces)
+            //   - allowed pieces (only suggest pieces belonging to selected files)
             // This is a single O(n/8) pass with zero heap allocations.
-            var suggestedPiece = myBitfield.SuggestPieceToDownload(peerBitfield, reservationBitfield, availability);
+            var suggestedPiece = myBitfield.SuggestPieceToDownload(peerBitfield, reservationBitfield, availability, wantedBitfield, allowedPieces);
             if (!suggestedPiece.Index.HasValue)
                 return suggestedPiece;
 
@@ -35,8 +43,9 @@ namespace Torrential.Peers
             // As we approach 100% completion, reduce reservation length for faster endgame.
             // This is a simple linear function that reduces the reservation length as we approach 100%.
             var reservationLengthSeconds = RESERVATION_LENGTH_SECONDS;
-            if (myBitfield.CompletionRatio > 0.80)
-                reservationLengthSeconds = (int)(RESERVATION_LENGTH_SECONDS - ((RESERVATION_LENGTH_SECONDS - 1) * myBitfield.CompletionRatio));
+            var completionRatio = bitfieldManager.GetWantedCompletionRatio(infohash, myBitfield);
+            if (completionRatio > 0.80f)
+                reservationLengthSeconds = (int)(RESERVATION_LENGTH_SECONDS - ((RESERVATION_LENGTH_SECONDS - 1) * completionRatio));
 
             // There is a small race window where two peers may select the same unreserved piece.
             // One will win the reservation; the other gets a null result and retries.

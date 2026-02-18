@@ -56,6 +56,7 @@ namespace Torrential
     public enum TorrentStatus
     {
         Idle,
+        Verifying,
         Running,
         Stopped,
         Copying,

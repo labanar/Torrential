@@ -24,6 +24,18 @@ namespace Torrential.Extensions.SignalR
         public async Task HandleTorrentComplete(TorrentCompleteEvent evt) =>
             await hubContext.Clients.All.TorrentCompleted(evt);
 
+        public async Task HandleTorrentVerificationStarted(TorrentVerificationStartedEvent evt) =>
+            await hubContext.Clients.All.TorrentVerificationStarted(evt);
+
+        public async Task HandleTorrentVerificationCompleted(TorrentVerificationCompletedEvent evt) =>
+            await hubContext.Clients.All.TorrentVerificationCompleted(evt);
+
+        public async Task HandleTorrentFileCopyStarted(TorrentFileCopyStartedEvent evt) =>
+            await hubContext.Clients.All.TorrentFileCopyStarted(evt);
+
+        public async Task HandleTorrentFileCopyCompleted(TorrentFileCopyCompletedEvent evt) =>
+            await hubContext.Clients.All.TorrentFileCopyCompleted(evt);
+
         public async Task HandleTorrentRemoved(TorrentRemovedEvent evt) =>
             await hubContext.Clients.All.TorrentRemoved(evt);
 
@@ -31,11 +43,11 @@ namespace Torrential.Extensions.SignalR
         /// Instead of forwarding every piece verification to SignalR immediately,
         /// record the latest progress. The PieceVerifiedBatchService flushes to
         /// SignalR every 250ms -- collapsing hundreds of events into ~4/sec.
-        /// Zero allocation: just a dictionary write of a value-type key + float.
+        /// Zero allocation: just a dictionary write + queue enqueue per event.
         /// </summary>
         public Task HandlePieceVerified(TorrentPieceVerifiedEvent evt)
         {
-            pieceVerifiedBatch.RecordProgress(evt.InfoHash, evt.Progress);
+            pieceVerifiedBatch.RecordProgress(evt.InfoHash, evt.Progress, evt.PieceIndex);
             return Task.CompletedTask;
         }
 
@@ -50,5 +62,8 @@ namespace Torrential.Extensions.SignalR
 
         public async Task HandleTorrentStats(TorrentStatsEvent evt) =>
             await hubContext.Clients.All.TorrentStatsUpdated(evt);
+
+        public async Task HandleFileSelectionChanged(FileSelectionChangedEvent evt) =>
+            await hubContext.Clients.All.FileSelectionChanged(evt);
     }
 }

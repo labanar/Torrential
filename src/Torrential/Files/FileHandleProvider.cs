@@ -1,30 +1,26 @@
-﻿using CommunityToolkit.HighPerformance;
 using Microsoft.Win32.SafeHandles;
 using System.Collections.Concurrent;
-using System.Text;
-using Torrential.Settings;
 using Torrential.Torrents;
 
 namespace Torrential.Files;
 
-internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileService fileService, SettingsManager settingsManager)
+internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileService fileService)
     : IFileHandleProvider
 {
-    public ConcurrentDictionary<InfoHash, SafeFileHandle> _partFiles = new ConcurrentDictionary<InfoHash, SafeFileHandle>();
-    public SemaphoreSlim _creationSemaphore = new SemaphoreSlim(1, 1);
+    public ConcurrentDictionary<InfoHash, SafeFileHandle> _partFiles = new();
+    public SemaphoreSlim _creationSemaphore = new(1, 1);
 
     public void RemovePartFileHandle(InfoHash hash)
     {
-        if (!_partFiles.TryRemove(hash, out SafeFileHandle? handle))
+        if (!_partFiles.TryRemove(hash, out var handle))
             return;
 
         handle?.Close();
-        return;
     }
 
     public async ValueTask<SafeFileHandle> GetPartFileHandle(InfoHash hash)
     {
-        if (_partFiles.TryGetValue(hash, out SafeFileHandle? handle) && handle != null)
+        if (_partFiles.TryGetValue(hash, out var handle) && handle != null)
             return handle;
 
         await _creationSemaphore.WaitAsync();
@@ -39,12 +35,9 @@ internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileSer
             if (!metaCache.TryGet(hash, out var meta))
                 throw new ArgumentException("Torrent metadata not found in cache");
 
-            var pieceSize = (int)meta.PieceSize;
-            var numberOfPieces = meta.NumberOfPieces;
-            var torrentName = Path.GetFileNameWithoutExtension(FileUtilities.GetPathSafeFileName(meta.Name));
             var filePath = await fileService.GetPartFilePath(hash);
             FileUtilities.TouchFile(filePath, meta.TotalSize);
-            return _partFiles.GetOrAdd(hash, (torrentId) => File.OpenHandle(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous));
+            return _partFiles.GetOrAdd(hash, _ => File.OpenHandle(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous));
         }
         finally
         {
@@ -54,46 +47,27 @@ internal class FileHandleProvider(TorrentMetadataCache metaCache, TorrentFileSer
 
     public async ValueTask<SafeFileHandle> GetCompletedFileHandle(InfoHash infoHash, TorrentMetadataFile file)
     {
-        var settings = await settingsManager.GetFileSettings();
-
-        if (!metaCache.TryGet(infoHash, out var meta))
-            throw new ArgumentException("Torrent metadata not found in cache");
-
-        //Check if file exists
-        var torrentName = Path.GetFileNameWithoutExtension(FileUtilities.GetPathSafeFileName(meta.Name));
-        var safeFileName = GetSafeFilePath(file.Filename);
-        var filePath = Path.Combine(settings.CompletedPath, torrentName, safeFileName);
+        var completedPath = await GetCompletedTorrentPath(infoHash);
+        var safeFileName = FileUtilities.GetSafeRelativePath(file.Filename);
+        var filePath = Path.Combine(completedPath, safeFileName);
 
         FileUtilities.TouchFile(filePath, file.FileSize);
         return File.OpenHandle(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous);
     }
 
-    private static string GetSafeFilePath(ReadOnlySpan<char> path)
+    public async Task<string> GetCompletedTorrentPath(InfoHash infoHash)
     {
-        var pathBuilder = new StringBuilder();
-        var invalidPathChars = Path.GetInvalidPathChars();
-        var invalidFileNameChars = Path.GetInvalidFileNameChars();
-        foreach (var pathSegment in path.Tokenize(Path.DirectorySeparatorChar))
-        {
-            foreach (var c in pathSegment)
-            {
-                if (invalidPathChars.Contains(c))
-                    continue;
+        if (!metaCache.TryGet(infoHash, out _))
+            throw new ArgumentException("Torrent metadata not found in cache");
 
-                if (invalidFileNameChars.Contains(c))
-                    continue;
+        var completedPath = await fileService.GetCompletedTorrentPath(infoHash);
+        Directory.CreateDirectory(completedPath);
+        return completedPath;
+    }
 
-                pathBuilder.Append(c);
-            }
-
-            if (pathBuilder[pathBuilder.Length - 1] == ' ')
-                pathBuilder.Remove(pathBuilder.Length - 1, 1);
-
-            pathBuilder.Append(Path.DirectorySeparatorChar);
-        }
-
-        //Remove trailing directory separator
-        pathBuilder.Remove(pathBuilder.Length - 1, 1);
-        return pathBuilder.ToString();
+    public async ValueTask<Stream> OpenPartFileSegmentReadStream(InfoHash infoHash, TorrentMetadataFile file, bool leaveOpen = true)
+    {
+        var partFileHandle = await GetPartFileHandle(infoHash);
+        return new PartFileSegmentReadStream(partFileHandle, file.FileStartByte, file.FileSize, leaveOpen);
     }
 }

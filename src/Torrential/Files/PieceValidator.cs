@@ -15,7 +15,7 @@ namespace Torrential.Files
         public required int PieceIndex { get; init; }
     }
 
-    public class PieceValidator(ILogger<PieceValidator> logger, TorrentMetadataCache metaCache, IFileHandleProvider fileHandleProvider, BitfieldManager bitfieldMgr, TorrentEventBus eventBus)
+    public class PieceValidator(ILogger<PieceValidator> logger, TorrentMetadataCache metaCache, IFileHandleProvider fileHandleProvider, BitfieldManager bitfieldMgr, TorrentEventBus eventBus, TorrentVerificationTracker verificationTracker)
     {
         // Tracks whether TorrentCompleteEvent has already been published for each torrent.
         // TryAdd is atomic: only the first caller to add the key succeeds, guaranteeing exactly-once publish.
@@ -23,66 +23,73 @@ namespace Torrential.Files
 
         public async Task ValidateAsync(PieceValidationRequest request)
         {
-            if (!metaCache.TryGet(request.InfoHash, out var meta))
+            try
             {
-                logger.LogError("Could not find torrent metadata");
-                return;
-            }
-
-            if (!bitfieldMgr.TryGetDownloadBitfield(request.InfoHash, out var downloadBitfield))
-                return;
-
-            if (!bitfieldMgr.TryGetVerificationBitfield(request.InfoHash, out var verificationBitfield))
-                return;
-
-            if (verificationBitfield.HasPiece(request.PieceIndex))
-            {
-                logger.LogDebug("Already verified piece {Piece} - ignoring", request.PieceIndex);
-                return;
-            }
-
-            var fileHandle = await fileHandleProvider.GetPartFileHandle(request.InfoHash);
-            var buffer = ArrayPool<byte>.Shared.Rent(20);
-            meta.GetPieceHash(request.PieceIndex).CopyTo(buffer);
-
-            var pipe = PipePool.Shared.Get();
-            var fillTask = FillPipeWithPiece(fileHandle, pipe.Writer, request.PieceIndex, (int)meta.PieceSize).ConfigureAwait(true);
-
-            var pieceSize = request.PieceIndex == meta.NumberOfPieces - 1 ? meta.FinalPieceSize : meta.PieceSize;
-            var bufferSize = LargestPowerOf2ThatDividesX((int)pieceSize);
-            var result = await Sha1Helper.VerifyHash(pipe.Reader, buffer, bufferSize);
-
-            ArrayPool<byte>.Shared.Return(buffer);
-            await fillTask;
-            logger.LogDebug("Validation result for {Piece}: {Result}", request.PieceIndex, result);
-            PipePool.Shared.Return(pipe);
-
-
-            if (result)
-            {
-                verificationBitfield.MarkHave(request.PieceIndex);
-                await eventBus.PublishPieceVerified(new TorrentPieceVerifiedEvent { InfoHash = request.InfoHash, PieceIndex = request.PieceIndex, Progress = verificationBitfield.CompletionRatio });
-
-                if (verificationBitfield.HasAll())
+                if (!metaCache.TryGet(request.InfoHash, out var meta))
                 {
-                    // Atomic guard: TryAdd returns true only for the first thread that inserts the key.
-                    // All concurrent threads that also see HasAll() == true will get false from TryAdd
-                    // and skip the publish, guaranteeing exactly one TorrentCompleteEvent per torrent.
-                    if (_completionPublished.TryAdd(request.InfoHash, 1))
+                    logger.LogError("Could not find torrent metadata");
+                    return;
+                }
+
+                if (!bitfieldMgr.TryGetDownloadBitfield(request.InfoHash, out var downloadBitfield))
+                    return;
+
+                if (!bitfieldMgr.TryGetVerificationBitfield(request.InfoHash, out var verificationBitfield))
+                    return;
+
+                if (verificationBitfield.HasPiece(request.PieceIndex))
+                {
+                    logger.LogDebug("Already verified piece {Piece} - ignoring", request.PieceIndex);
+                    return;
+                }
+
+                var fileHandle = await fileHandleProvider.GetPartFileHandle(request.InfoHash);
+                var buffer = ArrayPool<byte>.Shared.Rent(20);
+                meta.GetPieceHash(request.PieceIndex).CopyTo(buffer);
+
+                var pipe = PipePool.Shared.Get();
+                var fillTask = FillPipeWithPiece(fileHandle, pipe.Writer, request.PieceIndex, (int)meta.PieceSize).ConfigureAwait(true);
+
+                var pieceSize = request.PieceIndex == meta.NumberOfPieces - 1 ? meta.FinalPieceSize : meta.PieceSize;
+                var bufferSize = LargestPowerOf2ThatDividesX((int)pieceSize);
+                var result = await Sha1Helper.VerifyHash(pipe.Reader, buffer, bufferSize);
+
+                ArrayPool<byte>.Shared.Return(buffer);
+                await fillTask;
+                logger.LogDebug("Validation result for {Piece}: {Result}", request.PieceIndex, result);
+                PipePool.Shared.Return(pipe);
+
+                if (result)
+                {
+                    verificationBitfield.MarkHave(request.PieceIndex);
+                    var progress = bitfieldMgr.GetWantedCompletionRatio(request.InfoHash, verificationBitfield);
+                    await eventBus.PublishPieceVerified(new TorrentPieceVerifiedEvent { InfoHash = request.InfoHash, PieceIndex = request.PieceIndex, Progress = progress });
+
+                    if (bitfieldMgr.HasAllWantedPieces(request.InfoHash, verificationBitfield))
                     {
-                        logger.LogInformation("All pieces verified");
-                        await eventBus.PublishTorrentComplete(new TorrentCompleteEvent { InfoHash = request.InfoHash });
-                    }
-                    else
-                    {
-                        logger.LogDebug("All pieces verified but completion event already published — skipping duplicate");
+                        // Atomic guard: TryAdd returns true only for the first thread that inserts the key.
+                        // All concurrent threads that also see HasAll() == true will get false from TryAdd
+                        // and skip the publish, guaranteeing exactly one TorrentCompleteEvent per torrent.
+                        if (_completionPublished.TryAdd(request.InfoHash, 1))
+                        {
+                            logger.LogInformation("All pieces verified");
+                            await eventBus.PublishTorrentComplete(new TorrentCompleteEvent { InfoHash = request.InfoHash });
+                        }
+                        else
+                        {
+                            logger.LogDebug("All pieces verified but completion event already published - skipping duplicate");
+                        }
                     }
                 }
+                else
+                {
+                    logger.LogWarning("Piece verification failed for {Piece}, unmarking from download bitfield", request.PieceIndex);
+                    downloadBitfield.UnmarkHave(request.PieceIndex);
+                }
             }
-            else
+            finally
             {
-                logger.LogWarning("Piece verification failed for {Piece}, unmarking from download bitfield", request.PieceIndex);
-                downloadBitfield.UnmarkHave(request.PieceIndex);
+                await verificationTracker.MarkValidationCompleted(request.InfoHash);
             }
         }
 

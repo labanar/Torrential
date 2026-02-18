@@ -13,6 +13,9 @@ namespace Torrential.Extensions.SignalR;
 /// The ConcurrentDictionary key is an InfoHash (readonly record struct, 20 bytes,
 /// value-equality by default) so no heap allocation for the key. The value is a
 /// float written atomically via TryRemove during flush.
+///
+/// Additionally tracks verified piece indices per batch window so the detail pane
+/// can incrementally update its local bitfield without re-fetching.
 /// </summary>
 public sealed class PieceVerifiedBatchService : BackgroundService
 {
@@ -22,6 +25,10 @@ public sealed class PieceVerifiedBatchService : BackgroundService
     // drained by the flush timer thread. ConcurrentDictionary handles the concurrency.
     private readonly ConcurrentDictionary<InfoHash, float> _pendingProgress = new();
 
+    // Accumulates verified piece indices per torrent within the current batch window.
+    // ConcurrentQueue is thread-safe for concurrent Enqueue; the flush drains it.
+    private readonly ConcurrentDictionary<InfoHash, ConcurrentQueue<int>> _pendingPieceIndices = new();
+
     private static readonly TimeSpan FlushInterval = TimeSpan.FromMilliseconds(250);
 
     public PieceVerifiedBatchService(IHubContext<TorrentHub, ITorrentClient> hubContext)
@@ -30,8 +37,19 @@ public sealed class PieceVerifiedBatchService : BackgroundService
     }
 
     /// <summary>
-    /// Called by the event bus handler to record the latest progress.
-    /// This is a cheap dictionary write -- no SignalR, no serialization, no async.
+    /// Called by the event bus handler to record the latest progress and piece index.
+    /// This is a cheap dictionary write + queue enqueue -- no SignalR, no serialization, no async.
+    /// </summary>
+    public void RecordProgress(InfoHash infoHash, float progress, int pieceIndex)
+    {
+        _pendingProgress[infoHash] = progress;
+
+        var queue = _pendingPieceIndices.GetOrAdd(infoHash, static _ => new ConcurrentQueue<int>());
+        queue.Enqueue(pieceIndex);
+    }
+
+    /// <summary>
+    /// Overload for callers that don't have a piece index (backward compatibility).
     /// </summary>
     public void RecordProgress(InfoHash infoHash, float progress)
     {
@@ -58,11 +76,23 @@ public sealed class PieceVerifiedBatchService : BackgroundService
         {
             if (_pendingProgress.TryRemove(infoHash, out var progress))
             {
+                // Drain accumulated piece indices for this batch
+                int[] verifiedPieces = Array.Empty<int>();
+                if (_pendingPieceIndices.TryRemove(infoHash, out var queue))
+                {
+                    var list = new List<int>();
+                    while (queue.TryDequeue(out var idx))
+                        list.Add(idx);
+                    if (list.Count > 0)
+                        verifiedPieces = list.ToArray();
+                }
+
                 await _hubContext.Clients.All.PieceVerified(new TorrentPieceVerifiedEvent
                 {
                     InfoHash = infoHash,
-                    PieceIndex = -1, // Batched -- individual index is irrelevant to the UI
-                    Progress = progress
+                    PieceIndex = -1, // Batched -- use VerifiedPieces for individual indices
+                    Progress = progress,
+                    VerifiedPieces = verifiedPieces
                 });
             }
         }

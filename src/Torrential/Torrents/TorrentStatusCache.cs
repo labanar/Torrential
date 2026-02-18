@@ -30,6 +30,9 @@ namespace Torrential.Torrents
     /// </summary>
     public sealed class TorrentStatusCacheMaintainer(TorrentStatusCache torrentStatus)
     {
+        private readonly ConcurrentDictionary<InfoHash, int> _copyFileCounters = [];
+        private readonly ConcurrentDictionary<InfoHash, TorrentStatus> _preCopyStatuses = [];
+
         public Task HandleTorrentStarted(TorrentStartedEvent evt)
         {
             torrentStatus.UpdateStatus(evt.InfoHash, TorrentStatus.Running);
@@ -45,7 +48,50 @@ namespace Torrential.Torrents
         public Task HandleTorrentRemoved(TorrentRemovedEvent evt)
         {
             torrentStatus.RemoveStatus(evt.InfoHash);
+            _copyFileCounters.TryRemove(evt.InfoHash, out _);
+            _preCopyStatuses.TryRemove(evt.InfoHash, out _);
             return Task.CompletedTask;
+        }
+
+        public Task HandleVerificationStarted(TorrentVerificationStartedEvent evt)
+        {
+            torrentStatus.UpdateStatus(evt.InfoHash, TorrentStatus.Verifying);
+            return Task.CompletedTask;
+        }
+
+        public async Task HandleVerificationCompleted(TorrentVerificationCompletedEvent evt)
+        {
+            if (await torrentStatus.GetStatus(evt.InfoHash) == TorrentStatus.Verifying)
+                torrentStatus.UpdateStatus(evt.InfoHash, TorrentStatus.Idle);
+        }
+
+        public async Task HandleFileCopyStarted(TorrentFileCopyStartedEvent evt)
+        {
+            var inFlightFileCopies = _copyFileCounters.AddOrUpdate(evt.InfoHash, 1, (_, current) => current + 1);
+            if (inFlightFileCopies != 1)
+                return;
+
+            var priorStatus = await torrentStatus.GetStatus(evt.InfoHash);
+            _preCopyStatuses[evt.InfoHash] = priorStatus == TorrentStatus.Copying ? TorrentStatus.Idle : priorStatus;
+            torrentStatus.UpdateStatus(evt.InfoHash, TorrentStatus.Copying);
+        }
+
+        public async Task HandleFileCopyCompleted(TorrentFileCopyCompletedEvent evt)
+        {
+            if (!_copyFileCounters.TryGetValue(evt.InfoHash, out _))
+                return;
+
+            var remaining = _copyFileCounters.AddOrUpdate(evt.InfoHash, 0, (_, current) => Math.Max(0, current - 1));
+            if (remaining != 0)
+                return;
+
+            _copyFileCounters.TryRemove(evt.InfoHash, out _);
+            var restoreStatus = _preCopyStatuses.TryRemove(evt.InfoHash, out var previous)
+                ? previous
+                : TorrentStatus.Idle;
+
+            if (await torrentStatus.GetStatus(evt.InfoHash) == TorrentStatus.Copying)
+                torrentStatus.UpdateStatus(evt.InfoHash, restoreStatus);
         }
     }
 }

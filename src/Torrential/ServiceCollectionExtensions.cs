@@ -25,12 +25,17 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITrackerClient, UdpTrackerClient>();
 
         services.AddSingleton<IFileHandleProvider, FileHandleProvider>();
+        services.AddSingleton<IArchiveExtractionService, ArchiveExtractionService>();
         services.AddSingleton<IMetadataFileService, MetadataFileService>();
+        services.AddSingleton<FileSelectionService>();
+        services.AddSingleton<IFileSelectionService>(sp => sp.GetRequiredService<FileSelectionService>());
+        services.AddSingleton<FileSelectionPieceMap>();
         services.AddSingleton<IBlockSaveService, BlockSaveService>();
         services.AddSingleton<PeerSwarm>();
         services.AddSingleton<TorrentRunner>();
         services.AddSingleton<TorrentTaskManager>();
 
+        services.AddSingleton<RecoverableDataDetector>();
         services.AddSingleton<TorrentFileService>();
         services.AddSingleton<PieceReservationService>();
         services.AddSingleton<BitfieldManager>();
@@ -46,6 +51,7 @@ public static class ServiceCollectionExtensions
 
         // Event bus and handler types
         services.AddSingleton<TorrentEventBus>();
+        services.AddSingleton<TorrentVerificationTracker>();
         services.AddSingleton<PieceValidator>();
         services.AddSingleton<PeerSwarmMessageDispatcher>();
         services.AddSingleton<TorrentStatusCacheMaintainer>();

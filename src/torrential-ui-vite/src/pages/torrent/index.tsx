@@ -22,6 +22,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCircleArrowDown,
   faCircleArrowUp,
+  faCircleNotch,
   faCirclePause,
   faDownLong,
   faPause,
@@ -42,15 +43,26 @@ import {
   useAppDispatch,
 } from "../../store";
 import { TorrentsState, setTorrents } from "../../store/slices/torrentsSlice";
-import { PeerApiModel, TorrentApiModel } from "../../services/api";
-import { PeerSummary, TorrentSummary } from "../../types";
+import {
+  addTorrent,
+  browseDirectories,
+  PeerApiModel,
+  previewTorrent,
+  TorrentApiModel,
+  TorrentPreviewApiModel,
+} from "../../services/api";
+import { PeerSummary, TorrentPreviewSummary, TorrentSummary } from "../../types";
 import { setPeers } from "../../store/slices/peersSlice";
+import {
+  selectTorrentForDetail,
+} from "../../store/slices/torrentDetailSlice";
 import {
   FileUpload,
   FileUploadElement,
 } from "../../components/FileUpload/file-upload";
 import Layout from "../layout";
 import { AlfredContext, setContext } from "../../store/slices/alfredSlice";
+import { DetailPane } from "./detail-pane";
 
 export default function TorrentPage() {
   return (
@@ -202,11 +214,6 @@ function Page() {
   useHotkeys(
     "space",
     () => {
-      // let nextId = selectedId - 1;
-      // if (nextId < 0) nextId = suggestions.length - 1;
-      // setSelectedId(nextId);
-      // console.log(nextId);
-
       selectTorrent(torrents[currentPosition].infoHash);
       console.log("space from torrents");
     },
@@ -216,17 +223,23 @@ function Page() {
     }
   );
 
+  // Track focused torrent for the detail pane
+  const focusedInfoHash = torrents[currentPosition]?.infoHash ?? null;
+
+  useEffect(() => {
+    dispatch(selectTorrentForDetail(focusedInfoHash));
+  }, [dispatch, focusedInfoHash]);
+
   return (
     <>
       <div className={styles.root}>
-        {memoActionRow}
-        {/* <ActionsRow selectedTorrents={selectedTorrents} /> */}
-        <div className={styles.torrentDivider}>
-          <Divider orientation="horizontal" />
-        </div>
-        <div className={styles.torrentList}>
-          {torrents.map((t, i) => (
-            <>
+        <div className={styles.topPane}>
+          {memoActionRow}
+          <div className={styles.torrentDivider}>
+            <Divider orientation="horizontal" />
+          </div>
+          <div className={styles.torrentList}>
+            {torrents.map((t, i) => (
               <TorrentRow
                 toggleSelect={selectTorrent}
                 toggleFocus={() => setCurrentPosition(i)}
@@ -253,9 +266,14 @@ function Page() {
                 totalBytes={t.sizeInBytes ?? 0}
                 title={t.name ?? "???"}
               />
-            </>
-          ))}
+            ))}
+          </div>
         </div>
+        {focusedInfoHash && (
+          <div className={styles.bottomPane}>
+            <DetailPane infoHash={focusedInfoHash} />
+          </div>
+        )}
       </div>
     </>
   );
@@ -272,30 +290,58 @@ const ActionsRow = ({
 }: ActionsRowProps) => {
   const uploadRef = useRef<FileUploadElement | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<TorrentPreviewSummary | null>(null);
+  const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isAddLoading, setIsAddLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [completedPathOverride, setCompletedPathOverride] = useState("");
+
+  const resetPreviewState = () => {
+    setSelectedFile(null);
+    setPreview(null);
+    setSelectedFileIds([]);
+    setPreviewModalOpen(false);
+    setIsAddLoading(false);
+    setAddError(null);
+    setCompletedPathOverride("");
+  };
+
+  const mapPreview = (model: TorrentPreviewApiModel): TorrentPreviewSummary => {
+    return {
+      name: model.name,
+      infoHash: model.infoHash,
+      totalSizeBytes: model.totalSizeBytes,
+      files: model.files.map((f) => ({
+        id: f.id,
+        filename: f.filename,
+        sizeBytes: f.sizeBytes,
+      })),
+    };
+  };
 
   const onUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
+    setPreviewError(null);
+    setAddError(null);
+    setIsPreviewLoading(true);
+    setSelectedFile(file);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/torrents/add`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
+      const previewResult = await previewTorrent(file);
+      const previewSummary = mapPreview(previewResult);
 
-      if (!response.ok) {
-        throw new Error("File upload failed");
-      }
-
-      const result = await response.json();
-      console.log("File uploaded successfully:", result);
-      // Handle success
+      setPreview(previewSummary);
+      setSelectedFileIds(previewSummary.files.map((f) => f.id));
+      setPreviewModalOpen(true);
     } catch (error) {
-      console.error("Error uploading file:", error);
-      // Handle error
+      console.error("Error previewing torrent file:", error);
+      setPreviewError("Failed to preview torrent file.");
+      resetPreviewState();
+    } finally {
+      setIsPreviewLoading(false);
     }
   };
 
@@ -368,6 +414,55 @@ const ActionsRow = ({
     return selectedTorrents.length === 0;
   }, [selectedTorrents]);
 
+  const toggleFileSelection = (id: number) => {
+    setSelectedFileIds((current) => {
+      if (current.includes(id)) {
+        return current.filter((x) => x !== id);
+      }
+
+      return [...current, id];
+    });
+  };
+
+  const toggleAllFileSelection = () => {
+    if (!preview) {
+      return;
+    }
+
+    setSelectedFileIds((current) => {
+      const allIds = preview.files.map((f) => f.id);
+      if (current.length === allIds.length) {
+        return [];
+      }
+
+      return allIds;
+    });
+  };
+
+  const confirmAddTorrent = async () => {
+    if (selectedFile === null) {
+      setAddError("No torrent file selected.");
+      return;
+    }
+
+    setAddError(null);
+    setIsAddLoading(true);
+
+    try {
+      await addTorrent(selectedFile, selectedFileIds, completedPathOverride.trim() || undefined);
+      resetPreviewState();
+    } catch (e) {
+      console.error("Error adding torrent:", e);
+      setAddError("Failed to add torrent.");
+    } finally {
+      setIsAddLoading(false);
+    }
+  };
+
+  const closePreviewModal = () => {
+    resetPreviewState();
+  };
+
   return (
     <div className={styles.actionBar}>
       <FileUpload
@@ -383,11 +478,30 @@ const ActionsRow = ({
         onRemove={(_, deleteFiles) => removeTorrents(deleteFiles)}
       />
 
+      <TorrentFilePreviewModal
+        open={previewModalOpen}
+        preview={preview}
+        selectedFileIds={selectedFileIds}
+        isAddLoading={isAddLoading}
+        addError={addError}
+        completedPathOverride={completedPathOverride}
+        onCompletedPathChange={setCompletedPathOverride}
+        onClose={closePreviewModal}
+        onConfirm={confirmAddTorrent}
+        onToggleFile={toggleFileSelection}
+        onToggleAllFiles={toggleAllFileSelection}
+      />
+
       <div className={styles.actionSearch}>
         <Input
           placeholder="Filter"
           style={{ maxWidth: "200px", justifySelf: "start" }}
         />
+        {previewError && (
+          <Text className={styles.uploadError} color={"red.300"} fontSize={"sm"}>
+            {previewError}
+          </Text>
+        )}
       </div>
 
       <div className={styles.actionButtons}>
@@ -425,6 +539,7 @@ const ActionsRow = ({
           <IconButton
             colorScheme={"blue"}
             aria-label="Add"
+            isLoading={isPreviewLoading}
             icon={<FontAwesomeIcon icon={faPlus} />}
             onClick={() => {
               if (uploadRef === null || uploadRef.current === null) return;
@@ -437,6 +552,231 @@ const ActionsRow = ({
     </div>
   );
 };
+
+interface TorrentFilePreviewModalProps {
+  open: boolean;
+  preview: TorrentPreviewSummary | null;
+  selectedFileIds: number[];
+  isAddLoading: boolean;
+  addError: string | null;
+  completedPathOverride: string;
+  onCompletedPathChange: (value: string) => void;
+  onToggleFile: (id: number) => void;
+  onToggleAllFiles: () => void;
+  onConfirm: () => void;
+  onClose: () => void;
+}
+
+function TorrentFilePreviewModal({
+  open,
+  preview,
+  selectedFileIds,
+  isAddLoading,
+  addError,
+  completedPathOverride,
+  onCompletedPathChange,
+  onToggleFile,
+  onToggleAllFiles,
+  onConfirm,
+  onClose,
+}: TorrentFilePreviewModalProps) {
+  const prettyPrintBytes = (bytes: number) => {
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+    if (bytes === 0) return "0 Byte";
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    if (i === 0) return bytes + " " + sizes[i];
+    return (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i];
+  };
+
+  const totalFiles = preview?.files.length ?? 0;
+  const hasSomeSelected = selectedFileIds.length > 0;
+  const hasAllSelected = totalFiles > 0 && selectedFileIds.length === totalFiles;
+  const [isPathPickerOpen, setIsPathPickerOpen] = useState(false);
+  const [isPathPickerLoading, setIsPathPickerLoading] = useState(false);
+  const [pathPickerError, setPathPickerError] = useState<string | null>(null);
+  const [pathPickerCurrentPath, setPathPickerCurrentPath] = useState("");
+  const [pathPickerParentPath, setPathPickerParentPath] = useState<string | null>(null);
+  const [pathPickerDirectories, setPathPickerDirectories] = useState<string[]>([]);
+  const [pathPickerSelection, setPathPickerSelection] = useState("");
+
+  const loadDirectories = useCallback(
+    async (path?: string) => {
+      setIsPathPickerLoading(true);
+      setPathPickerError(null);
+
+      try {
+        const result = await browseDirectories(path);
+        setPathPickerCurrentPath(result.currentPath);
+        setPathPickerParentPath(result.parentPath ?? null);
+        setPathPickerDirectories(result.directories);
+        setPathPickerSelection(result.currentPath || "");
+      } catch (error) {
+        console.error("Error browsing directories:", error);
+        setPathPickerError("Failed to load directories.");
+      } finally {
+        setIsPathPickerLoading(false);
+      }
+    },
+    []
+  );
+
+  const openPathPicker = async () => {
+    setIsPathPickerOpen(true);
+    await loadDirectories(completedPathOverride.trim() || undefined);
+  };
+
+  const applySelectedPath = () => {
+    if (!pathPickerSelection) {
+      return;
+    }
+
+    onCompletedPathChange(pathPickerSelection);
+    setIsPathPickerOpen(false);
+  };
+
+  return (
+    <Modal isOpen={open} onClose={onClose} size={"xl"}>
+      <ModalOverlay />
+      <ModalContent className={styles.deleteModal}>
+        <ModalHeader>Choose Files to Download</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody className={styles.previewModalBody}>
+          <Text className={styles.previewTorrentName}>{preview?.name}</Text>
+          <Text fontSize={"sm"} color={"gray.400"}>
+            {preview
+              ? `${selectedFileIds.length} of ${preview.files.length} selected`
+              : ""}
+          </Text>
+          <Checkbox
+            className={styles.previewSelectAll}
+            isChecked={hasAllSelected}
+            isIndeterminate={hasSomeSelected && !hasAllSelected}
+            onChange={onToggleAllFiles}
+            isDisabled={totalFiles === 0}
+          >
+            {hasAllSelected ? "Deselect All" : "Select All"}
+          </Checkbox>
+          <div className={styles.previewFileList}>
+            {preview?.files.map((file) => (
+              <div key={file.id} className={styles.previewFileRow}>
+                <Checkbox
+                  isChecked={selectedFileIds.includes(file.id)}
+                  onChange={() => onToggleFile(file.id)}
+                >
+                  <Text noOfLines={1}>{file.filename}</Text>
+                </Checkbox>
+                <Text color={"gray.400"} fontSize={"sm"}>
+                  {prettyPrintBytes(file.sizeBytes)}
+                </Text>
+              </div>
+            ))}
+          </div>
+          <div className={styles.completedPathSection}>
+            <Text fontSize={"sm"} fontWeight={500}>
+              Completed Path
+            </Text>
+            <div className={styles.completedPathInputRow}>
+              <Input
+                placeholder="Leave empty to use default"
+                value={completedPathOverride}
+                onChange={(e) => onCompletedPathChange(e.target.value)}
+                size={"sm"}
+              />
+              <Button size={"sm"} onClick={openPathPicker}>
+                Browse
+              </Button>
+            </div>
+            <Text fontSize={"xs"} color={"gray.500"}>
+              Override where files are moved after download completes.
+            </Text>
+          </div>
+          {addError && (
+            <Text className={styles.uploadError} color={"red.300"} fontSize={"sm"}>
+              {addError}
+            </Text>
+          )}
+
+          <Modal isOpen={isPathPickerOpen} onClose={() => setIsPathPickerOpen(false)} size={"xl"}>
+            <ModalOverlay />
+            <ModalContent>
+              <ModalHeader>Select Completed Path</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody className={styles.pathPickerBody}>
+                <div className={styles.pathPickerTopRow}>
+                  <Text fontSize={"sm"} noOfLines={1}>
+                    {pathPickerCurrentPath || "Choose a root folder"}
+                  </Text>
+                  <Button
+                    size={"sm"}
+                    onClick={() => loadDirectories(pathPickerParentPath ?? undefined)}
+                    isDisabled={!pathPickerParentPath || isPathPickerLoading}
+                  >
+                    Up
+                  </Button>
+                </div>
+                <div className={styles.pathPickerList}>
+                  {isPathPickerLoading && <Text fontSize={"sm"}>Loading directories...</Text>}
+                  {!isPathPickerLoading && pathPickerDirectories.length === 0 && (
+                    <Text fontSize={"sm"} color={"gray.400"}>
+                      No child directories.
+                    </Text>
+                  )}
+                  {!isPathPickerLoading &&
+                    pathPickerDirectories.map((directory) => (
+                      <Button
+                        key={directory}
+                        justifyContent={"flex-start"}
+                        variant={pathPickerSelection === directory ? "solid" : "ghost"}
+                        colorScheme={pathPickerSelection === directory ? "blue" : undefined}
+                        onClick={() => setPathPickerSelection(directory)}
+                        onDoubleClick={() => loadDirectories(directory)}
+                      >
+                        {directory}
+                      </Button>
+                    ))}
+                </div>
+                {pathPickerError && (
+                  <Text color={"red.300"} fontSize={"sm"}>
+                    {pathPickerError}
+                  </Text>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  mr={3}
+                  onClick={() => loadDirectories(pathPickerSelection || undefined)}
+                  isDisabled={!pathPickerSelection || isPathPickerLoading}
+                >
+                  Open
+                </Button>
+                <Button
+                  colorScheme="blue"
+                  mr={3}
+                  onClick={applySelectedPath}
+                  isDisabled={!pathPickerSelection}
+                >
+                  Use Selected
+                </Button>
+                <Button onClick={() => setIsPathPickerOpen(false)}>Cancel</Button>
+              </ModalFooter>
+            </ModalContent>
+          </Modal>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            colorScheme="blue"
+            mr={3}
+            isLoading={isAddLoading}
+            onClick={onConfirm}
+          >
+            Add Torrent
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  );
+}
 
 interface TorrentRowProps {
   infoHash: string;
@@ -472,6 +812,8 @@ function TorrentRow({
   const color = useMemo(() => {
     if (status === "Stopped" || status === "Idle") return "orange";
     if (status === "Running") return "green";
+    if (status === "Verifying" || status === "Copying") return "blue";
+    return "gray";
   }, [status]);
 
   function prettyPrintBytes(bytes: number) {
@@ -533,6 +875,18 @@ function TorrentRow({
                   }}
                 />
               )}
+              {(status === "Verifying" || status === "Copying") && (
+                <FontAwesomeIcon
+                  icon={faCircleNotch}
+                  spin
+                  size={"1x"}
+                  style={{
+                    paddingRight: "0.8em",
+                    paddingLeft: "0.4em",
+                    color,
+                  }}
+                />
+              )}
             </div>
             <Text className={styles.title} fontSize={"md"} noOfLines={1}>
               {title}
@@ -551,6 +905,8 @@ function TorrentRow({
             height={"1em"}
           />
           <Text className={styles.progressDetails} fontSize={"xs"}>
+            <span>{status}</span>
+            {` • `}
             <Tooltip label={`${seeders + leechers} peers`}>
               <span>
                 <FontAwesomeIcon
