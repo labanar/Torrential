@@ -52,7 +52,7 @@
 
 .sidebarItemText {
   flex-grow: 1;
-  text-align: right;
+  text-align: left;
   font-size: 1rem;
 }
 
