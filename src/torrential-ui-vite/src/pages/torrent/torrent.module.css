@@ -20,10 +20,34 @@
 
 .bottomPane {
   flex: 0 0 auto;
-  max-height: 50%;
-  min-height: 200px;
-  overflow: auto;
-  overflow-x: hidden;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.splitPaneHandle {
+  flex: 0 0 auto;
+  height: 14px;
+  width: 100%;
+  cursor: ns-resize;
+  user-select: none;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(var(--muted-foreground));
+  border-top: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+}
+
+.splitPaneHandle:hover,
+.splitPaneHandle:focus-visible,
+.splitPaneHandleActive {
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted));
+  outline: none;
 }
 
 .torrentList {
@@ -376,9 +400,8 @@
 }
 
 @media (max-width: 768px) {
-  .bottomPane {
-    min-height: 220px;
-    max-height: 55%;
+  .splitPaneHandle {
+    height: 18px;
   }
 
   .actionBar {

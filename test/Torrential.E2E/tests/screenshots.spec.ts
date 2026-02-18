@@ -22,6 +22,32 @@ async function assertNoHorizontalOverflow(page: Page) {
   expect(layout.bodyScrollWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
 }
 
+async function getElementHeight(page: Page, selector: string) {
+  const box = await page.locator(selector).first().boundingBox();
+  expect(box, `${selector} should be visible`).not.toBeNull();
+  return box!.height;
+}
+
+async function expectPaneHeightStableAcrossTabs(page: Page, tolerancePx: number) {
+  const paneSelector = '[class*="bottomPane"]';
+  const peersHeight = await getElementHeight(page, paneSelector);
+
+  await page.locator('button:has-text("BITFIELD")').click();
+  await page.waitForSelector('text=Pieces');
+  const bitfieldHeight = await getElementHeight(page, paneSelector);
+
+  await page.locator('button:has-text("FILES")').click();
+  await expect(
+    page.locator('text=Filename').or(page.locator('text=No files')).first(),
+  ).toBeVisible();
+  const filesHeight = await getElementHeight(page, paneSelector);
+
+  const heights = [peersHeight, bitfieldHeight, filesHeight];
+  const minHeight = Math.min(...heights);
+  const maxHeight = Math.max(...heights);
+  expect(maxHeight - minHeight).toBeLessThanOrEqual(tolerancePx);
+}
+
 async function expectFullyInViewport(
   page: Page,
   selector: string,
@@ -86,17 +112,41 @@ test.describe('Screenshots', () => {
   test('torrent info pane', async ({ page }, testInfo) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+    await assertNoHorizontalOverflow(page);
+
+    const torrentListSelector = '[class*="torrentList"]';
+    const detailPaneSelector = '[class*="bottomPane"]';
+    const splitterSelector = '[class*="splitPaneHandle"]';
+    const detailHeightTolerancePx = testInfo.project.name.includes('mobile') ? 6 : 4;
+    const reclaimTolerancePx = 6;
 
     // Click on the torrent row to open the info pane
     const torrentRow = page.locator('[class*="torrentContainer"]').filter({ hasText: 'debian' });
+    const listHeightBeforeOpen = await getElementHeight(page, torrentListSelector);
     await torrentRow.click();
+    await page.waitForSelector(detailPaneSelector);
+
+    const listHeightWithPaneOpen = await getElementHeight(page, torrentListSelector);
+    expect(listHeightWithPaneOpen).toBeLessThan(listHeightBeforeOpen - 40);
+
+    await expectPaneHeightStableAcrossTabs(page, detailHeightTolerancePx);
+    await assertNoHorizontalOverflow(page);
 
     // Switch to the BITFIELD tab and wait for piece data to load
-    await page.locator('text=BITFIELD').click();
+    await page.locator('button:has-text("BITFIELD")').click();
     await page.waitForSelector('text=Pieces');
+
+    const closeButton = page.locator('button[aria-label="Close torrent details"]');
+    await expect(closeButton).toBeVisible();
+    await closeButton.click();
+
+    await expect(page.locator(detailPaneSelector)).toHaveCount(0);
+    await expect(page.locator(splitterSelector)).toHaveCount(0);
+    const listHeightAfterClose = await getElementHeight(page, torrentListSelector);
+    expect(Math.abs(listHeightAfterClose - listHeightBeforeOpen)).toBeLessThanOrEqual(reclaimTolerancePx);
+
     await assertNoHorizontalOverflow(page);
-    await expectFullyInViewport(page, 'text=BITFIELD', 'BITFIELD tab control');
-    await expectFullyInViewport(page, 'text=Pieces', 'bitfield content heading');
+    await expectFullyInViewport(page, '[class*="torrentContainer"]', 'torrent list row');
 
     await page.screenshot({
       path: screenshotPath(testInfo.project.name, 'torrent-info-pane'),
