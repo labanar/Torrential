@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Torrential;
 
@@ -11,9 +12,11 @@ using Torrential;
 namespace Torrential.Migrations
 {
     [DbContext(typeof(TorrentialDb))]
-    partial class TorrentialDbModelSnapshot : ModelSnapshot
+    [Migration("20260218224506_AddIntegrationsSettings")]
+    partial class AddIntegrationsSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.1");

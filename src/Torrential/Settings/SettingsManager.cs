@@ -15,6 +15,9 @@ namespace Torrential.Settings
         public async ValueTask<ConnectionSettings> GetConnectionSettings() => await GetSettingsSection(f => f.ConnectionSettings);
         public async ValueTask SaveConnectionSettings(ConnectionSettings settings) => await SaveSettingsSection(f => f.ConnectionSettings, settings);
 
+        public async ValueTask<IntegrationsSettings> GetIntegrationsSettings() => await GetSettingsSection(f => f.IntegrationsSettings);
+        public async ValueTask SaveIntegrationsSettings(IntegrationsSettings settings) => await SaveSettingsSection(f => f.IntegrationsSettings, settings);
+
 
         internal async ValueTask<T> GetSettingsSection<T>(Func<TorrentialSettings, T> selector)
             where T : ISettingsSection<T>

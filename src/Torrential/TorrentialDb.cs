@@ -32,6 +32,9 @@ namespace Torrential
 
             modelBuilder.Entity<TorrentialSettings>()
                 .ComplexProperty(p => p.ConnectionSettings);
+
+            modelBuilder.Entity<TorrentialSettings>()
+                .ComplexProperty(p => p.IntegrationsSettings);
         }
     }
 
@@ -71,6 +74,7 @@ namespace Torrential
         public FileSettings FileSettings { get; set; } = FileSettings.Default;
         public TcpListenerSettings TcpListenerSettings { get; set; } = TcpListenerSettings.Default;
         public ConnectionSettings ConnectionSettings { get; set; } = ConnectionSettings.Default;
+        public IntegrationsSettings IntegrationsSettings { get; set; } = IntegrationsSettings.Default;
     }
 
     public interface ISettingsSection<T>
@@ -160,6 +164,71 @@ namespace Torrential
                 return false;
 
             return true;
+        }
+    }
+
+    public record IntegrationsSettings : ISettingsSection<IntegrationsSettings>
+    {
+        public static IntegrationsSettings Default { get; } = new()
+        {
+            SlackEnabled = false,
+            SlackWebhookUrl = "",
+            SlackMessageTemplate = "Download completed: {name}",
+            SlackTriggerDownloadComplete = true,
+            DiscordEnabled = false,
+            DiscordWebhookUrl = "",
+            DiscordMessageTemplate = "Download completed: {name}",
+            DiscordTriggerDownloadComplete = true,
+            CommandHookEnabled = false,
+            CommandTemplate = "",
+            CommandWorkingDirectory = "",
+            CommandTriggerDownloadComplete = true
+        };
+
+        public static string CacheKey => "settings.integrations";
+
+        public required bool SlackEnabled { get; set; }
+        public required string SlackWebhookUrl { get; set; }
+        public required string SlackMessageTemplate { get; set; }
+        public required bool SlackTriggerDownloadComplete { get; set; }
+
+        public required bool DiscordEnabled { get; set; }
+        public required string DiscordWebhookUrl { get; set; }
+        public required string DiscordMessageTemplate { get; set; }
+        public required bool DiscordTriggerDownloadComplete { get; set; }
+
+        public required bool CommandHookEnabled { get; set; }
+        public required string CommandTemplate { get; set; }
+        public string? CommandWorkingDirectory { get; set; }
+        public required bool CommandTriggerDownloadComplete { get; set; }
+
+        public static bool Validate(IntegrationsSettings settings)
+        {
+            if (settings.SlackEnabled && !TryValidateWebhookUrl(settings.SlackWebhookUrl))
+                return false;
+
+            if (settings.DiscordEnabled && !TryValidateWebhookUrl(settings.DiscordWebhookUrl))
+                return false;
+
+            if (settings.SlackEnabled && string.IsNullOrWhiteSpace(settings.SlackMessageTemplate))
+                return false;
+
+            if (settings.DiscordEnabled && string.IsNullOrWhiteSpace(settings.DiscordMessageTemplate))
+                return false;
+
+            if (settings.CommandHookEnabled && string.IsNullOrWhiteSpace(settings.CommandTemplate))
+                return false;
+
+            return true;
+        }
+
+        private static bool TryValidateWebhookUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return false;
+
+            return Uri.TryCreate(url, UriKind.Absolute, out var uri)
+                && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
         }
     }
 }
