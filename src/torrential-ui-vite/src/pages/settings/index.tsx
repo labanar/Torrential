@@ -1,14 +1,15 @@
 "use client";
 
-import { Divider, Grid, GridItem, IconButton, Text } from "@chakra-ui/react";
 import { faCheck } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useForm, useWatch } from "react-hook-form";
 import styles from "./settings.module.css";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, type ReactNode } from "react";
 import { FormInput } from "../../components/Form/FormInput";
 import { FormNumericInput } from "../../components/Form/FormNumericInput";
 import { FormCheckbox } from "../../components/Form/FormCheckbox";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import Layout from "../layout";
 
 export default function SettingsPage() {
@@ -33,9 +34,7 @@ function GeneralSettings() {
   const fileSettingsValues = useWatch({ control: fileSettingsControl });
   const fetchFilesettings = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/settings/file`
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/file`);
       const json = await response.json();
       console.log(json);
       const { downloadPath, completedPath } = json.data;
@@ -114,9 +113,7 @@ function GeneralSettings() {
   });
   const fetchTcpListenerSettings = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/settings/tcp`
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/tcp`);
       const json = await response.json();
       console.log(json);
       const { enabled, port } = json.data;
@@ -142,24 +139,13 @@ function GeneralSettings() {
     fetchFilesettings();
     fetchTcpListenerSettings();
     fetchConnectionSettings();
-  }, []);
+  }, [fetchConnectionSettings, fetchFilesettings, fetchTcpListenerSettings]);
 
   return (
     <>
-      <div
-        style={{
-          padding: "1em",
-          flexGrow: 1,
-          display: "flex",
-          flexDirection: "column",
-          gap: "16px",
-          alignItems: "center",
-        }}
-      >
-        <Text alignSelf={"flex-start"} fontSize={30}>
-          Settings
-        </Text>
-        <Divider />
+      <div className={styles.settingsRoot}>
+        <h1 className={styles.pageTitle}>Settings</h1>
+        <Separator />
         <SectionHeader name="Files" />
 
         <RowComponent label="Download Path">
@@ -169,7 +155,7 @@ function GeneralSettings() {
           <FormInput fieldName="completedPath" control={fileSettingsControl} />
         </RowComponent>
 
-        <Divider />
+        <Separator />
         <SectionHeader name="Connections" />
 
         <RowComponent label="Max connections (per torrent)">
@@ -199,7 +185,7 @@ function GeneralSettings() {
           />
         </RowComponent>
 
-        <Divider />
+        <Separator />
         <SectionHeader name="Inbound Connections" />
 
         <FormCheckbox
@@ -218,22 +204,11 @@ function GeneralSettings() {
           />
         </RowComponent>
       </div>
-      <IconButton
-        position={"absolute"}
-        bottom={0}
-        right={0}
-        mr={8}
-        mb={8}
-        isRound={true}
-        variant="solid"
-        colorScheme="green"
-        aria-label="Done"
-        fontSize="30px"
-        size={"lg"}
-        isDisabled={
-          !isFileSettingsDirty &&
-          !isConnectionSettingsDirty &&
-          !isTcpListenerSettingsDirty
+      <Button
+        className={styles.saveButton}
+        size="icon"
+        disabled={
+          !isFileSettingsDirty && !isConnectionSettingsDirty && !isTcpListenerSettingsDirty
         }
         onClick={() => {
           if (isFileSettingsDirty) {
@@ -255,35 +230,28 @@ function GeneralSettings() {
             resetTcpListenerSettings(tcpListenerSettingsValue);
           }
         }}
-        icon={<FontAwesomeIcon icon={faCheck} />}
-      />
+        type="button"
+      >
+        <FontAwesomeIcon icon={faCheck} />
+      </Button>
     </>
   );
 }
 
-interface SectionHeaderProps {
-  name: string;
-}
-function SectionHeader({ name }: SectionHeaderProps) {
-  return (
-    <Text alignSelf={"flex-start"} fontSize={20} fontWeight={500} pb={4}>
-      {name}
-    </Text>
-  );
+function SectionHeader({ name }: { name: string }) {
+  return <h2 className={styles.sectionTitle}>{name}</h2>;
 }
 
 interface RowInputProps {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
-const RowComponent: React.FC<RowInputProps> = ({ label, children }) => {
+const RowComponent = ({ label, children }: RowInputProps) => {
   return (
-    <Grid templateColumns="repeat(2, 1fr)" alignItems={"center"} gap={8}>
-      <GridItem>
-        <Text align={"right"}>{label}</Text>
-      </GridItem>
-      {children}
-    </Grid>
+    <div className={styles.settingRow}>
+      <p className={styles.settingLabel}>{label}</p>
+      <div>{children}</div>
+    </div>
   );
 };

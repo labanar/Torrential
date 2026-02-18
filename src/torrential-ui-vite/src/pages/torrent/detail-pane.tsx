@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Checkbox, Spinner, Text } from "@chakra-ui/react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSeedling } from "@fortawesome/free-solid-svg-icons";
+import { faCircleNotch, faSeedling } from "@fortawesome/free-solid-svg-icons";
 import classNames from "classnames";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -9,10 +9,7 @@ import {
   fetchDetailSuccess,
   fetchDetailError,
 } from "../../store/slices/torrentDetailSlice";
-import {
-  fetchTorrentDetail,
-  updateFileSelection,
-} from "../../services/api";
+import { fetchTorrentDetail, updateFileSelection } from "../../services/api";
 import type { TorrentDetail, TorrentDetailPeer, TorrentFile } from "../../types";
 import styles from "./detail-pane.module.css";
 
@@ -72,8 +69,8 @@ export function DetailPane({ infoHash }: { infoHash: string }) {
     return (
       <div className={styles.detailPane}>
         <div className={styles.emptyState}>
-          <Spinner size="sm" mr={2} />
-          <Text>Loading details...</Text>
+          <FontAwesomeIcon icon={faCircleNotch} spin className={styles.loadingSpinner} />
+          <p>Loading details...</p>
         </div>
       </div>
     );
@@ -83,7 +80,7 @@ export function DetailPane({ infoHash }: { infoHash: string }) {
     return (
       <div className={styles.detailPane}>
         <div className={styles.emptyState}>
-          <Text>{error}</Text>
+          <p>{error}</p>
         </div>
       </div>
     );
@@ -93,7 +90,7 @@ export function DetailPane({ infoHash }: { infoHash: string }) {
     return (
       <div className={styles.detailPane}>
         <div className={styles.emptyState}>
-          <Text>No details available</Text>
+          <p>No details available</p>
         </div>
       </div>
     );
@@ -113,11 +110,7 @@ export function DetailPane({ infoHash }: { infoHash: string }) {
         {activeTab === "peers" && <PeersSection peers={detail.peers} />}
         {activeTab === "bitfield" && <BitfieldSection bitfield={detail.bitfield} />}
         {activeTab === "files" && (
-          <FilesSection
-            infoHash={infoHash}
-            files={detail.files}
-            onRefresh={loadDetail}
-          />
+          <FilesSection infoHash={infoHash} files={detail.files} onRefresh={loadDetail} />
         )}
       </div>
     </div>
@@ -157,7 +150,7 @@ function PeersSection({ peers }: { peers: TorrentDetailPeer[] }) {
   if (peers.length === 0) {
     return (
       <div className={styles.emptyState}>
-        <Text>No connected peers</Text>
+        <p>No connected peers</p>
       </div>
     );
   }
@@ -184,11 +177,7 @@ function PeersSection({ peers }: { peers: TorrentDetailPeer[] }) {
             <td>{prettyBytes(peer.bytesUploaded)}</td>
             <td>
               {peer.isSeed && (
-                <FontAwesomeIcon
-                  icon={faSeedling}
-                  size="sm"
-                  style={{ color: "var(--chakra-colors-green-400)" }}
-                />
+                <FontAwesomeIcon icon={faSeedling} size="sm" className={styles.seedIcon} />
               )}
             </td>
           </tr>
@@ -224,9 +213,7 @@ function BitfieldSection({
 
       // Bounded sampling keeps rendering responsive even for very large torrents.
       return Array.from({ length: bucketCount }, (_, bucketIndex) => {
-        const startPiece = Math.floor(
-          (bucketIndex * bitfield.pieceCount) / bucketCount
-        );
+        const startPiece = Math.floor((bucketIndex * bitfield.pieceCount) / bucketCount);
         const endPiece = Math.max(
           startPiece + 1,
           Math.floor(((bucketIndex + 1) * bitfield.pieceCount) / bucketCount)
@@ -314,7 +301,7 @@ function FilesSection({
   if (files.length === 0) {
     return (
       <div className={styles.emptyState}>
-        <Text>No files</Text>
+        <p>No files</p>
       </div>
     );
   }
@@ -333,10 +320,9 @@ function FilesSection({
           <tr key={file.id}>
             <td>
               <Checkbox
-                isChecked={file.isSelected}
-                isDisabled={pending}
-                onChange={() => toggleFile(file.id, file.isSelected)}
-                size="sm"
+                checked={file.isSelected}
+                disabled={pending}
+                onCheckedChange={() => toggleFile(file.id, file.isSelected)}
               />
             </td>
             <td>{file.filename}</td>

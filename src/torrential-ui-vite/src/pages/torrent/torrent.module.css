@@ -102,18 +102,6 @@
     gap: 10;
   }
   
-  .progress {
-    padding-top: 0.2em;
-  }
-  
-  .title {
-    font-weight: 500;
-  }
-  
-  .progressDetails {
-    padding-top: 0.6em;
-  }
-  
   .actionBar {
     min-height: 6em;
     display: flex;
@@ -140,6 +128,8 @@
 
 .uploadError {
   margin-top: 4px;
+  color: hsl(var(--destructive));
+  font-size: 0.875rem;
 }
 
 .previewModalBody {
@@ -151,10 +141,17 @@
 
 .previewTorrentName {
   font-weight: 600;
+  margin: 0;
 }
 
 .previewSelectAll {
   align-self: flex-start;
+}
+
+.previewSelectionSummary {
+  margin: 0;
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
 }
 
 .previewFileList {
@@ -174,11 +171,36 @@
   gap: 8px;
 }
 
+.previewFileName {
+  display: inline-block;
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewFileSize {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+}
+
 .completedPathSection {
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin-top: 4px;
+}
+
+.completedPathLabel {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.completedPathHint {
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
 }
 
 .completedPathInputRow {
@@ -200,6 +222,14 @@
   gap: 10px;
 }
 
+.pathPickerCurrentPath {
+  margin: 0;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pathPickerList {
   display: flex;
   flex-direction: column;
@@ -209,5 +239,69 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   padding: 8px;
+}
+
+.pathPickerStatus {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.pathPickerEmpty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.dialogFooterActions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.title {
+  font-weight: 500;
+  font-size: 1rem;
+  margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress {
+  padding-top: 0.2em;
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.progressBar {
+  height: 1em;
+}
+
+.progressBarGreen > div {
+  background-color: #22c55e;
+}
+
+.progressBarOrange > div {
+  background-color: #f59e0b;
+}
+
+.progressBarBlue > div {
+  background-color: #3b82f6;
+}
+
+.progressBarGray > div {
+  background-color: #9ca3af;
+}
+
+.progressDetails {
+  padding-top: 0.6em;
+  margin: 0;
+  font-size: 0.75rem;
 }
 
