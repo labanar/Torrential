@@ -401,15 +401,20 @@
   .actionButtons {
     order: 1;
     justify-content: flex-start;
+    flex-wrap: nowrap;
+    width: 100%;
+    gap: 0.5rem;
+    overflow-x: auto;
   }
 
   .actionButtons > * {
-    flex: 1 1 calc(25% - 0.6rem);
-    min-width: 0;
+    flex: 0 0 auto;
   }
 
   .actionButtons :global(button) {
-    width: 100%;
+    width: auto;
+    min-width: 2.25rem;
+    height: 2.25rem;
   }
 
   .torrent {
@@ -489,12 +494,6 @@
 
   .dialogFooterActions :global(button) {
     width: 100%;
-  }
-}
-
-@media (max-width: 520px) {
-  .actionButtons > * {
-    flex: 1 1 calc(50% - 0.5rem);
   }
 }
 

@@ -170,108 +170,108 @@ function GeneralSettings() {
   }, [fetchConnectionSettings, fetchFilesettings, fetchTcpListenerSettings]);
 
   return (
-    <>
-      <div className={`${styles.settingsRoot} page-shell`}>
+    <div className={`${styles.settingsRoot} page-shell`}>
+      <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Settings</h1>
-        <Separator />
-        <SectionHeader name="Files" />
-
-        <RowComponent label="Download Path">
-          <FormInput
-            fieldName="downloadPath"
-            control={fileSettingsControl}
-            className={styles.pathInput}
-          />
-        </RowComponent>
-        <RowComponent label="Completed Path">
-          <FormInput
-            fieldName="completedPath"
-            control={fileSettingsControl}
-            className={styles.pathInput}
-          />
-        </RowComponent>
-
-        <Separator />
-        <SectionHeader name="Connections" />
-
-        <RowComponent label="Max connections (per torrent)">
-          <FormNumericInput
-            min={0}
-            control={connectionSettingsControl}
-            fieldName="maxConnectionsPerTorrent"
-            className={styles.connectionNumericInput}
-          />
-        </RowComponent>
-
-        <RowComponent label="Max connections (Global)">
-          <FormNumericInput
-            min={0}
-            control={connectionSettingsControl}
-            fieldName="maxConnectionsGlobal"
-            className={styles.connectionNumericInput}
-          />
-        </RowComponent>
-
-        <RowComponent label="Max Half-open connections">
-          <FormNumericInput
-            min={0}
-            control={connectionSettingsControl}
-            fieldName="maxHalfOpenConnections"
-            className={styles.connectionNumericInput}
-          />
-        </RowComponent>
-
-        <Separator />
-        <SectionHeader name="Inbound Connections" />
-
-        <FormCheckbox
-          control={tcpListenerSettingsControl}
-          fieldName="enabled"
-          text="Allow inbound connections"
-          className={styles.tcpInboundCheckbox}
-        />
-
-        <RowComponent label="Port">
-          <FormNumericInput
-            min={0}
-            control={tcpListenerSettingsControl}
-            fieldName="port"
-            className={styles.portInput}
-          />
-        </RowComponent>
+        <Button
+          className={styles.saveButton}
+          disabled={
+            !isFileSettingsDirty && !isConnectionSettingsDirty && !isTcpListenerSettingsDirty
+          }
+          aria-label="Save settings"
+          onClick={() => {
+            if (isFileSettingsDirty) {
+              console.log("Saving file settings");
+              console.log(fileSettingsValues);
+              saveFileSettings(fileSettingsValues);
+              resetFileSettings(fileSettingsValues);
+            }
+            if (isConnectionSettingsDirty) {
+              console.log("Saving connection settings");
+              console.log(connectionSettingsValues);
+              saveConnectionSettings(connectionSettingsValues);
+              resetConnectionSettings(connectionSettingsValues);
+            }
+            if (isTcpListenerSettingsDirty) {
+              console.log("Saving TCP Listener settings");
+              console.log(tcpListenerSettingsValue);
+              saveTcpSettings(tcpListenerSettingsValue);
+              resetTcpListenerSettings(tcpListenerSettingsValue);
+            }
+          }}
+          type="button"
+        >
+          <FontAwesomeIcon icon={faCheck} />
+          <span className={styles.saveButtonLabel}>Save</span>
+        </Button>
       </div>
-      <Button
-        className={styles.saveButton}
-        disabled={
-          !isFileSettingsDirty && !isConnectionSettingsDirty && !isTcpListenerSettingsDirty
-        }
-        aria-label="Save settings"
-        onClick={() => {
-          if (isFileSettingsDirty) {
-            console.log("Saving file settings");
-            console.log(fileSettingsValues);
-            saveFileSettings(fileSettingsValues);
-            resetFileSettings(fileSettingsValues);
-          }
-          if (isConnectionSettingsDirty) {
-            console.log("Saving connection settings");
-            console.log(connectionSettingsValues);
-            saveConnectionSettings(connectionSettingsValues);
-            resetConnectionSettings(connectionSettingsValues);
-          }
-          if (isTcpListenerSettingsDirty) {
-            console.log("Saving TCP Listener settings");
-            console.log(tcpListenerSettingsValue);
-            saveTcpSettings(tcpListenerSettingsValue);
-            resetTcpListenerSettings(tcpListenerSettingsValue);
-          }
-        }}
-        type="button"
-      >
-        <FontAwesomeIcon icon={faCheck} />
-        <span className={styles.saveButtonLabel}>Save</span>
-      </Button>
-    </>
+      <Separator />
+      <SectionHeader name="Files" />
+
+      <RowComponent label="Download Path">
+        <FormInput
+          fieldName="downloadPath"
+          control={fileSettingsControl}
+          className={styles.pathInput}
+        />
+      </RowComponent>
+      <RowComponent label="Completed Path">
+        <FormInput
+          fieldName="completedPath"
+          control={fileSettingsControl}
+          className={styles.pathInput}
+        />
+      </RowComponent>
+
+      <Separator />
+      <SectionHeader name="Connections" />
+
+      <RowComponent label="Max connections (per torrent)">
+        <FormNumericInput
+          min={0}
+          control={connectionSettingsControl}
+          fieldName="maxConnectionsPerTorrent"
+          className={styles.connectionNumericInput}
+        />
+      </RowComponent>
+
+      <RowComponent label="Max connections (Global)">
+        <FormNumericInput
+          min={0}
+          control={connectionSettingsControl}
+          fieldName="maxConnectionsGlobal"
+          className={styles.connectionNumericInput}
+        />
+      </RowComponent>
+
+      <RowComponent label="Max Half-open connections">
+        <FormNumericInput
+          min={0}
+          control={connectionSettingsControl}
+          fieldName="maxHalfOpenConnections"
+          className={styles.connectionNumericInput}
+        />
+      </RowComponent>
+
+      <Separator />
+      <SectionHeader name="Inbound Connections" />
+
+      <FormCheckbox
+        control={tcpListenerSettingsControl}
+        fieldName="enabled"
+        text="Allow inbound connections"
+        className={styles.tcpInboundCheckbox}
+      />
+
+      <RowComponent label="Port">
+        <FormNumericInput
+          min={0}
+          control={tcpListenerSettingsControl}
+          fieldName="port"
+          className={styles.portInput}
+        />
+      </RowComponent>
+    </div>
   );
 }
 
