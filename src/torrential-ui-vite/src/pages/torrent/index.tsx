@@ -22,6 +22,7 @@ import {
   faCircleNotch,
   faCirclePause,
   faDownLong,
+  faGripLines,
   faPause,
   faPlay,
   faPlus,
@@ -30,7 +31,7 @@ import {
   faUpLong,
   faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import classNames from "classnames";
 import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
@@ -74,6 +75,12 @@ function Page() {
   const torrents = useSelector(torrentsWithPeersSelector);
   const [selectedTorrents, setSelectedTorrents] = useState<string[]>([]);
   const [currentPosition, setCurrentPosition] = useState(0);
+  const [openedInfoHash, setOpenedInfoHash] = useState<string | null>(null);
+  const [detailPaneHeight, setDetailPaneHeight] = useState(320);
+  const [isResizingDetailPane, setIsResizingDetailPane] = useState(false);
+  const splitRootRef = useRef<HTMLDivElement | null>(null);
+  const splitterRef = useRef<HTMLDivElement | null>(null);
+  const resizeStartRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
   const memoActionRow = useMemo(() => {
     return (
@@ -181,6 +188,7 @@ function Page() {
   useHotkeys(
     "up",
     () => {
+      if (torrents.length === 0) return;
       let nextId = currentPosition - 1;
       if (nextId < 0) nextId = torrents.length - 1;
       setCurrentPosition(nextId);
@@ -196,6 +204,7 @@ function Page() {
   useHotkeys(
     "down",
     () => {
+      if (torrents.length === 0) return;
       let nextId = currentPosition + 1;
       if (nextId >= torrents.length) nextId = 0;
       setCurrentPosition(nextId);
@@ -211,6 +220,7 @@ function Page() {
   useHotkeys(
     "space",
     () => {
+      if (torrents.length === 0) return;
       selectTorrent(torrents[currentPosition].infoHash);
       console.log("space from torrents");
     },
@@ -220,16 +230,122 @@ function Page() {
     }
   );
 
-  // Track focused torrent for the detail pane
   const focusedInfoHash = torrents[currentPosition]?.infoHash ?? null;
+  const isDetailPaneOpen = openedInfoHash !== null;
+
+  const getPaneHeightBounds = useCallback(() => {
+    const rootHeight = splitRootRef.current?.getBoundingClientRect().height ?? window.innerHeight;
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    const minHeight = isMobile ? 180 : 220;
+    const maxHeight = Math.max(minHeight + 40, Math.floor(rootHeight * (isMobile ? 0.7 : 0.65)));
+    return { minHeight, maxHeight };
+  }, []);
+
+  const clampDetailPaneHeight = useCallback(
+    (height: number) => {
+      const { minHeight, maxHeight } = getPaneHeightBounds();
+      return Math.max(minHeight, Math.min(maxHeight, height));
+    },
+    [getPaneHeightBounds]
+  );
+
+  const adjustDetailPaneHeight = useCallback(
+    (delta: number) => {
+      setDetailPaneHeight((current) => clampDetailPaneHeight(current + delta));
+    },
+    [clampDetailPaneHeight]
+  );
 
   useEffect(() => {
-    dispatch(selectTorrentForDetail(focusedInfoHash));
-  }, [dispatch, focusedInfoHash]);
+    const handleResize = () => {
+      setDetailPaneHeight((current) => clampDetailPaneHeight(current));
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [clampDetailPaneHeight]);
+
+  useEffect(() => {
+    if (isDetailPaneOpen) {
+      setDetailPaneHeight((current) => clampDetailPaneHeight(current));
+    }
+  }, [clampDetailPaneHeight, isDetailPaneOpen]);
+
+  useEffect(() => {
+    if (openedInfoHash && !torrents.some((torrent) => torrent.infoHash === openedInfoHash)) {
+      setOpenedInfoHash(null);
+    }
+  }, [openedInfoHash, torrents]);
+
+  useEffect(() => {
+    if (!focusedInfoHash && openedInfoHash !== null) {
+      setOpenedInfoHash(null);
+    }
+  }, [focusedInfoHash, openedInfoHash]);
+
+  useEffect(() => {
+    if (focusedInfoHash && openedInfoHash) {
+      setOpenedInfoHash(focusedInfoHash);
+    }
+  }, [focusedInfoHash, openedInfoHash]);
+
+  useEffect(() => {
+    dispatch(selectTorrentForDetail(openedInfoHash));
+  }, [dispatch, openedInfoHash]);
+
+  useHotkeys(
+    "enter",
+    () => {
+      const currentTorrent = torrents[currentPosition];
+      if (!currentTorrent) return;
+      setOpenedInfoHash(currentTorrent.infoHash);
+    },
+    {
+      scopes: ["torrents"],
+      enableOnFormTags: ["input", "textarea", "select"],
+    }
+  );
+
+  useHotkeys(
+    "esc",
+    () => {
+      setOpenedInfoHash(null);
+    },
+    {
+      scopes: ["torrents"],
+      enableOnFormTags: ["input", "textarea", "select"],
+    }
+  );
+
+  const onSplitterPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (!isDetailPaneOpen) return;
+    resizeStartRef.current = { startY: event.clientY, startHeight: detailPaneHeight };
+    setIsResizingDetailPane(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onSplitterPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!resizeStartRef.current) return;
+    const delta = resizeStartRef.current.startY - event.clientY;
+    const targetHeight = resizeStartRef.current.startHeight + delta;
+    setDetailPaneHeight(clampDetailPaneHeight(targetHeight));
+  };
+
+  const stopSplitterResize = (event: PointerEvent<HTMLDivElement>) => {
+    if (resizeStartRef.current) {
+      resizeStartRef.current = null;
+      setIsResizingDetailPane(false);
+    }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
 
   return (
     <TooltipProvider>
-      <div className={`${styles.root} page-shell`}>
+      <div className={`${styles.root} page-shell`} ref={splitRootRef}>
         <div className={styles.topPane}>
           {memoActionRow}
           <div className={styles.torrentDivider}>
@@ -239,7 +355,10 @@ function Page() {
             {torrents.map((t, i) => (
               <TorrentRow
                 toggleSelect={selectTorrent}
-                toggleFocus={() => setCurrentPosition(i)}
+                toggleFocus={() => {
+                  setCurrentPosition(i);
+                  setOpenedInfoHash(t.infoHash);
+                }}
                 isFocused={currentPosition === i}
                 isSelected={isSelected(t.infoHash)}
                 uploadRate={t.uploadRate}
@@ -266,10 +385,48 @@ function Page() {
             ))}
           </div>
         </div>
-        {focusedInfoHash && (
-          <div className={styles.bottomPane}>
-            <DetailPane infoHash={focusedInfoHash} />
-          </div>
+        {isDetailPaneOpen && openedInfoHash && (
+          <>
+            <div
+              ref={splitterRef}
+              className={classNames(styles.splitPaneHandle, {
+                [styles.splitPaneHandleActive]: isResizingDetailPane,
+              })}
+              role="separator"
+              aria-label="Resize torrent details pane"
+              aria-orientation="horizontal"
+              tabIndex={0}
+              onPointerDown={onSplitterPointerDown}
+              onPointerMove={onSplitterPointerMove}
+              onPointerUp={stopSplitterResize}
+              onPointerCancel={stopSplitterResize}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  adjustDetailPaneHeight(24);
+                } else if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  adjustDetailPaneHeight(-24);
+                } else if (event.key === "Home") {
+                  event.preventDefault();
+                  const { minHeight } = getPaneHeightBounds();
+                  setDetailPaneHeight(minHeight);
+                } else if (event.key === "End") {
+                  event.preventDefault();
+                  const { maxHeight } = getPaneHeightBounds();
+                  setDetailPaneHeight(maxHeight);
+                }
+              }}
+            >
+              <FontAwesomeIcon icon={faGripLines} />
+            </div>
+            <div className={styles.bottomPane} style={{ height: `${detailPaneHeight}px` }}>
+              <DetailPane
+                infoHash={openedInfoHash}
+                onClose={() => setOpenedInfoHash(null)}
+              />
+            </div>
+          </>
         )}
       </div>
     </TooltipProvider>

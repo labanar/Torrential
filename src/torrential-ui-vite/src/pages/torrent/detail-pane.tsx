@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleNotch, faSeedling } from "@fortawesome/free-solid-svg-icons";
+import { faCircleNotch, faSeedling, faXmark } from "@fortawesome/free-solid-svg-icons";
 import classNames from "classnames";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -15,7 +15,12 @@ import styles from "./detail-pane.module.css";
 
 type Tab = "peers" | "bitfield" | "files";
 
-export function DetailPane({ infoHash }: { infoHash: string }) {
+interface DetailPaneProps {
+  infoHash: string;
+  onClose: () => void;
+}
+
+export function DetailPane({ infoHash, onClose }: DetailPaneProps) {
   const dispatch = useAppDispatch();
   const { detail, loading, error } = useAppSelector((s) => s.torrentDetail);
   const [activeTab, setActiveTab] = useState<Tab>("peers");
@@ -100,6 +105,16 @@ export function DetailPane({ infoHash }: { infoHash: string }) {
     <div className={styles.detailPane}>
       <div className={styles.detailHeader}>
         <span className={styles.detailHeaderTitle}>{detail.name}</span>
+        <div className={styles.detailHeaderActions}>
+          <button
+            type="button"
+            className={styles.detailCloseButton}
+            aria-label="Close torrent details"
+            onClick={onClose}
+          >
+            <FontAwesomeIcon icon={faXmark} />
+          </button>
+        </div>
       </div>
       <div className={styles.tabs}>
         <TabButton label="PEERS" tab="peers" active={activeTab} onClick={setActiveTab} />
