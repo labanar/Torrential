@@ -72,5 +72,6 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<TcpPeerListenerBackgroundService>();
 
         services.AddSingleton<IPostDownloadAction, FileCopyPostDownloadAction>();
+        services.AddSingleton<IPostDownloadAction, IntegrationPostDownloadAction>();
     }
 }
