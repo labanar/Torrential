@@ -1,10 +1,4 @@
-import {
-  NumberDecrementStepper,
-  NumberIncrementStepper,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-} from "@chakra-ui/react";
+import { Input } from "@/components/ui/input";
 import { Control, Controller } from "react-hook-form";
 
 interface FormNumericInputProps {
@@ -27,13 +21,15 @@ export const FormNumericInput: React.FC<FormNumericInputProps> = ({
       name={fieldName}
       control={control}
       render={({ field }) => (
-        <NumberInput className={className} min={min} max={max} {...field}>
-          <NumberInputField />
-          <NumberInputStepper>
-            <NumberIncrementStepper />
-            <NumberDecrementStepper />
-          </NumberInputStepper>
-        </NumberInput>
+        <Input
+          {...field}
+          type="number"
+          min={min}
+          max={max}
+          className={className}
+          value={field.value ?? ""}
+          onChange={(event) => field.onChange(event.target.value)}
+        />
       )}
     />
   );

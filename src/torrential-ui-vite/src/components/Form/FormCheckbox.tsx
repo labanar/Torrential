@@ -1,4 +1,4 @@
-import { Checkbox } from "@chakra-ui/react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Control, Controller } from "react-hook-form";
 
 interface FormCheckboxProps {
@@ -19,15 +19,18 @@ export const FormCheckbox: React.FC<FormCheckboxProps> = ({
       name={fieldName}
       control={control}
       render={({ field: { onChange, onBlur, value, ref } }) => (
-        <Checkbox
-          onChange={(e) => onChange(e.target.checked)}
-          onBlur={onBlur}
-          isChecked={value}
-          ref={ref}
+        <label
           className={className}
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}
         >
+          <Checkbox
+            checked={Boolean(value)}
+            onCheckedChange={(checked) => onChange(checked === true)}
+            onBlur={onBlur}
+            ref={ref}
+          />
           {text ?? ""}
-        </Checkbox>
+        </label>
       )}
     />
   );

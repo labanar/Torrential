@@ -1,44 +1,70 @@
 .toastContainer {
-    font-family: "Courier New", Courier, monospace;
-    display: flex;
-    flex-direction: row;
-    padding: 0.5em;
-    border-radius: 0.2em;
-  }
-  
-  .success {
-    background: "#68D391";
-  }
-  
-  .warning {
-    background: "#F6AD55";
-  }
-  
-  .error {
-    background: "#FC8181";
-  }
-  
-  .info {
-    background: "#63B3ED";
-  }
-  
-  .icon {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding-right: 0.8em;
-    padding-left: 0.8em;
-  }
-  
-  .content {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1em;
-  }
-  
+  font-family: "Courier New", Courier, monospace;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0.5em;
+  border-radius: 0.2em;
+  border: 1px solid hsl(var(--border));
+  min-width: 300px;
+}
 
-  .close {
-    padding-left: 0.2em;
-  }
-  
+.success {
+  background: #68d391;
+  color: #111827;
+}
+
+.warning {
+  background: #f6ad55;
+  color: #111827;
+}
+
+.error {
+  background: #fc8181;
+  color: #111827;
+}
+
+.info {
+  background: #63b3ed;
+  color: #111827;
+}
+
+.icon {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding-right: 0.8em;
+  padding-left: 0.8em;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1em;
+  flex: 1;
+}
+
+.title {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.description {
+  font-size: 0.875rem;
+}
+
+.close {
+  padding-left: 0.2em;
+}
+
+.closeButton {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

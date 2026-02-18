@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Box, CloseButton, Text, ToastId, useToast } from "@chakra-ui/react";
 import {
   ToastNotificationPayload,
   dequeueNext,
@@ -9,45 +8,51 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import classes from "./toast-notification.module.css";
 import { type IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "../../store";
+import { toast } from "sonner";
+import { X } from "lucide-react";
+import classNames from "classnames";
 
 export const selectCurrentToast = (state: RootState) =>
   state.notifications.currentToast;
 
 const renderToast = (
-  id: ToastId,
-  onClose: () => void,
+  id: string | number,
   notification: ToastNotificationPayload
 ) => {
-  const { status, icon, title, description } = notification;
-  let bgColor = "blue.300";
-  if (status === "success") bgColor = "green.300";
-  if (status === "warning") bgColor = "orange.300";
-  if (status === "error") bgColor = "red.300";
+  const { status, icon, title, description, isClosable } = notification;
+
   return (
-    <Box bg={bgColor} id={id.toString()} className={classes.toastContainer}>
-      <Box className={classes.icon}>
+    <div
+      id={id.toString()}
+      className={classNames(classes.toastContainer, classes[status])}
+    >
+      <div className={classes.icon}>
         {typeof icon !== "string" && icon !== undefined && (
           <FontAwesomeIcon icon={icon as IconDefinition} size={"xl"} />
         )}
-      </Box>
-      <Box className={classes.content}>
-        <Box className={classes.title}>
-          <Text size={"sm"}>{title}</Text>
-        </Box>
-        <Box className={classes.description}>
-          <Text size={"sm"}>{description}</Text>
-        </Box>
-      </Box>
-      <Box className={classes.close}>
-        <CloseButton onClick={onClose} />
-      </Box>
-    </Box>
+      </div>
+      <div className={classes.content}>
+        <div className={classes.title}>{title}</div>
+        <div className={classes.description}>{description}</div>
+      </div>
+      {isClosable && (
+        <div className={classes.close}>
+          <button
+            type="button"
+            className={classes.closeButton}
+            onClick={() => toast.dismiss(id)}
+            aria-label="Close notification"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 
 export default function ToastNotification() {
   const dispatch = useDispatch();
-  const toast = useToast();
   const currentToast = useSelector(selectCurrentToast);
 
   useEffect(() => {
@@ -56,17 +61,13 @@ export default function ToastNotification() {
 
   useEffect(() => {
     if (currentToast) {
-      const { duration } = currentToast;
-
-      toast({
-        position: "bottom-right",
-        duration,
-        render: ({ id, onClose }) => renderToast(id!, onClose, currentToast),
+      toast.custom((id) => renderToast(id, currentToast), {
+        duration: currentToast.duration,
       });
 
       dispatch(dequeueNext());
     }
-  }, [currentToast, toast, dispatch]);
+  }, [currentToast, dispatch]);
 
-  return <></>;
+  return null;
 }

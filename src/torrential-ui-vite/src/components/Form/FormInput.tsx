@@ -1,4 +1,4 @@
-import { Input } from "@chakra-ui/react";
+import { Input } from "@/components/ui/input";
 import { Control, Controller } from "react-hook-form";
 
 interface FormInputProps {
@@ -7,12 +7,16 @@ interface FormInputProps {
   control: Control<any, any>;
 }
 
-export const FormInput: React.FC<FormInputProps> = ({ fieldName, control }) => {
+export const FormInput: React.FC<FormInputProps> = ({
+  className,
+  fieldName,
+  control,
+}) => {
   return (
     <Controller
       name={fieldName}
       control={control}
-      render={({ field }) => <Input {...field} />}
+      render={({ field }) => <Input {...field} className={className} />}
     />
   );
 };

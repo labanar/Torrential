@@ -2,7 +2,6 @@ import * as React from "react";
 import * as ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "./index.css";
-import { ChakraProvider, extendTheme } from "@chakra-ui/react";
 import TorrentPage from "./pages/torrent";
 import { Provider } from "react-redux";
 import store from "./store";
@@ -32,21 +31,25 @@ const router = createBrowserRouter([
   },
 ]);
 
-const theme = extendTheme({
-  initialColorMode: "system",
-  useSystemColorMode: true,
-});
+const applyInitialTheme = () => {
+  const savedTheme = window.localStorage.getItem("theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const shouldUseDarkMode = savedTheme ? savedTheme === "dark" : prefersDark;
+
+  document.documentElement.classList.toggle("dark", shouldUseDarkMode);
+  document.documentElement.style.colorScheme = shouldUseDarkMode ? "dark" : "light";
+};
+
+applyInitialTheme();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ChakraProvider theme={theme}>
-      <Provider store={store}>
-        <HotkeysProvider initiallyActiveScopes={["global"]}>
-          <ToastNotification />
-          <Toaster />
-          <RouterProvider router={router} />
-        </HotkeysProvider>
-      </Provider>
-    </ChakraProvider>
+    <Provider store={store}>
+      <HotkeysProvider initiallyActiveScopes={["global"]}>
+        <ToastNotification />
+        <Toaster />
+        <RouterProvider router={router} />
+      </HotkeysProvider>
+    </Provider>
   </React.StrictMode>
 );
