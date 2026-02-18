@@ -13,6 +13,50 @@ namespace Torrential.Tests;
 
 public class FileSelectionRegressionTests
 {
+    /// <summary>
+    /// In-memory IFileSelectionService that captures what was persisted during the add flow.
+    /// </summary>
+    private sealed class InMemoryFileSelectionService : IFileSelectionService
+    {
+        private readonly Dictionary<string, HashSet<long>> _store = new();
+
+        public Task<IReadOnlySet<long>> GetSelectedFileIds(InfoHash infoHash)
+        {
+            if (_store.TryGetValue(infoHash.AsString(), out var set))
+                return Task.FromResult<IReadOnlySet<long>>(set);
+            return Task.FromResult<IReadOnlySet<long>>(new HashSet<long>());
+        }
+
+        public Task SetSelectedFileIds(InfoHash infoHash, IReadOnlyCollection<long> fileIds)
+        {
+            _store[infoHash.AsString()] = new HashSet<long>(fileIds);
+            return Task.CompletedTask;
+        }
+    }
+
+    private static readonly MethodInfo ApplyFileSelectionMethod =
+        typeof(TorrentAddCommandHandler).GetMethod(
+            "ApplyFileSelection",
+            BindingFlags.Static | BindingFlags.NonPublic)!;
+
+    /// <summary>
+    /// Invokes the private static ApplyFileSelection method on TorrentAddCommandHandler.
+    /// </summary>
+    private static void InvokeApplyFileSelection(TorrentMetadata metadata, IReadOnlyCollection<long>? selectedFileIds)
+    {
+        ApplyFileSelectionMethod.Invoke(null, [metadata, selectedFileIds]);
+    }
+
+    /// <summary>
+    /// Replicates the persistence step from TorrentAddCommandHandler.Execute:
+    /// persists the effective file selection (files where IsSelected == true) to the service.
+    /// </summary>
+    private static async Task PersistEffectiveSelection(TorrentMetadata metadata, IFileSelectionService service)
+    {
+        var selectedFileIds = metadata.Files.Where(f => f.IsSelected).Select(f => f.Id).ToArray();
+        await service.SetSelectedFileIds(metadata.InfoHash, selectedFileIds);
+    }
+
     [Fact]
     public void Selected_file_ids_are_preserved_in_metadata()
     {
@@ -27,13 +71,7 @@ public class FileSelectionRegressionTests
                 new TorrentMetadataFile { Id = 2, Filename = "c.bin", FileStartByte = 16, FileSize = 8, IsSelected = true }
             ]);
 
-        var applySelection = typeof(TorrentAddCommandHandler).GetMethod(
-            "ApplyFileSelection",
-            BindingFlags.Static | BindingFlags.NonPublic);
-
-        Assert.NotNull(applySelection);
-
-        applySelection!.Invoke(null, [metadata, new long[] { 1 }]);
+        InvokeApplyFileSelection(metadata, new long[] { 1 });
 
         Assert.False(metadata.Files.Single(x => x.Id == 0).IsSelected);
         Assert.True(metadata.Files.Single(x => x.Id == 1).IsSelected);
@@ -181,11 +219,209 @@ public class FileSelectionRegressionTests
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Add-flow selection persistence regression tests
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// When SelectedFileIds is a subset, the add flow must persist exactly that subset
+    /// via IFileSelectionService — not all files.
+    /// Exercises: ApplyFileSelection → persist IsSelected flags → verify service state.
+    /// </summary>
+    [Fact]
+    public async Task Add_flow_persists_subset_selection()
+    {
+        var metadata = CreateMetadata(
+            pieceSize: 8,
+            totalSize: 24,
+            numberOfPieces: 3,
+            files:
+            [
+                new TorrentMetadataFile { Id = 0, Filename = "a.bin", FileStartByte = 0, FileSize = 8, IsSelected = true },
+                new TorrentMetadataFile { Id = 1, Filename = "b.bin", FileStartByte = 8, FileSize = 8, IsSelected = true },
+                new TorrentMetadataFile { Id = 2, Filename = "c.bin", FileStartByte = 16, FileSize = 8, IsSelected = true }
+            ]);
+
+        var service = new InMemoryFileSelectionService();
+
+        // Simulate add-flow: user selects only file 1
+        InvokeApplyFileSelection(metadata, new long[] { 1 });
+        await PersistEffectiveSelection(metadata, service);
+
+        var persisted = await service.GetSelectedFileIds(metadata.InfoHash);
+        Assert.Single(persisted);
+        Assert.Contains(1L, persisted);
+        Assert.DoesNotContain(0L, persisted);
+        Assert.DoesNotContain(2L, persisted);
+    }
+
+    /// <summary>
+    /// When SelectedFileIds is null (backward compatibility), the add flow must persist
+    /// all file IDs — every file is selected by default.
+    /// </summary>
+    [Fact]
+    public async Task Add_flow_with_null_selection_persists_all_file_ids()
+    {
+        var metadata = CreateMetadata(
+            pieceSize: 8,
+            totalSize: 24,
+            numberOfPieces: 3,
+            files:
+            [
+                new TorrentMetadataFile { Id = 0, Filename = "a.bin", FileStartByte = 0, FileSize = 8, IsSelected = false },
+                new TorrentMetadataFile { Id = 1, Filename = "b.bin", FileStartByte = 8, FileSize = 8, IsSelected = false },
+                new TorrentMetadataFile { Id = 2, Filename = "c.bin", FileStartByte = 16, FileSize = 8, IsSelected = false }
+            ],
+            infoHash: "aabbccddee0123456789aabbccddee0123456789");
+
+        var service = new InMemoryFileSelectionService();
+
+        // Simulate add-flow: null selection → all files selected
+        InvokeApplyFileSelection(metadata, null);
+        await PersistEffectiveSelection(metadata, service);
+
+        var persisted = await service.GetSelectedFileIds(metadata.InfoHash);
+        Assert.Equal(3, persisted.Count);
+        Assert.Contains(0L, persisted);
+        Assert.Contains(1L, persisted);
+        Assert.Contains(2L, persisted);
+    }
+
+    /// <summary>
+    /// Invalid file IDs in the request (IDs that don't match any file) must not appear
+    /// in the persisted selection. ApplyFileSelection only marks files that exist in
+    /// metadata, and the handler persists based on IsSelected flags — so invalid IDs
+    /// are naturally filtered out.
+    /// </summary>
+    [Fact]
+    public async Task Add_flow_with_invalid_ids_persists_only_valid_ids()
+    {
+        var metadata = CreateMetadata(
+            pieceSize: 8,
+            totalSize: 24,
+            numberOfPieces: 3,
+            files:
+            [
+                new TorrentMetadataFile { Id = 0, Filename = "a.bin", FileStartByte = 0, FileSize = 8, IsSelected = true },
+                new TorrentMetadataFile { Id = 1, Filename = "b.bin", FileStartByte = 8, FileSize = 8, IsSelected = true },
+                new TorrentMetadataFile { Id = 2, Filename = "c.bin", FileStartByte = 16, FileSize = 8, IsSelected = true }
+            ],
+            infoHash: "1122334455667788990011223344556677889900");
+
+        var service = new InMemoryFileSelectionService();
+
+        // Simulate add-flow: user selects file 1 plus a bogus ID 999
+        InvokeApplyFileSelection(metadata, new long[] { 1, 999 });
+        await PersistEffectiveSelection(metadata, service);
+
+        // Only the valid ID (1) should be present; 999 never matched a file so it was not persisted
+        var persisted = await service.GetSelectedFileIds(metadata.InfoHash);
+        Assert.Contains(1L, persisted);
+        Assert.DoesNotContain(999L, persisted);
+        Assert.DoesNotContain(0L, persisted);
+        Assert.DoesNotContain(2L, persisted);
+    }
+
+    // -----------------------------------------------------------------------
+    // Detail-pane contract regression tests
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// The detail-pane file list must reflect the persisted IFileSelectionService state,
+    /// not the in-memory metadata IsSelected flags. This ensures the info pane shows
+    /// the correct checkboxes after a partial add selection.
+    /// Mirrors the mapping in GET /torrents/{infoHash}/detail:
+    ///   IsSelected = selectedFileIds.Contains(f.Id)
+    /// </summary>
+    [Fact]
+    public async Task Detail_pane_files_reflect_persisted_file_selection()
+    {
+        var metadata = CreateMetadata(
+            pieceSize: 8,
+            totalSize: 24,
+            numberOfPieces: 3,
+            files:
+            [
+                new TorrentMetadataFile { Id = 0, Filename = "a.bin", FileStartByte = 0, FileSize = 8, IsSelected = true },
+                new TorrentMetadataFile { Id = 1, Filename = "b.bin", FileStartByte = 8, FileSize = 8, IsSelected = true },
+                new TorrentMetadataFile { Id = 2, Filename = "c.bin", FileStartByte = 16, FileSize = 8, IsSelected = true }
+            ],
+            infoHash: "dd00dd00dd00dd00dd00dd00dd00dd00dd00dd00");
+
+        var service = new InMemoryFileSelectionService();
+
+        // Simulate a partial selection persisted during the add flow
+        await service.SetSelectedFileIds(metadata.InfoHash, new long[] { 1 });
+
+        var selectedFileIds = await service.GetSelectedFileIds(metadata.InfoHash);
+
+        // Reproduce the exact mapping the detail endpoint uses
+        var detailFiles = metadata.Files.Select(f => new
+        {
+            f.Id,
+            f.Filename,
+            f.FileSize,
+            IsSelected = selectedFileIds.Contains(f.Id)
+        }).ToArray();
+
+        // Only file 1 should be selected — matching what was persisted, not "all files"
+        Assert.False(detailFiles.Single(f => f.Id == 0).IsSelected);
+        Assert.True(detailFiles.Single(f => f.Id == 1).IsSelected);
+        Assert.False(detailFiles.Single(f => f.Id == 2).IsSelected);
+    }
+
+    /// <summary>
+    /// After the add flow persists a partial selection, post-add toggles via the
+    /// /torrents/{infoHash}/files/select endpoint should update the selection.
+    /// SignalR FileSelectionChanged events carry the new selectedFileIds to the UI.
+    /// This test validates the same overwrite semantics that the update endpoint +
+    /// Redux updateDetailFiles reducer rely on.
+    /// </summary>
+    [Fact]
+    public async Task Post_add_toggle_updates_persisted_selection_for_detail_pane()
+    {
+        var metadata = CreateMetadata(
+            pieceSize: 8,
+            totalSize: 24,
+            numberOfPieces: 3,
+            files:
+            [
+                new TorrentMetadataFile { Id = 0, Filename = "a.bin", FileStartByte = 0, FileSize = 8, IsSelected = true },
+                new TorrentMetadataFile { Id = 1, Filename = "b.bin", FileStartByte = 8, FileSize = 8, IsSelected = true },
+                new TorrentMetadataFile { Id = 2, Filename = "c.bin", FileStartByte = 16, FileSize = 8, IsSelected = true }
+            ],
+            infoHash: "ee00ee00ee00ee00ee00ee00ee00ee00ee00ee00");
+
+        var service = new InMemoryFileSelectionService();
+
+        // Initial partial selection from add flow
+        await service.SetSelectedFileIds(metadata.InfoHash, new long[] { 0 });
+
+        // Post-add toggle: user also selects file 2 via the detail pane UI
+        await service.SetSelectedFileIds(metadata.InfoHash, new long[] { 0, 2 });
+
+        var selectedFileIds = await service.GetSelectedFileIds(metadata.InfoHash);
+
+        // The detail endpoint maps isSelected from persisted selection
+        var detailFiles = metadata.Files
+            .Select(f => new { f.Id, IsSelected = selectedFileIds.Contains(f.Id) })
+            .ToArray();
+
+        Assert.True(detailFiles.Single(f => f.Id == 0).IsSelected);
+        Assert.False(detailFiles.Single(f => f.Id == 1).IsSelected);
+        Assert.True(detailFiles.Single(f => f.Id == 2).IsSelected);
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
     private static TorrentMetadata CreateMetadata(
         long pieceSize,
         long totalSize,
         int numberOfPieces,
-        TorrentMetadataFile[] files)
+        TorrentMetadataFile[] files,
+        string infoHash = "0123456789abcdef0123456789abcdef01234567")
     {
         return new TorrentMetadata
         {
@@ -195,7 +431,7 @@ public class FileSelectionRegressionTests
             Files = files,
             PieceSize = pieceSize,
             TotalSize = totalSize,
-            InfoHash = "0123456789abcdef0123456789abcdef01234567",
+            InfoHash = infoHash,
             PieceHashesConcatenated = new byte[numberOfPieces * 20]
         };
     }

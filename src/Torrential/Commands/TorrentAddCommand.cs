@@ -40,9 +40,9 @@ namespace Torrential.Commands
             //Save the metadata to the file system
             await metaFileService.SaveMetadata(command.Metadata);
 
-            // Default all files selected on add
-            var allFileIds = command.Metadata.Files.Select(f => f.Id).ToArray();
-            await fileSelectionService.SetSelectedFileIds(command.Metadata.InfoHash, allFileIds);
+            // Persist the effective file selection (respects user choice from the add dialog)
+            var selectedFileIds = command.Metadata.Files.Where(f => f.IsSelected).Select(f => f.Id).ToArray();
+            await fileSelectionService.SetSelectedFileIds(command.Metadata.InfoHash, selectedFileIds);
 
             await db.SaveChangesAsync();
             await mgr.Add(command.Metadata, recoveryResult);
