@@ -1,3 +1,5 @@
+import type { IntegrationsSettings, IntegrationsSettingsUpdateRequest } from "../types";
+
 export async function fetchTorrents(): Promise<TorrentApiModel[]> {
   const response = await fetch(
     `${import.meta.env.VITE_API_BASE_URL}/torrents`
@@ -253,4 +255,36 @@ export async function browseDirectories(path?: string): Promise<DirectoryBrowseA
   }
 
   return result.data;
+}
+
+export async function fetchIntegrationsSettings(): Promise<IntegrationsSettings> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/integrations`);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch integrations settings");
+  }
+
+  const result: ApiResponse<IntegrationsSettings> = await response.json();
+  if (!result.data) {
+    throw new Error("Integrations settings endpoint returned no data");
+  }
+
+  return result.data;
+}
+
+export async function saveIntegrationsSettings(
+  settings: IntegrationsSettingsUpdateRequest
+): Promise<boolean> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/integrations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+
+  if (!response.ok) {
+    return false;
+  }
+
+  const result: ApiResponse<{ success: boolean }> = await response.json();
+  return result.data?.success ?? false;
 }

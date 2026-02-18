@@ -78,3 +78,20 @@ export interface TorrentPreviewSummary {
   totalSizeBytes: number;
   files: TorrentPreviewFileSummary[];
 }
+
+export interface IntegrationsSettings {
+  slackEnabled: boolean;
+  slackWebhookUrl: string;
+  slackMessageTemplate: string;
+  slackTriggerDownloadComplete: boolean;
+  discordEnabled: boolean;
+  discordWebhookUrl: string;
+  discordMessageTemplate: string;
+  discordTriggerDownloadComplete: boolean;
+  commandHookEnabled: boolean;
+  commandTemplate: string;
+  commandWorkingDirectory: string | null;
+  commandTriggerDownloadComplete: boolean;
+}
+
+export type IntegrationsSettingsUpdateRequest = IntegrationsSettings;
