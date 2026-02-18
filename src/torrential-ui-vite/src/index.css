@@ -79,8 +79,8 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue",
-      sans-serif;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas",
+        monospace;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
