@@ -61,7 +61,7 @@ namespace Torrential.Settings
 
             persistedSettings = new();
             section = selector(persistedSettings);
-            section = value;
+            UpdateSection(section, value);
             cache.Set(T.CacheKey, section);
             await lease.Context.Settings.AddAsync(persistedSettings);
             await lease.Context.SaveChangesAsync();

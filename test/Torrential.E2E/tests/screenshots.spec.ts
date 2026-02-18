@@ -197,4 +197,30 @@ test.describe('Screenshots', () => {
       fullPage: true,
     });
   });
+
+  test('integrations page', async ({ page }, testInfo) => {
+    await page.goto('/integrations');
+    await page.waitForLoadState('networkidle');
+    await assertNoHorizontalOverflow(page);
+
+    await expect(page.locator('h1:has-text("Integrations")')).toBeVisible();
+    await expect(page.locator('h2:has-text("Slack")')).toBeVisible();
+    await expect(page.locator('h2:has-text("Discord")')).toBeVisible();
+    await expect(page.locator('h2:has-text("Command Hook")')).toBeVisible();
+
+    const integrationsSaveAction = page
+      .locator('button[aria-label="Save integrations settings"], button:has-text("Save"), button:has-text("SAVE")')
+      .first();
+    await expect(integrationsSaveAction).toBeVisible();
+    await expectFullyInViewport(
+      page,
+      'button[aria-label="Save integrations settings"], button:has-text("Save"), button:has-text("SAVE")',
+      'integrations save action',
+    );
+
+    await page.screenshot({
+      path: screenshotPath(testInfo.project.name, 'integrations'),
+      fullPage: true,
+    });
+  });
 });

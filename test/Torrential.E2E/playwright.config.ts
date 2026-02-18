@@ -8,6 +8,10 @@ export default defineConfig({
     baseURL: process.env.BASE_URL ?? 'http://app:8080',
     screenshot: 'off',
     trace: 'off',
+    locale: 'en-US',
+    timezoneId: 'UTC',
+    colorScheme: 'light',
+    reducedMotion: 'reduce',
   },
   projects: [
     {
