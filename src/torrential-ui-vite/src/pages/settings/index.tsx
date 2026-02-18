@@ -171,7 +171,7 @@ function GeneralSettings() {
 
   return (
     <>
-      <div className={styles.settingsRoot}>
+      <div className={`${styles.settingsRoot} page-shell`}>
         <h1 className={styles.pageTitle}>Settings</h1>
         <Separator />
         <SectionHeader name="Files" />
@@ -287,7 +287,7 @@ const RowComponent = ({ label, children }: RowInputProps) => {
   return (
     <div className={styles.settingRow}>
       <p className={styles.settingLabel}>{label}</p>
-      <div>{children}</div>
+      <div className={styles.settingControl}>{children}</div>
     </div>
   );
 };

@@ -2,13 +2,16 @@
   display: flex;
   flex-direction: column;
   min-height: 200px;
-  overflow-y: auto;
+  min-width: 0;
+  overflow: auto;
+  overflow-x: hidden;
   border-top: 1px solid hsl(var(--border));
 }
 
 .detailHeader {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   padding: 0.5em 1.25em;
@@ -29,9 +32,12 @@
   gap: 0;
   border-bottom: 1px solid hsl(var(--border));
   padding: 0 1.25em;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tab {
+  flex: 0 0 auto;
   padding: 0.5em 1em;
   font-size: 0.8em;
   font-weight: 500;
@@ -54,13 +60,15 @@
 
 .tabContent {
   flex: 1;
-  overflow-y: auto;
+  min-width: 0;
+  overflow: auto;
   padding: 0.75em 1.25em;
 }
 
 /* Peers table */
 .peersTable {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 0.8em;
 }
@@ -121,7 +129,8 @@
 
 /* Files section */
 .filesTable {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 0.8em;
 }
@@ -161,4 +170,24 @@
 
 .seedIcon {
   color: #22c55e;
+}
+
+@media (max-width: 768px) {
+  .detailHeader {
+    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .tabs {
+    padding: 0 0.75rem;
+  }
+
+  .tabContent {
+    padding: 0.75rem;
+  }
+
+  .bitfieldStats {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
 }

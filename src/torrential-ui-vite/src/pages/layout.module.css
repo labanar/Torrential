@@ -1,16 +1,66 @@
 .root {
   font-family: "Courier New", Courier, monospace;
   display: flex;
-  flex-grow: 1;
+  flex: 1 1 auto;
   height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mobileTopBar {
+  display: none;
+}
+
+.mobileTitle {
+  letter-spacing: 0.14em;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.mobileMenuButton {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.mobileMenuButton:hover {
+  background-color: hsl(var(--accent));
+}
+
+.mobileBackdrop {
+  display: none;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2em;
-  padding: 1.25em;
+  gap: 1rem;
+  padding: 1rem;
+  width: 18rem;
+  min-width: 18rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.mobileCloseButton {
+  display: none;
 }
 
 .divider {
@@ -27,11 +77,11 @@
   font-weight: 500;
   transition: transform 0.2s ease, background-color 0.2s ease;
   user-select: none;
-  padding: 1em;
+  padding: 0.85rem 0.9rem;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
   letter-spacing: 0.08em;
   border: 0;
   background: transparent;
@@ -42,6 +92,12 @@
 }
 
 .sidebarItem:hover {
+  font-weight: 700;
+  background-color: hsl(var(--accent));
+}
+
+.sidebarItemActive {
+  background-color: hsl(var(--accent));
   font-weight: 700;
 }
 
@@ -57,23 +113,27 @@
 }
 
 .main {
-  flex-grow: 1;
+  flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
+  min-width: 0;
+  overflow: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .sidebarTitle {
   font-family: "Courier New", Courier, monospace;
-  align-self: center;
   letter-spacing: 0.2em;
-  padding-bottom: 2em;
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .sidebarFooter {
   flex: 1;
-  align-content: flex-end;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
 }
 
 .themeToggle {
@@ -90,4 +150,83 @@
 
 .themeToggle:hover {
   background-color: hsl(var(--accent));
+}
+
+@media (max-width: 900px) {
+  .root {
+    flex-direction: column;
+  }
+
+  .mobileTopBar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 56px;
+    padding: 0.35rem 0.75rem;
+    border-bottom: 1px solid hsl(var(--border));
+    flex: 0 0 auto;
+    z-index: 20;
+  }
+
+  .mobileBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    background: rgba(0, 0, 0, 0);
+    pointer-events: none;
+    transition: background-color 0.2s ease;
+    z-index: 29;
+  }
+
+  .mobileBackdropVisible {
+    pointer-events: auto;
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(85vw, 20rem);
+    min-width: min(85vw, 20rem);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    background-color: hsl(var(--background));
+    border-right: 1px solid hsl(var(--border));
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+
+  .mobileCloseButton {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+  }
+
+  .mobileCloseButton:hover {
+    background-color: hsl(var(--accent));
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .main {
+    width: 100%;
+  }
 }

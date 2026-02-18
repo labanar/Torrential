@@ -229,7 +229,7 @@ function Page() {
 
   return (
     <TooltipProvider>
-      <div className={styles.root}>
+      <div className={`${styles.root} page-shell`}>
         <div className={styles.topPane}>
           {memoActionRow}
           <div className={styles.torrentDivider}>
