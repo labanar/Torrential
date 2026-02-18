@@ -8,6 +8,7 @@ import { Provider } from "react-redux";
 import store from "./store";
 import { HotkeysProvider } from "react-hotkeys-hook";
 import ToastNotification from "./components/ToastNotification/toast-notification";
+import { Toaster } from "@/components/ui/toaster";
 import PeersPage from "./pages/peers";
 import IntegrationsPage from "./pages/integrations";
 import SettingsPage from "./pages/settings";
@@ -42,6 +43,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <Provider store={store}>
         <HotkeysProvider initiallyActiveScopes={["global"]}>
           <ToastNotification />
+          <Toaster />
           <RouterProvider router={router} />
         </HotkeysProvider>
       </Provider>
