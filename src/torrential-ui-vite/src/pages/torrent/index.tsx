@@ -292,10 +292,13 @@ function Page() {
   }, [clampDetailPaneHeight, isDetailPaneOpen]);
 
   useEffect(() => {
-    if (openedInfoHash && !torrents.some((torrent) => torrent.infoHash === openedInfoHash)) {
+    if (
+      openedInfoHash &&
+      !filteredTorrents.some((torrent) => torrent.infoHash === openedInfoHash)
+    ) {
       setOpenedInfoHash(null);
     }
-  }, [openedInfoHash, torrents]);
+  }, [openedInfoHash, filteredTorrents]);
 
   useEffect(() => {
     if (!focusedInfoHash && openedInfoHash !== null) {
@@ -401,6 +404,11 @@ function Page() {
                 title={t.name ?? "???"}
               />
             ))}
+            {filteredTorrents.length === 0 && filterQuery.trim() !== "" && (
+              <div className={styles.emptyFilterState}>
+                <p>No torrents match your filter.</p>
+              </div>
+            )}
           </div>
         </div>
         {isDetailPaneOpen && openedInfoHash && (
