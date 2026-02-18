@@ -492,7 +492,7 @@ const ActionsRow = ({
       <div className={styles.actionSearch}>
         <Input
           placeholder="Filter"
-          style={{ maxWidth: "200px", justifySelf: "start" }}
+          className={styles.actionSearchInput}
         />
         {previewError && (
           <p className={styles.uploadError}>
@@ -923,11 +923,10 @@ function TorrentRow({
             })}
           />
           <p className={styles.progressDetails}>
-            <span>{status}</span>
-            {" | "}
+            <span className={styles.progressMetaItem}>{status}</span>
             <Tooltip>
               <TooltipTrigger asChild>
-              <span>
+              <span className={styles.progressMetaItem}>
                 <FontAwesomeIcon
                   icon={faUserGroup}
                   size={"sm"}
@@ -938,10 +937,9 @@ function TorrentRow({
               </TooltipTrigger>
               <TooltipContent>{`${seeders + leechers} peers`}</TooltipContent>
             </Tooltip>
-            {" | "}
             <Tooltip>
               <TooltipTrigger asChild>
-              <span>
+              <span className={styles.progressMetaItem}>
                 <FontAwesomeIcon
                   icon={faSeedling}
                   size={"sm"}
@@ -952,19 +950,19 @@ function TorrentRow({
               </TooltipTrigger>
               <TooltipContent>{`${seeders} seeders`}</TooltipContent>
             </Tooltip>
-            <span>
+            <span className={styles.progressMetaItem}>
               <FontAwesomeIcon
                 icon={faDownLong}
                 size={"sm"}
-                style={{ paddingLeft: "1em", paddingRight: "0.3em" }}
+                style={{ paddingRight: "0.3em" }}
               />
               {prettyPrintBytes(downloadRate) + "/s"}
             </span>
-            <span>
+            <span className={styles.progressMetaItem}>
               <FontAwesomeIcon
                 icon={faUpLong}
                 size={"sm"}
-                style={{ paddingLeft: "0.5em", paddingRight: "0.3em" }}
+                style={{ paddingRight: "0.3em" }}
               />
               {prettyPrintBytes(uploadRate) + "/s"}
             </span>

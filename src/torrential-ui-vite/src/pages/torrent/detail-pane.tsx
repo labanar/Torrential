@@ -129,12 +129,14 @@ function TabButton({
   onClick: (t: Tab) => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
       className={classNames(styles.tab, { [styles.tabActive]: active === tab })}
       onClick={() => onClick(tab)}
+      aria-pressed={active === tab}
     >
       {label}
-    </div>
+    </button>
   );
 }
 
@@ -156,34 +158,74 @@ function PeersSection({ peers }: { peers: TorrentDetailPeer[] }) {
   }
 
   return (
-    <table className={styles.peersTable}>
-      <thead>
-        <tr>
-          <th>IP</th>
-          <th>Port</th>
-          <th>Progress</th>
-          <th>Downloaded</th>
-          <th>Uploaded</th>
-          <th>Seed</th>
-        </tr>
-      </thead>
-      <tbody>
+    <>
+      <div className={styles.tableScroller}>
+        <table className={styles.peersTable}>
+          <thead>
+            <tr>
+              <th>IP</th>
+              <th>Port</th>
+              <th>Progress</th>
+              <th>Downloaded</th>
+              <th>Uploaded</th>
+              <th>Seed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {peers.map((peer) => (
+              <tr key={peer.peerId}>
+                <td>{peer.ipAddress}</td>
+                <td>{peer.port}</td>
+                <td>{(peer.progress * 100).toFixed(1)}%</td>
+                <td>{prettyBytes(peer.bytesDownloaded)}</td>
+                <td>{prettyBytes(peer.bytesUploaded)}</td>
+                <td>
+                  {peer.isSeed && (
+                    <FontAwesomeIcon icon={faSeedling} size="sm" className={styles.seedIcon} />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className={styles.peerCards}>
         {peers.map((peer) => (
-          <tr key={peer.peerId}>
-            <td>{peer.ipAddress}</td>
-            <td>{peer.port}</td>
-            <td>{(peer.progress * 100).toFixed(1)}%</td>
-            <td>{prettyBytes(peer.bytesDownloaded)}</td>
-            <td>{prettyBytes(peer.bytesUploaded)}</td>
-            <td>
-              {peer.isSeed && (
-                <FontAwesomeIcon icon={faSeedling} size="sm" className={styles.seedIcon} />
-              )}
-            </td>
-          </tr>
+          <div key={peer.peerId} className={styles.detailCard}>
+            <div className={styles.detailCardRow}>
+              <span className={styles.detailCardLabel}>IP</span>
+              <span className={styles.detailCardValue}>{peer.ipAddress}</span>
+            </div>
+            <div className={styles.detailCardRow}>
+              <span className={styles.detailCardLabel}>Port</span>
+              <span className={styles.detailCardValue}>{peer.port}</span>
+            </div>
+            <div className={styles.detailCardRow}>
+              <span className={styles.detailCardLabel}>Progress</span>
+              <span className={styles.detailCardValue}>{(peer.progress * 100).toFixed(1)}%</span>
+            </div>
+            <div className={styles.detailCardRow}>
+              <span className={styles.detailCardLabel}>Downloaded</span>
+              <span className={styles.detailCardValue}>{prettyBytes(peer.bytesDownloaded)}</span>
+            </div>
+            <div className={styles.detailCardRow}>
+              <span className={styles.detailCardLabel}>Uploaded</span>
+              <span className={styles.detailCardValue}>{prettyBytes(peer.bytesUploaded)}</span>
+            </div>
+            <div className={styles.detailCardRow}>
+              <span className={styles.detailCardLabel}>Seed</span>
+              <span className={styles.detailCardValue}>
+                {peer.isSeed ? (
+                  <FontAwesomeIcon icon={faSeedling} size="sm" className={styles.seedIcon} />
+                ) : (
+                  "No"
+                )}
+              </span>
+            </div>
+          </div>
         ))}
-      </tbody>
-    </table>
+      </div>
+    </>
   );
 }
 
@@ -307,29 +349,51 @@ function FilesSection({
   }
 
   return (
-    <table className={styles.filesTable}>
-      <thead>
-        <tr>
-          <th style={{ width: "40px" }}></th>
-          <th>Filename</th>
-          <th>Size</th>
-        </tr>
-      </thead>
-      <tbody>
+    <>
+      <div className={styles.tableScroller}>
+        <table className={styles.filesTable}>
+          <thead>
+            <tr>
+              <th style={{ width: "40px" }}></th>
+              <th>Filename</th>
+              <th>Size</th>
+            </tr>
+          </thead>
+          <tbody>
+            {files.map((file) => (
+              <tr key={file.id}>
+                <td>
+                  <Checkbox
+                    checked={file.isSelected}
+                    disabled={pending}
+                    onCheckedChange={() => toggleFile(file.id, file.isSelected)}
+                  />
+                </td>
+                <td>{file.filename}</td>
+                <td>{prettyBytes(file.size)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className={styles.fileCards}>
         {files.map((file) => (
-          <tr key={file.id}>
-            <td>
+          <div key={file.id} className={styles.detailCard}>
+            <label className={styles.fileCardToggle}>
               <Checkbox
                 checked={file.isSelected}
                 disabled={pending}
                 onCheckedChange={() => toggleFile(file.id, file.isSelected)}
               />
-            </td>
-            <td>{file.filename}</td>
-            <td>{prettyBytes(file.size)}</td>
-          </tr>
+              <span className={styles.fileCardFilename}>{file.filename}</span>
+            </label>
+            <div className={styles.detailCardRow}>
+              <span className={styles.detailCardLabel}>Size</span>
+              <span className={styles.detailCardValue}>{prettyBytes(file.size)}</span>
+            </div>
+          </div>
         ))}
-      </tbody>
-    </table>
+      </div>
+    </>
   );
 }

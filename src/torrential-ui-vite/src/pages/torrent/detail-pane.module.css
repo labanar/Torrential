@@ -24,6 +24,10 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   font-size: 0.85em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tabs {
@@ -47,6 +51,11 @@
   border-bottom: 2px solid transparent;
   opacity: 0.6;
   transition: opacity 0.15s ease;
+  background: transparent;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  color: inherit;
 }
 
 .tab:hover {
@@ -63,6 +72,11 @@
   min-width: 0;
   overflow: auto;
   padding: 0.75em 1.25em;
+}
+
+.tableScroller {
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 /* Peers table */
@@ -92,6 +106,40 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+.peerCards,
+.fileCards {
+  display: none;
+}
+
+.detailCard {
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.detailCardRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.detailCardLabel {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.detailCardValue {
+  text-align: right;
+  font-size: 0.85rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* Bitfield visualization */
 .bitfieldContainer {
   display: flex;
@@ -111,6 +159,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 1px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .bitfieldPiece {
@@ -154,6 +204,18 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+.fileCardToggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.fileCardFilename {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+
 .emptyState {
   display: flex;
   align-items: center;
@@ -189,5 +251,28 @@
   .bitfieldStats {
     flex-wrap: wrap;
     gap: 0.75rem;
+  }
+
+  .tab {
+    padding: 0.55rem 0.75rem;
+    min-height: var(--touch-target-min);
+  }
+}
+
+@media (max-width: 700px) {
+  .peersTable,
+  .filesTable {
+    display: none;
+  }
+
+  .peerCards,
+  .fileCards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .tabContent {
+    overflow-x: hidden;
   }
 }
