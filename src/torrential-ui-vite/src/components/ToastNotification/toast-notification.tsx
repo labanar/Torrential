@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { X } from "lucide-react";
 import classNames from "classnames";
 
-export const selectCurrentToast = (state: RootState) =>
+const selectCurrentToast = (state: RootState) =>
   state.notifications.currentToast;
 
 const renderToast = (

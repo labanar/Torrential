@@ -66,7 +66,7 @@ export default function Alfred() {
       setSelectedId(0);
     }
     return () => disableScope("search");
-  }, [isOpen]);
+  }, [disableScope, enableScope, enabledScopes, isOpen, scopesToEnableOnClose]);
 
   useHotkeys(
     "up",

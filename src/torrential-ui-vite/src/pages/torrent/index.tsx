@@ -150,7 +150,7 @@ function Page() {
         data.forEach((torrent: TorrentApiModel) => {
           const torrentPeers: PeerSummary[] = torrent.peers.reduce(
             (tpv: PeerSummary[], p: PeerApiModel) => {
-              let summary: PeerSummary = {
+              const summary: PeerSummary = {
                 infoHash: torrent.infoHash,
                 ip: p.ipAddress,
                 port: p.port,
@@ -368,7 +368,7 @@ const ActionsRow = ({
 
   const removeTorrent = async (infoHash: string, deleteFiles: boolean) => {
     try {
-      let body = {
+      const body = {
         deleteFiles,
       };
 

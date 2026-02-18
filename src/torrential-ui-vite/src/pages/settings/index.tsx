@@ -12,6 +12,22 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import Layout from "../layout";
 
+interface FileSettings {
+  downloadPath: string;
+  completedPath: string;
+}
+
+interface ConnectionSettings {
+  maxConnectionsPerTorrent: string;
+  maxConnectionsGlobal: string;
+  maxHalfOpenConnections: string;
+}
+
+interface TcpListenerSettings {
+  port: string;
+  enabled: boolean;
+}
+
 export default function SettingsPage() {
   return (
     <Layout>
@@ -25,13 +41,13 @@ function GeneralSettings() {
     control: fileSettingsControl,
     formState: { isDirty: isFileSettingsDirty },
     reset: resetFileSettings,
-  } = useForm({
+  } = useForm<FileSettings>({
     defaultValues: {
       downloadPath: "",
       completedPath: "",
     },
   });
-  const fileSettingsValues = useWatch({ control: fileSettingsControl });
+  const fileSettingsValues = useWatch({ control: fileSettingsControl }) as FileSettings;
   const fetchFilesettings = useCallback(async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/file`);
@@ -39,9 +55,11 @@ function GeneralSettings() {
       console.log(json);
       const { downloadPath, completedPath } = json.data;
       resetFileSettings({ downloadPath, completedPath });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to fetch file settings", error);
+    }
   }, [resetFileSettings]);
-  const saveFileSettings = useCallback(async (values: any) => {
+  const saveFileSettings = useCallback(async (values: FileSettings) => {
     try {
       await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/file`, {
         method: "POST",
@@ -50,14 +68,16 @@ function GeneralSettings() {
           "Content-Type": "application/json",
         },
       });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to save file settings", error);
+    }
   }, []);
 
   const {
     control: connectionSettingsControl,
     formState: { isDirty: isConnectionSettingsDirty },
     reset: resetConnectionSettings,
-  } = useForm({
+  } = useForm<ConnectionSettings>({
     defaultValues: {
       maxConnectionsPerTorrent: "",
       maxConnectionsGlobal: "",
@@ -66,7 +86,7 @@ function GeneralSettings() {
   });
   const connectionSettingsValues = useWatch({
     control: connectionSettingsControl,
-  });
+  }) as ConnectionSettings;
   const fetchConnectionSettings = useCallback(async () => {
     try {
       const response = await fetch(
@@ -84,9 +104,11 @@ function GeneralSettings() {
         maxConnectionsPerTorrent: `${maxConnectionsPerTorrent}`,
         maxHalfOpenConnections: `${maxHalfOpenConnections}`,
       });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to fetch connection settings", error);
+    }
   }, [resetConnectionSettings]);
-  const saveConnectionSettings = useCallback(async (values: any) => {
+  const saveConnectionSettings = useCallback(async (values: ConnectionSettings) => {
     try {
       await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/connection`, {
         method: "POST",
@@ -95,14 +117,16 @@ function GeneralSettings() {
           "Content-Type": "application/json",
         },
       });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to save connection settings", error);
+    }
   }, []);
 
   const {
     control: tcpListenerSettingsControl,
     formState: { isDirty: isTcpListenerSettingsDirty },
     reset: resetTcpListenerSettings,
-  } = useForm({
+  } = useForm<TcpListenerSettings>({
     defaultValues: {
       port: "53123",
       enabled: true,
@@ -110,7 +134,7 @@ function GeneralSettings() {
   });
   const tcpListenerSettingsValue = useWatch({
     control: tcpListenerSettingsControl,
-  });
+  }) as TcpListenerSettings;
   const fetchTcpListenerSettings = useCallback(async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/tcp`);
@@ -121,9 +145,11 @@ function GeneralSettings() {
         enabled,
         port: `${port}`,
       });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to fetch TCP listener settings", error);
+    }
   }, [resetTcpListenerSettings]);
-  const saveTcpSettings = useCallback(async (values: any) => {
+  const saveTcpSettings = useCallback(async (values: TcpListenerSettings) => {
     try {
       await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/tcp`, {
         method: "POST",
@@ -132,7 +158,9 @@ function GeneralSettings() {
           "Content-Type": "application/json",
         },
       });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to save TCP settings", error);
+    }
   }, []);
 
   useEffect(() => {

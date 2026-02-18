@@ -63,3 +63,15 @@ Before merging frontend changes, verify:
 - [ ] Run the app with `dotnet run` and confirm `wwwroot/index.html` loads in the browser
 - [ ] If the change affects the split pane or layout, click a torrent in the list to verify the detail pane renders
 - [ ] Check browser DevTools Network tab: asset requests (JS/CSS) return 200, not 404
+
+## Shadcn Migration Notes (Phase 4)
+
+- Chakra UI and Emotion dependencies were removed from `src/torrential-ui-vite/package.json`.
+- Shared UI primitives are now provided by local shadcn-based components under `src/components/ui`.
+- Theme switching is handled by toggling the `dark` class on `document.documentElement` and persisting `theme` in `localStorage`.
+
+### Intentional UI Differences
+
+- Dialog, button, checkbox, tooltip, and input visuals now follow shadcn/Tailwind styling rather than Chakra defaults.
+- Spacing, focus rings, and hover/active states may differ slightly from prior Chakra rendering while preserving behavior.
+- The app uses Sonner-based toast rendering; toast visuals are intentionally different from Chakra's toast UI.

@@ -1,21 +1,21 @@
 import { Input } from "@/components/ui/input";
-import { Control, Controller } from "react-hook-form";
+import { Control, Controller, FieldValues, Path } from "react-hook-form";
 
-interface FormNumericInputProps {
+interface FormNumericInputProps<TFieldValues extends FieldValues> {
   min?: number;
   max?: number;
   className?: string;
-  fieldName: string;
-  control: Control<any, any>;
+  fieldName: Path<TFieldValues>;
+  control: Control<TFieldValues>;
 }
 
-export const FormNumericInput: React.FC<FormNumericInputProps> = ({
+export const FormNumericInput = <TFieldValues extends FieldValues>({
   min,
   max,
   className,
   fieldName,
   control,
-}) => {
+}: FormNumericInputProps<TFieldValues>) => {
   return (
     <Controller
       name={fieldName}
