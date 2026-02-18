@@ -32,6 +32,9 @@ namespace Torrential
 
             modelBuilder.Entity<TorrentialSettings>()
                 .ComplexProperty(p => p.ConnectionSettings);
+
+            modelBuilder.Entity<TorrentialSettings>()
+                .ComplexProperty(p => p.IntegrationSettings);
         }
     }
 
@@ -71,6 +74,7 @@ namespace Torrential
         public FileSettings FileSettings { get; set; } = FileSettings.Default;
         public TcpListenerSettings TcpListenerSettings { get; set; } = TcpListenerSettings.Default;
         public ConnectionSettings ConnectionSettings { get; set; } = ConnectionSettings.Default;
+        public IntegrationSettings IntegrationSettings { get; set; } = IntegrationSettings.Default;
     }
 
     public interface ISettingsSection<T>
@@ -161,5 +165,49 @@ namespace Torrential
 
             return true;
         }
+    }
+
+    public record IntegrationSettings : ISettingsSection<IntegrationSettings>
+    {
+        public static string CacheKey => "settings.integrations";
+
+        public static IntegrationSettings Default { get; } = new()
+        {
+            SlackEnabled = false,
+            SlackWebhookUrl = "",
+            SlackOnTorrentComplete = false,
+            DiscordEnabled = false,
+            DiscordWebhookUrl = "",
+            DiscordOnTorrentComplete = false,
+            CommandEnabled = false,
+            Command = "",
+            CommandOnTorrentComplete = false
+        };
+
+        public static bool Validate(IntegrationSettings settings)
+        {
+            if (settings.SlackEnabled && string.IsNullOrWhiteSpace(settings.SlackWebhookUrl))
+                return false;
+
+            if (settings.DiscordEnabled && string.IsNullOrWhiteSpace(settings.DiscordWebhookUrl))
+                return false;
+
+            if (settings.CommandEnabled && string.IsNullOrWhiteSpace(settings.Command))
+                return false;
+
+            return true;
+        }
+
+        public required bool SlackEnabled { get; set; }
+        public required string SlackWebhookUrl { get; set; }
+        public required bool SlackOnTorrentComplete { get; set; }
+
+        public required bool DiscordEnabled { get; set; }
+        public required string DiscordWebhookUrl { get; set; }
+        public required bool DiscordOnTorrentComplete { get; set; }
+
+        public required bool CommandEnabled { get; set; }
+        public required string Command { get; set; }
+        public required bool CommandOnTorrentComplete { get; set; }
     }
 }
