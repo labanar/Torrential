@@ -243,3 +243,40 @@ export async function browseDirectories(path?: string): Promise<DirectoryBrowseA
 
   return result.data;
 }
+
+// -- Integration Settings --
+
+export interface IntegrationSettingsApiModel {
+  slackEnabled: boolean;
+  slackWebhookUrl: string;
+  slackOnTorrentComplete: boolean;
+  discordEnabled: boolean;
+  discordWebhookUrl: string;
+  discordOnTorrentComplete: boolean;
+  commandEnabled: boolean;
+  command: string;
+  commandOnTorrentComplete: boolean;
+}
+
+export async function fetchIntegrationSettings(): Promise<IntegrationSettingsApiModel> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/integrations`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch integration settings");
+  }
+  const result: ApiResponse<IntegrationSettingsApiModel> = await response.json();
+  if (!result.data) {
+    throw new Error("Integration settings endpoint returned no data");
+  }
+  return result.data;
+}
+
+export async function saveIntegrationSettings(settings: IntegrationSettingsApiModel): Promise<void> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/integrations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to save integration settings");
+  }
+}
