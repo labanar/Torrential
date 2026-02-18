@@ -21,7 +21,14 @@ export const FormCheckbox = <TFieldValues extends FieldValues>({
       render={({ field: { onChange, onBlur, value, ref } }) => (
         <label
           className={className}
-          style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            minHeight: "var(--touch-target-min)",
+            cursor: "pointer",
+            lineHeight: 1.35,
+          }}
         >
           <Checkbox
             checked={Boolean(value)}

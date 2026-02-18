@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./layout.module.css";
 import {
   IconDefinition,
+  faBars,
   faGear,
   faMoon,
   faPlug,
@@ -11,9 +12,10 @@ import {
   faUmbrella,
   faUpDown,
   faUsers,
+  faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Alfred from "../components/Alfred/alfred";
 import SignalRService from "../services/signalR";
 import { Separator } from "@/components/ui/separator";
@@ -24,6 +26,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   useEffect(() => {
     const signalRService = new SignalRService(
       `${import.meta.env.VITE_API_BASE_URL}/torrents/hub`
@@ -35,11 +39,48 @@ export default function RootLayout({
     };
   }, []);
 
+  useEffect(() => {
+    if (!isMobileSidebarOpen) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMobileSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isMobileSidebarOpen]);
+
   const alfred = useMemo(() => <Alfred />, []);
 
   return (
     <div className={styles.root}>
-      <SideBar />
+      <div className={styles.mobileTopBar}>
+        <button
+          type="button"
+          className={styles.mobileMenuButton}
+          onClick={() => setIsMobileSidebarOpen(true)}
+          aria-label="Open navigation menu"
+        >
+          <FontAwesomeIcon icon={faBars} />
+        </button>
+        <span className={styles.mobileTitle}>TORRENTIAL</span>
+      </div>
+      <button
+        type="button"
+        aria-label="Close navigation menu"
+        className={`${styles.mobileBackdrop} ${
+          isMobileSidebarOpen ? styles.mobileBackdropVisible : ""
+        }`}
+        onClick={() => setIsMobileSidebarOpen(false)}
+      />
+      <SideBar
+        isMobileSidebarOpen={isMobileSidebarOpen}
+        closeMobileSidebar={() => setIsMobileSidebarOpen(false)}
+      />
       {alfred}
       <div className={styles.divider}>
         <Separator orientation="vertical" className={styles.verticalDivider} />
@@ -51,7 +92,13 @@ export default function RootLayout({
   );
 }
 
-function SideBar() {
+interface SideBarProps {
+  isMobileSidebarOpen: boolean;
+  closeMobileSidebar: () => void;
+}
+
+function SideBar({ isMobileSidebarOpen, closeMobileSidebar }: SideBarProps) {
+  const location = useLocation();
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     document.documentElement.classList.contains("dark") ? "dark" : "light"
   );
@@ -65,23 +112,60 @@ function SideBar() {
   }, [theme]);
 
   return (
-    <div id="sidebar" className={styles.sidebar}>
+    <div
+      id="sidebar"
+      className={`${styles.sidebar} ${isMobileSidebarOpen ? styles.sidebarOpen : ""}`}
+    >
+      <div className={styles.sidebarHeader}>
+        <span className={styles.sidebarTitle}>TORRENTIAL</span>
+        <button
+          type="button"
+          className={styles.mobileCloseButton}
+          onClick={closeMobileSidebar}
+          aria-label="Close navigation menu"
+        >
+          <FontAwesomeIcon icon={faXmark} />
+        </button>
+      </div>
       <FontAwesomeIcon
         icon={faUmbrella}
-        size={"6x"}
+        size={"5x"}
         style={{
           textAlign: "center",
           alignSelf: "center",
           paddingBottom: "0.1em",
-          paddingTop: "0.3em",
+          paddingTop: "0.2em",
           opacity: 0.1,
         }}
       />
-      <span className={styles.sidebarTitle}>TORRENTIAL</span>
-      <SideBarItem label="TORRENTS" linksTo="/" icon={faUpDown} />
-      <SideBarItem label="PEERS" linksTo="/peers" icon={faUsers} />
-      <SideBarItem label="INTEGRATIONS" linksTo="/integrations" icon={faPlug} />
-      <SideBarItem label="SETTINGS" linksTo="/settings" icon={faGear} />
+      <SideBarItem
+        label="TORRENTS"
+        linksTo="/"
+        icon={faUpDown}
+        isActive={location.pathname === "/"}
+        onNavigate={closeMobileSidebar}
+      />
+      <SideBarItem
+        label="PEERS"
+        linksTo="/peers"
+        icon={faUsers}
+        isActive={location.pathname === "/peers"}
+        onNavigate={closeMobileSidebar}
+      />
+      <SideBarItem
+        label="INTEGRATIONS"
+        linksTo="/integrations"
+        icon={faPlug}
+        isActive={location.pathname === "/integrations"}
+        onNavigate={closeMobileSidebar}
+      />
+      <SideBarItem
+        label="SETTINGS"
+        linksTo="/settings"
+        icon={faGear}
+        isActive={location.pathname === "/settings"}
+        onNavigate={closeMobileSidebar}
+      />
 
       <div className={styles.sidebarFooter}>
         <button
@@ -101,16 +185,27 @@ interface SideBarItemProps {
   label: string;
   linksTo: string;
   icon: IconDefinition;
+  isActive: boolean;
+  onNavigate: () => void;
 }
 
-function SideBarItem({ label, linksTo, icon }: SideBarItemProps) {
+function SideBarItem({
+  label,
+  linksTo,
+  icon,
+  isActive,
+  onNavigate,
+}: SideBarItemProps) {
   const navigate = useNavigate();
 
   return (
     <button
       type="button"
-      className={styles.sidebarItem}
-      onClick={() => navigate(linksTo)}
+      className={`${styles.sidebarItem} ${isActive ? styles.sidebarItemActive : ""}`}
+      onClick={() => {
+        navigate(linksTo);
+        onNavigate();
+      }}
     >
       <span className={styles.sidebarIcon}>
         <FontAwesomeIcon icon={icon} size={"lg"} />

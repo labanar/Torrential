@@ -9,6 +9,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       closeButton
       richColors
       position="bottom-right"
+      offset="1rem"
+      mobileOffset="0.75rem"
       {...props}
     />
   );

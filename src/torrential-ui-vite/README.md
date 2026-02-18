@@ -62,6 +62,8 @@ Before merging frontend changes, verify:
 - [ ] `dotnet build` in `src/Torrential.Web` succeeds (this runs the Vite build automatically)
 - [ ] Run the app with `dotnet run` and confirm `wwwroot/index.html` loads in the browser
 - [ ] If the change affects the split pane or layout, click a torrent in the list to verify the detail pane renders
+- [ ] Run screenshot E2E coverage in `test/Torrential.E2E` (`npm run screenshots`) and verify desktop + mobile images are generated for home list, detail pane, and settings
+- [ ] During mobile verification, confirm there is no horizontal overflow and primary actions/panes remain visible and tappable
 - [ ] Check browser DevTools Network tab: asset requests (JS/CSS) return 200, not 404
 
 ## Shadcn Migration Notes (Phase 4)

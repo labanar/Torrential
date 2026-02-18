@@ -229,7 +229,7 @@ function Page() {
 
   return (
     <TooltipProvider>
-      <div className={styles.root}>
+      <div className={`${styles.root} page-shell`}>
         <div className={styles.topPane}>
           {memoActionRow}
           <div className={styles.torrentDivider}>
@@ -492,7 +492,7 @@ const ActionsRow = ({
       <div className={styles.actionSearch}>
         <Input
           placeholder="Filter"
-          style={{ maxWidth: "200px", justifySelf: "start" }}
+          className={styles.actionSearchInput}
         />
         {previewError && (
           <p className={styles.uploadError}>
@@ -658,7 +658,9 @@ function TorrentFilePreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className={`max-w-3xl ${styles.deleteModal}`}>
+      <DialogContent
+        className={`max-w-3xl ${styles.deleteModal} ${styles.previewModalContent}`}
+      >
         <DialogHeader>
           <DialogTitle>Choose Files to Download</DialogTitle>
         </DialogHeader>
@@ -716,7 +718,9 @@ function TorrentFilePreviewModal({
             open={isPathPickerOpen}
             onOpenChange={(nextOpen) => setIsPathPickerOpen(nextOpen)}
           >
-            <DialogContent className="max-w-3xl">
+            <DialogContent
+              className={`max-w-3xl ${styles.pathPickerModalContent}`}
+            >
               <DialogHeader>
                 <DialogTitle>Select Completed Path</DialogTitle>
               </DialogHeader>
@@ -923,11 +927,10 @@ function TorrentRow({
             })}
           />
           <p className={styles.progressDetails}>
-            <span>{status}</span>
-            {" | "}
+            <span className={styles.progressMetaItem}>{status}</span>
             <Tooltip>
               <TooltipTrigger asChild>
-              <span>
+              <span className={styles.progressMetaItem}>
                 <FontAwesomeIcon
                   icon={faUserGroup}
                   size={"sm"}
@@ -938,10 +941,9 @@ function TorrentRow({
               </TooltipTrigger>
               <TooltipContent>{`${seeders + leechers} peers`}</TooltipContent>
             </Tooltip>
-            {" | "}
             <Tooltip>
               <TooltipTrigger asChild>
-              <span>
+              <span className={styles.progressMetaItem}>
                 <FontAwesomeIcon
                   icon={faSeedling}
                   size={"sm"}
@@ -952,19 +954,19 @@ function TorrentRow({
               </TooltipTrigger>
               <TooltipContent>{`${seeders} seeders`}</TooltipContent>
             </Tooltip>
-            <span>
+            <span className={styles.progressMetaItem}>
               <FontAwesomeIcon
                 icon={faDownLong}
                 size={"sm"}
-                style={{ paddingLeft: "1em", paddingRight: "0.3em" }}
+                style={{ paddingRight: "0.3em" }}
               />
               {prettyPrintBytes(downloadRate) + "/s"}
             </span>
-            <span>
+            <span className={styles.progressMetaItem}>
               <FontAwesomeIcon
                 icon={faUpLong}
                 size={"sm"}
-                style={{ paddingLeft: "0.5em", paddingRight: "0.3em" }}
+                style={{ paddingRight: "0.3em" }}
               />
               {prettyPrintBytes(uploadRate) + "/s"}
             </span>
@@ -1004,13 +1006,15 @@ function TorrentRemoveConfirmationModal({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className={`max-w-2xl ${styles.deleteModal}`}>
+      <DialogContent
+        className={`max-w-2xl ${styles.deleteModal} ${styles.deleteModalContent}`}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>Are you sure you want remove:</DialogDescription>
         </DialogHeader>
         <div className={styles.deleteModalBody}>
-          <ul style={{ paddingLeft: "2em" }}>
+          <ul className={styles.deleteModalList}>
             {infoHashes.map((hash) => {
               return (
                 <li key={hash}>
