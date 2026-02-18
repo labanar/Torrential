@@ -368,6 +368,24 @@ app.MapPost("settings/connection", async (ConnectionSettingsUpdateRequest reques
     return ActionResponse.SuccessResponse;
 });
 
+app.MapGet("settings/integrations", async (SettingsManager mgr) =>
+{
+    var settings = await mgr.GetIntegrationSettings();
+    return new IntegrationSettingsGetResponse(settings);
+});
+
+app.MapPost("settings/integrations", async (IntegrationSettingsUpdateRequest request, SettingsManager mgr) =>
+{
+    await mgr.SaveIntegrationSettings(new()
+    {
+        SlackEnabled = request.SlackEnabled,
+        SlackWebhookUrl = request.SlackWebhookUrl,
+        DiscordEnabled = request.DiscordEnabled,
+        DiscordWebhookUrl = request.DiscordWebhookUrl
+    });
+    return ActionResponse.SuccessResponse;
+});
+
 app.MapGet("filesystem/directories", (string? path) =>
 {
     try
