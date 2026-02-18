@@ -154,6 +154,25 @@ test.describe('Screenshots', () => {
     });
   });
 
+  test('integrations page', async ({ page }, testInfo) => {
+    await page.goto('/integrations');
+    await page.waitForLoadState('networkidle');
+    await assertNoHorizontalOverflow(page);
+
+    const saveButton = page.locator('button[aria-label="Save integration settings"]');
+    await expect(saveButton).toBeVisible();
+    await expectFullyInViewport(
+      page,
+      'button[aria-label="Save integration settings"]',
+      'integrations save action',
+    );
+
+    await page.screenshot({
+      path: screenshotPath(testInfo.project.name, 'integrations'),
+      fullPage: true,
+    });
+  });
+
   test('settings page', async ({ page }, testInfo) => {
     await page.goto('/settings');
     await page.waitForLoadState('networkidle');
