@@ -220,7 +220,7 @@
 }
 
 .previewTorrentName {
-  font-weight: 600;
+  font-weight: 500;
   margin: 0;
 }
 
@@ -276,7 +276,7 @@
 .completedPathLabel {
   margin: 0;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .completedPathHint {
@@ -354,7 +354,7 @@
 }
 
 .title {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 1rem;
   margin: 0;
   max-width: 100%;
@@ -431,7 +431,7 @@
 .emptyStateTitle {
   margin: 0;
   font-size: 1.1rem;
-  font-weight: 600;
+  font-weight: 500;
   color: hsl(var(--muted-foreground));
 }
 

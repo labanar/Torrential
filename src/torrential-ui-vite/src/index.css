@@ -81,6 +81,7 @@
     overflow: hidden;
     font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas",
         monospace;
+    font-weight: 300;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

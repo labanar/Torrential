@@ -14,7 +14,8 @@
 .mobileTitle {
   letter-spacing: 0.14em;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 500;
+  text-transform: uppercase;
 }
 
 .mobileMenuButton {
@@ -72,7 +73,7 @@
 }
 
 .sidebarItem {
-  font-weight: 500;
+  font-weight: 400;
   transition: transform 0.2s ease, background-color 0.2s ease;
   user-select: none;
   padding: 0.65rem 0.75rem;
@@ -89,16 +90,17 @@
   cursor: pointer;
   border-radius: 0.5rem;
   margin: 0 0.25rem;
+  text-transform: uppercase;
 }
 
 .sidebarItem:hover {
-  font-weight: 600;
+  font-weight: 400;
   background-color: hsl(var(--accent));
 }
 
 .sidebarItemActive {
   background-color: hsl(var(--accent));
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .sidebarIcon {
@@ -124,8 +126,9 @@
 
 .sidebarTitle {
   letter-spacing: 0.08em;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 1.1rem;
+  text-transform: uppercase;
 }
 
 .sidebarFooter {
