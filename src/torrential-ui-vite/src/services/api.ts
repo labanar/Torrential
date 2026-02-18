@@ -1,4 +1,15 @@
-export function fetchTorrents() {}
+export async function fetchTorrents(): Promise<TorrentApiModel[]> {
+  const response = await fetch(
+    `${import.meta.env.VITE_API_BASE_URL}/torrents`
+  );
+
+  if (!response.ok) {
+    throw new Error("Error fetching torrents");
+  }
+
+  const result: ApiResponse<TorrentApiModel[]> = await response.json();
+  return result.data ?? [];
+}
 
 interface ApiErrorData {
   code: string;
