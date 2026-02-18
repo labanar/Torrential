@@ -8,4 +8,4 @@ COPY . .
 
 RUN mkdir -p /app/screenshots
 
-CMD ["npx", "playwright", "test", "--project=screenshots"]
+CMD ["npx", "playwright", "test"]
