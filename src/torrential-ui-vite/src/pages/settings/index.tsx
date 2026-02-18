@@ -177,10 +177,18 @@ function GeneralSettings() {
         <SectionHeader name="Files" />
 
         <RowComponent label="Download Path">
-          <FormInput fieldName="downloadPath" control={fileSettingsControl} />
+          <FormInput
+            fieldName="downloadPath"
+            control={fileSettingsControl}
+            className={styles.pathInput}
+          />
         </RowComponent>
         <RowComponent label="Completed Path">
-          <FormInput fieldName="completedPath" control={fileSettingsControl} />
+          <FormInput
+            fieldName="completedPath"
+            control={fileSettingsControl}
+            className={styles.pathInput}
+          />
         </RowComponent>
 
         <Separator />
