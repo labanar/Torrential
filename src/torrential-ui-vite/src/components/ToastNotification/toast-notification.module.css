@@ -6,7 +6,10 @@
   padding: 0.5em;
   border-radius: 0.2em;
   border: 1px solid hsl(var(--border));
-  min-width: 300px;
+  width: min(100%, 22rem);
+  min-width: 0;
+  max-width: min(22rem, calc(100vw - 1rem));
+  overflow: hidden;
 }
 
 .success {
@@ -43,6 +46,7 @@
   flex-direction: column;
   gap: 0.1em;
   flex: 1;
+  min-width: 0;
 }
 
 .title {
@@ -52,6 +56,7 @@
 
 .description {
   font-size: 0.875rem;
+  overflow-wrap: anywhere;
 }
 
 .close {
@@ -67,4 +72,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .toastContainer {
+    width: min(100%, calc(100vw - 1rem));
+    max-width: calc(100vw - 1rem);
+  }
 }

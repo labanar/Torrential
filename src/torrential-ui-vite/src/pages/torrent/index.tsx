@@ -658,7 +658,9 @@ function TorrentFilePreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className={`max-w-3xl ${styles.deleteModal}`}>
+      <DialogContent
+        className={`max-w-3xl ${styles.deleteModal} ${styles.previewModalContent}`}
+      >
         <DialogHeader>
           <DialogTitle>Choose Files to Download</DialogTitle>
         </DialogHeader>
@@ -716,7 +718,9 @@ function TorrentFilePreviewModal({
             open={isPathPickerOpen}
             onOpenChange={(nextOpen) => setIsPathPickerOpen(nextOpen)}
           >
-            <DialogContent className="max-w-3xl">
+            <DialogContent
+              className={`max-w-3xl ${styles.pathPickerModalContent}`}
+            >
               <DialogHeader>
                 <DialogTitle>Select Completed Path</DialogTitle>
               </DialogHeader>
@@ -1002,13 +1006,15 @@ function TorrentRemoveConfirmationModal({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className={`max-w-2xl ${styles.deleteModal}`}>
+      <DialogContent
+        className={`max-w-2xl ${styles.deleteModal} ${styles.deleteModalContent}`}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>Are you sure you want remove:</DialogDescription>
         </DialogHeader>
         <div className={styles.deleteModalBody}>
-          <ul style={{ paddingLeft: "2em" }}>
+          <ul className={styles.deleteModalList}>
             {infoHashes.map((hash) => {
               return (
                 <li key={hash}>

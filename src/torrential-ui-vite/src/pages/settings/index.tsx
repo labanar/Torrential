@@ -242,10 +242,10 @@ function GeneralSettings() {
       </div>
       <Button
         className={styles.saveButton}
-        size="icon"
         disabled={
           !isFileSettingsDirty && !isConnectionSettingsDirty && !isTcpListenerSettingsDirty
         }
+        aria-label="Save settings"
         onClick={() => {
           if (isFileSettingsDirty) {
             console.log("Saving file settings");
@@ -269,6 +269,7 @@ function GeneralSettings() {
         type="button"
       >
         <FontAwesomeIcon icon={faCheck} />
+        <span className={styles.saveButtonLabel}>Save</span>
       </Button>
     </>
   );

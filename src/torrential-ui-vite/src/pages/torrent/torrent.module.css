@@ -53,10 +53,26 @@
   font-family: "Courier New", Courier, monospace;
 }
 
+.deleteModalContent {
+  display: flex;
+  flex-direction: column;
+  max-height: min(34rem, calc(100dvh - 1rem));
+}
+
 .deleteModalBody {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.deleteModalList {
+  margin: 0;
+  padding-left: 2em;
+  min-height: 0;
+  max-height: min(16rem, 45vh);
+  overflow-y: auto;
 }
 
 .deleteFilesCheckbox {
@@ -156,7 +172,20 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 60vh;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.previewModalContent {
+  display: flex;
+  flex-direction: column;
+  max-height: min(42rem, calc(100dvh - 1rem));
+}
+
+.pathPickerModalContent {
+  display: flex;
+  flex-direction: column;
+  max-height: min(40rem, calc(100dvh - 1rem));
 }
 
 .previewTorrentName {
@@ -179,6 +208,8 @@
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
+  min-height: 0;
+  max-height: min(40vh, 18rem);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   padding: 10px;
@@ -256,7 +287,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 45vh;
+  min-height: 0;
+  max-height: min(45vh, 18rem);
   overflow-y: auto;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
@@ -278,6 +310,10 @@
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
+  position: sticky;
+  bottom: 0;
+  background: hsl(var(--background));
+  padding-top: 0.5rem;
 }
 
 .checkboxLabel {
@@ -419,8 +455,40 @@
     flex-wrap: wrap;
   }
 
+  .completedPathInputRow :global(button) {
+    width: 100%;
+  }
+
   .pathPickerTopRow {
     flex-wrap: wrap;
+  }
+
+  .pathPickerTopRow :global(button) {
+    width: 100%;
+  }
+
+  .previewModalContent {
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .deleteModalContent {
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .pathPickerModalContent {
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .deleteModalList {
+    max-height: 30vh;
+  }
+
+  .dialogFooterActions {
+    gap: 0.5rem;
+  }
+
+  .dialogFooterActions :global(button) {
+    width: 100%;
   }
 }
 
