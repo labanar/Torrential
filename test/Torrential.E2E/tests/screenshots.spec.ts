@@ -154,6 +154,29 @@ test.describe('Screenshots', () => {
     });
   });
 
+  test('peers page', async ({ page, baseURL }, testInfo) => {
+    // Ensure at least one torrent is loaded so peers can exist
+    const torrentFile = path.join(fixturesDir, 'debian-12.0.0-amd64-netinst.iso.torrent');
+    await addTorrentViaApi(baseURL!, torrentFile);
+
+    await page.goto('/peers');
+    await page.waitForLoadState('networkidle');
+    await assertNoHorizontalOverflow(page);
+
+    // The page should render the "Peers" title
+    await expect(page.locator('text=Peers').first()).toBeVisible();
+
+    // Expect either connected peer rows or the empty state message
+    const peersTable = page.locator('[class*="peersTable"]');
+    const emptyState = page.locator('text=No connected peers');
+    await expect(peersTable.or(emptyState).first()).toBeVisible();
+
+    await page.screenshot({
+      path: screenshotPath(testInfo.project.name, 'peers'),
+      fullPage: true,
+    });
+  });
+
   test('settings page', async ({ page }, testInfo) => {
     await page.goto('/settings');
     await page.waitForLoadState('networkidle');

@@ -44,6 +44,7 @@ import { TorrentsState, setTorrents } from "../../store/slices/torrentsSlice";
 import {
   addTorrent,
   browseDirectories,
+  fetchTorrents as fetchTorrentsApi,
   PeerApiModel,
   previewTorrent,
   TorrentApiModel,
@@ -120,62 +121,50 @@ function Page() {
 
   const fetchTorrents = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/torrents`
+      const data = await fetchTorrentsApi();
+
+      const mappedTorrents = data.reduce(
+        (pv: TorrentsState, cv: TorrentApiModel) => {
+          const summary: TorrentSummary = {
+            name: cv.name,
+            infoHash: cv.infoHash,
+            progress: cv.progress,
+            uploadRate: cv.uploadRate,
+            downloadRate: cv.downloadRate,
+            sizeInBytes: cv.totalSizeBytes,
+            status: cv.status,
+            bytesUploaded: cv.bytesUploaded,
+            bytesDownloaded: cv.bytesDownloaded,
+          };
+
+          pv[cv.infoHash] = summary;
+          return pv;
+        },
+        {}
       );
+      dispatch(setTorrents(mappedTorrents));
 
-      if (!response.ok) {
-        console.log("Error fetching torrents");
-        return;
-      }
-
-      const result = await response.json();
-      if (result.data) {
-        const { data } = result;
-
-        const mappedTorrents = data.reduce(
-          (pv: TorrentsState, cv: TorrentApiModel) => {
-            const summary: TorrentSummary = {
-              name: cv.name,
-              infoHash: cv.infoHash,
-              progress: cv.progress,
-              uploadRate: cv.uploadRate,
-              downloadRate: cv.downloadRate,
-              sizeInBytes: cv.totalSizeBytes,
-              status: cv.status,
-              bytesUploaded: cv.bytesUploaded,
-              bytesDownloaded: cv.bytesDownloaded,
+      data.forEach((torrent: TorrentApiModel) => {
+        const torrentPeers: PeerSummary[] = torrent.peers.reduce(
+          (tpv: PeerSummary[], p: PeerApiModel) => {
+            const summary: PeerSummary = {
+              infoHash: torrent.infoHash,
+              ip: p.ipAddress,
+              port: p.port,
+              peerId: p.peerId,
+              isSeed: p.isSeed,
             };
 
-            pv[cv.infoHash] = summary;
-            return pv;
+            tpv.push(summary);
+            return tpv;
           },
-          {}
+          []
         );
-        dispatch(setTorrents(mappedTorrents));
 
-        data.forEach((torrent: TorrentApiModel) => {
-          const torrentPeers: PeerSummary[] = torrent.peers.reduce(
-            (tpv: PeerSummary[], p: PeerApiModel) => {
-              const summary: PeerSummary = {
-                infoHash: torrent.infoHash,
-                ip: p.ipAddress,
-                port: p.port,
-                peerId: p.peerId,
-                isSeed: p.isSeed,
-              };
-
-              tpv.push(summary);
-              return tpv;
-            },
-            []
-          );
-
-          dispatch(
-            setPeers({ infoHash: torrent.infoHash, peers: torrentPeers })
-          );
-        });
-      }
+        dispatch(
+          setPeers({ infoHash: torrent.infoHash, peers: torrentPeers })
+        );
+      });
     } catch (error) {
       console.log("error fetching torrents");
     }

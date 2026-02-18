@@ -18,6 +18,16 @@ export interface PeerSummary {
   isSeed: boolean;
 }
 
+export interface ConnectedPeer {
+  infoHash: string;
+  torrentName: string;
+  torrentStatus: string;
+  peerId: string;
+  ip: string;
+  port: number;
+  isSeed: boolean;
+}
+
 export interface TorrentDetail {
   infoHash: string;
   name: string;

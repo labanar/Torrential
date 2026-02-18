@@ -4,7 +4,7 @@ import peersReducer from "./slices/peersSlice";
 import notificationsReducer from "./slices/notificationsSlice";
 import torrentDetailReducer from "./slices/torrentDetailSlice";
 import { useDispatch, useSelector } from "react-redux";
-import { TorrentSummary } from "../types";
+import { ConnectedPeer, TorrentSummary } from "../types";
 
 const store = configureStore({
   reducer: {
@@ -30,6 +30,24 @@ export const torrentsWithPeersSelector = createSelector(
       ...torrents[infoHash],
       peers: peers[infoHash] || [],
     }))
+);
+
+export const selectAllConnectedPeers = createSelector(
+  (state: RootState) => state.torrents,
+  (state: RootState) => state.peers,
+  (torrents, peers): ConnectedPeer[] =>
+    Object.entries(peers).flatMap(([infoHash, peerList]) => {
+      const torrent = torrents[infoHash];
+      return peerList.map((peer) => ({
+        infoHash,
+        torrentName: torrent?.name ?? infoHash,
+        torrentStatus: torrent?.status ?? "",
+        peerId: peer.peerId,
+        ip: peer.ip,
+        port: peer.port,
+        isSeed: peer.isSeed,
+      }));
+    })
 );
 
 export const selectTorrentsByInfoHashes = (infoHashes: string[]) =>
