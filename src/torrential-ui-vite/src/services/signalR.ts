@@ -3,7 +3,7 @@ import {
   HubConnectionBuilder,
   LogLevel,
 } from "@microsoft/signalr";
-import { addPeer, removePeer, updatePeer } from "../store/slices/peersSlice";
+import { addPeer, clearPeers, removePeer, updatePeer } from "../store/slices/peersSlice";
 import {
   FileSelectionChangedEvent,
   PeerBitfieldReceivedEvent,
@@ -267,6 +267,7 @@ export class SignalRService {
       const { torrents } = store.getState();
       const { name } = torrents[infoHash];
 
+      store.dispatch(clearPeers({ infoHash }));
       store.dispatch(removeTorrent(payload));
       store.dispatch(
         queueNotification({
