@@ -48,6 +48,10 @@
   width: 10em;
 }
 
+.pathInput {
+  width: min(100%, 36rem);
+}
+
 .saveButton {
   position: absolute;
   bottom: 2rem;
