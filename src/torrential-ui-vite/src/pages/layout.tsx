@@ -9,7 +9,6 @@ import {
   faMoon,
   faPlug,
   faSun,
-  faUmbrella,
   faUpDown,
   faUsers,
   faXmark,
@@ -67,7 +66,7 @@ export default function RootLayout({
         >
           <FontAwesomeIcon icon={faBars} />
         </button>
-        <span className={styles.mobileTitle}>TORRENTIAL</span>
+        <span className={styles.mobileTitle}>Torrential</span>
       </div>
       <button
         type="button"
@@ -117,7 +116,7 @@ function SideBar({ isMobileSidebarOpen, closeMobileSidebar }: SideBarProps) {
       className={`${styles.sidebar} ${isMobileSidebarOpen ? styles.sidebarOpen : ""}`}
     >
       <div className={styles.sidebarHeader}>
-        <span className={styles.sidebarTitle}>TORRENTIAL</span>
+        <span className={styles.sidebarTitle}>Torrential</span>
         <button
           type="button"
           className={styles.mobileCloseButton}
@@ -127,40 +126,29 @@ function SideBar({ isMobileSidebarOpen, closeMobileSidebar }: SideBarProps) {
           <FontAwesomeIcon icon={faXmark} />
         </button>
       </div>
-      <FontAwesomeIcon
-        icon={faUmbrella}
-        size={"5x"}
-        style={{
-          textAlign: "center",
-          alignSelf: "center",
-          paddingBottom: "0.1em",
-          paddingTop: "0.2em",
-          opacity: 0.1,
-        }}
-      />
       <SideBarItem
-        label="TORRENTS"
+        label="Torrents"
         linksTo="/"
         icon={faUpDown}
         isActive={location.pathname === "/"}
         onNavigate={closeMobileSidebar}
       />
       <SideBarItem
-        label="PEERS"
+        label="Peers"
         linksTo="/peers"
         icon={faUsers}
         isActive={location.pathname === "/peers"}
         onNavigate={closeMobileSidebar}
       />
       <SideBarItem
-        label="INTEGRATIONS"
+        label="Integrations"
         linksTo="/integrations"
         icon={faPlug}
         isActive={location.pathname === "/integrations"}
         onNavigate={closeMobileSidebar}
       />
       <SideBarItem
-        label="SETTINGS"
+        label="Settings"
         linksTo="/settings"
         icon={faGear}
         isActive={location.pathname === "/settings"}

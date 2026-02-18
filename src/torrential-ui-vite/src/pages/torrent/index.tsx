@@ -383,6 +383,15 @@ function Page() {
                 title={t.name ?? "???"}
               />
             ))}
+            {torrents.length === 0 && (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyStateContent}>
+                  <FontAwesomeIcon icon={faCircleArrowDown} size="2x" className={styles.emptyStateIcon} />
+                  <p className={styles.emptyStateTitle}>No torrents</p>
+                  <p className={styles.emptyStateDescription}>Add a .torrent file to get started</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         {isDetailPaneOpen && openedInfoHash && (
@@ -727,7 +736,6 @@ const ActionsRow = ({
           <TooltipContent>Add Torrent</TooltipContent>
         </Tooltip>
       </div>
-      <div style={{ flexGrow: 1, flexShrink: 1 }}></div>
     </div>
   );
 };
@@ -1024,33 +1032,24 @@ function TorrentRow({
                 <FontAwesomeIcon
                   icon={faCircleArrowDown}
                   size={"1x"}
-                  style={{
-                    paddingRight: "0.8em",
-                    paddingLeft: "0.4em",
-                    color,
-                  }}
+                  className={styles.torrentStatusIcon}
+                  style={{ color }}
                 />
               )}
               {status === "Running" && progress >= 1 && (
                 <FontAwesomeIcon
                   icon={faCircleArrowUp}
                   size={"1x"}
-                  style={{
-                    paddingRight: "0.8em",
-                    paddingLeft: "0.4em",
-                    color,
-                  }}
+                  className={styles.torrentStatusIcon}
+                  style={{ color }}
                 />
               )}
               {(status === "Stopped" || status === "Idle") && (
                 <FontAwesomeIcon
                   icon={faCirclePause}
                   size={"1x"}
-                  style={{
-                    paddingRight: "0.8em",
-                    paddingLeft: "0.4em",
-                    color,
-                  }}
+                  className={styles.torrentStatusIcon}
+                  style={{ color }}
                 />
               )}
               {(status === "Verifying" || status === "Copying") && (
@@ -1058,11 +1057,8 @@ function TorrentRow({
                   icon={faCircleNotch}
                   spin
                   size={"1x"}
-                  style={{
-                    paddingRight: "0.8em",
-                    paddingLeft: "0.4em",
-                    color,
-                  }}
+                  className={styles.torrentStatusIcon}
+                  style={{ color }}
                 />
               )}
             </div>
