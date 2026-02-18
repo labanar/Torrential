@@ -74,6 +74,7 @@ function Page() {
   const dispatch = useAppDispatch();
   const torrents = useSelector(torrentsWithPeersSelector);
   const [selectedTorrents, setSelectedTorrents] = useState<string[]>([]);
+  const [filterQuery, setFilterQuery] = useState("");
   const [currentPosition, setCurrentPosition] = useState(0);
   const [openedInfoHash, setOpenedInfoHash] = useState<string | null>(null);
   const [detailPaneHeight, setDetailPaneHeight] = useState(320);
@@ -82,14 +83,23 @@ function Page() {
   const splitterRef = useRef<HTMLDivElement | null>(null);
   const resizeStartRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
+  const filteredTorrents = useMemo(() => {
+    const trimmed = filterQuery.trim();
+    if (!trimmed) return torrents;
+    const lower = trimmed.toLowerCase();
+    return torrents.filter((t) => (t.name ?? "").toLowerCase().includes(lower));
+  }, [torrents, filterQuery]);
+
   const memoActionRow = useMemo(() => {
     return (
       <ActionsRow
         selectedTorrents={selectedTorrents}
         setSelectedTorrents={setSelectedTorrents}
+        filterQuery={filterQuery}
+        onFilterQueryChange={setFilterQuery}
       />
     );
-  }, [selectedTorrents]);
+  }, [selectedTorrents, filterQuery]);
 
   useEffect(() => {
     dispatch(setContext(AlfredContext.TorrentList));
@@ -103,6 +113,14 @@ function Page() {
   useEffect(() => {
     console.log("TORRENTS CHANGED");
   }, [torrents]);
+
+  useEffect(() => {
+    if (filteredTorrents.length === 0) {
+      setCurrentPosition(0);
+    } else if (currentPosition >= filteredTorrents.length) {
+      setCurrentPosition(filteredTorrents.length - 1);
+    }
+  }, [filteredTorrents.length, currentPosition]);
 
   const selectTorrent = (infoHash: string) => {
     if (selectedTorrents.includes(infoHash)) {
@@ -188,9 +206,9 @@ function Page() {
   useHotkeys(
     "up",
     () => {
-      if (torrents.length === 0) return;
+      if (filteredTorrents.length === 0) return;
       let nextId = currentPosition - 1;
-      if (nextId < 0) nextId = torrents.length - 1;
+      if (nextId < 0) nextId = filteredTorrents.length - 1;
       setCurrentPosition(nextId);
       console.log(nextId);
       console.log("up from torrents " + nextId);
@@ -204,9 +222,9 @@ function Page() {
   useHotkeys(
     "down",
     () => {
-      if (torrents.length === 0) return;
+      if (filteredTorrents.length === 0) return;
       let nextId = currentPosition + 1;
-      if (nextId >= torrents.length) nextId = 0;
+      if (nextId >= filteredTorrents.length) nextId = 0;
       setCurrentPosition(nextId);
       console.log(nextId);
       console.log("down from torrents " + nextId);
@@ -220,8 +238,8 @@ function Page() {
   useHotkeys(
     "space",
     () => {
-      if (torrents.length === 0) return;
-      selectTorrent(torrents[currentPosition].infoHash);
+      if (filteredTorrents.length === 0) return;
+      selectTorrent(filteredTorrents[currentPosition].infoHash);
       console.log("space from torrents");
     },
     {
@@ -230,7 +248,7 @@ function Page() {
     }
   );
 
-  const focusedInfoHash = torrents[currentPosition]?.infoHash ?? null;
+  const focusedInfoHash = filteredTorrents[currentPosition]?.infoHash ?? null;
   const isDetailPaneOpen = openedInfoHash !== null;
 
   const getPaneHeightBounds = useCallback(() => {
@@ -298,7 +316,7 @@ function Page() {
   useHotkeys(
     "enter",
     () => {
-      const currentTorrent = torrents[currentPosition];
+      const currentTorrent = filteredTorrents[currentPosition];
       if (!currentTorrent) return;
       setOpenedInfoHash(currentTorrent.infoHash);
     },
@@ -352,7 +370,7 @@ function Page() {
             <Separator orientation="horizontal" />
           </div>
           <div className={styles.torrentList}>
-            {torrents.map((t, i) => (
+            {filteredTorrents.map((t, i) => (
               <TorrentRow
                 toggleSelect={selectTorrent}
                 toggleFocus={() => {
@@ -436,11 +454,15 @@ function Page() {
 interface ActionsRowProps {
   selectedTorrents: string[];
   setSelectedTorrents: (infoHashes: string[]) => void;
+  filterQuery: string;
+  onFilterQueryChange: (query: string) => void;
 }
 
 const ActionsRow = ({
   selectedTorrents,
   setSelectedTorrents,
+  filterQuery,
+  onFilterQueryChange,
 }: ActionsRowProps) => {
   const uploadRef = useRef<FileUploadElement | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -650,6 +672,8 @@ const ActionsRow = ({
         <Input
           placeholder="Filter"
           className={styles.actionSearchInput}
+          value={filterQuery}
+          onChange={(e) => onFilterQueryChange(e.target.value)}
         />
         {previewError && (
           <p className={styles.uploadError}>
