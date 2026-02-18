@@ -1,22 +1,19 @@
 "use client";
 
 import {
-  Button,
-  Checkbox,
-  Divider,
-  IconButton,
-  Input,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Progress,
-  Text,
-  Tooltip,
-} from "@chakra-ui/react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import styles from "./torrent.module.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -153,7 +150,7 @@ function Page() {
         data.forEach((torrent: TorrentApiModel) => {
           const torrentPeers: PeerSummary[] = torrent.peers.reduce(
             (tpv: PeerSummary[], p: PeerApiModel) => {
-              let summary: PeerSummary = {
+              const summary: PeerSummary = {
                 infoHash: torrent.infoHash,
                 ip: p.ipAddress,
                 port: p.port,
@@ -231,12 +228,12 @@ function Page() {
   }, [dispatch, focusedInfoHash]);
 
   return (
-    <>
+    <TooltipProvider>
       <div className={styles.root}>
         <div className={styles.topPane}>
           {memoActionRow}
           <div className={styles.torrentDivider}>
-            <Divider orientation="horizontal" />
+            <Separator orientation="horizontal" />
           </div>
           <div className={styles.torrentList}>
             {torrents.map((t, i) => (
@@ -275,7 +272,7 @@ function Page() {
           </div>
         )}
       </div>
-    </>
+    </TooltipProvider>
   );
 }
 
@@ -371,7 +368,7 @@ const ActionsRow = ({
 
   const removeTorrent = async (infoHash: string, deleteFiles: boolean) => {
     try {
-      let body = {
+      const body = {
         deleteFiles,
       };
 
@@ -498,54 +495,79 @@ const ActionsRow = ({
           style={{ maxWidth: "200px", justifySelf: "start" }}
         />
         {previewError && (
-          <Text className={styles.uploadError} color={"red.300"} fontSize={"sm"}>
+          <p className={styles.uploadError}>
             {previewError}
-          </Text>
+          </p>
         )}
       </div>
 
       <div className={styles.actionButtons}>
-        <Tooltip label="Start">
-          <IconButton
-            isDisabled={torrentActionsDisabled}
-            onClick={() => startTorrents()}
-            colorScheme={"green"}
-            aria-label="Start"
-            icon={<FontAwesomeIcon icon={faPlay} />}
-          />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="outline"
+              disabled={torrentActionsDisabled}
+              className="border-green-600 text-green-600 hover:bg-green-600/10"
+              aria-label="Start"
+              type="button"
+              onClick={() => startTorrents()}
+            >
+              <FontAwesomeIcon icon={faPlay} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Start</TooltipContent>
         </Tooltip>
 
-        <Tooltip label="Stop">
-          <IconButton
-            onClick={() => stopTorrents()}
-            isDisabled={torrentActionsDisabled}
-            colorScheme={"orange"}
-            aria-label="Stop"
-            icon={<FontAwesomeIcon icon={faPause} />}
-          />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="outline"
+              type="button"
+              disabled={torrentActionsDisabled}
+              className="border-amber-500 text-amber-500 hover:bg-amber-500/10"
+              aria-label="Stop"
+              onClick={() => stopTorrents()}
+            >
+              <FontAwesomeIcon icon={faPause} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Stop</TooltipContent>
         </Tooltip>
 
-        <Tooltip label="Delete">
-          <IconButton
-            onClick={() => setDeleteModalOpen(true)}
-            isDisabled={torrentActionsDisabled}
-            colorScheme={"red"}
-            aria-label="Remove"
-            icon={<FontAwesomeIcon icon={faTrash} />}
-          />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="destructive"
+              type="button"
+              onClick={() => setDeleteModalOpen(true)}
+              disabled={torrentActionsDisabled}
+              aria-label="Remove"
+            >
+              <FontAwesomeIcon icon={faTrash} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Delete</TooltipContent>
         </Tooltip>
 
-        <Tooltip label="Add Torrent">
-          <IconButton
-            colorScheme={"blue"}
-            aria-label="Add"
-            isLoading={isPreviewLoading}
-            icon={<FontAwesomeIcon icon={faPlus} />}
-            onClick={() => {
-              if (uploadRef === null || uploadRef.current === null) return;
-              uploadRef.current.openFilePicker();
-            }}
-          />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              type="button"
+              aria-label="Add"
+              loading={isPreviewLoading}
+              onClick={() => {
+                if (uploadRef === null || uploadRef.current === null) return;
+                uploadRef.current.openFilePicker();
+              }}
+            >
+              <FontAwesomeIcon icon={faPlus} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Add Torrent</TooltipContent>
         </Tooltip>
       </div>
       <div style={{ flexGrow: 1, flexShrink: 1 }}></div>
@@ -635,146 +657,144 @@ function TorrentFilePreviewModal({
   };
 
   return (
-    <Modal isOpen={open} onClose={onClose} size={"xl"}>
-      <ModalOverlay />
-      <ModalContent className={styles.deleteModal}>
-        <ModalHeader>Choose Files to Download</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody className={styles.previewModalBody}>
-          <Text className={styles.previewTorrentName}>{preview?.name}</Text>
-          <Text fontSize={"sm"} color={"gray.400"}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className={`max-w-3xl ${styles.deleteModal}`}>
+        <DialogHeader>
+          <DialogTitle>Choose Files to Download</DialogTitle>
+        </DialogHeader>
+        <div className={styles.previewModalBody}>
+          <p className={styles.previewTorrentName}>{preview?.name}</p>
+          <p className={styles.previewSelectionSummary}>
             {preview
               ? `${selectedFileIds.length} of ${preview.files.length} selected`
               : ""}
-          </Text>
-          <Checkbox
-            className={styles.previewSelectAll}
-            isChecked={hasAllSelected}
-            isIndeterminate={hasSomeSelected && !hasAllSelected}
-            onChange={onToggleAllFiles}
-            isDisabled={totalFiles === 0}
-          >
-            {hasAllSelected ? "Deselect All" : "Select All"}
-          </Checkbox>
+          </p>
+          <label className={styles.checkboxLabel}>
+            <Checkbox
+              className={styles.previewSelectAll}
+              checked={hasSomeSelected && !hasAllSelected ? "indeterminate" : hasAllSelected}
+              onCheckedChange={() => onToggleAllFiles()}
+              disabled={totalFiles === 0}
+            />
+            <span>{hasAllSelected ? "Deselect All" : "Select All"}</span>
+          </label>
           <div className={styles.previewFileList}>
             {preview?.files.map((file) => (
               <div key={file.id} className={styles.previewFileRow}>
-                <Checkbox
-                  isChecked={selectedFileIds.includes(file.id)}
-                  onChange={() => onToggleFile(file.id)}
-                >
-                  <Text noOfLines={1}>{file.filename}</Text>
-                </Checkbox>
-                <Text color={"gray.400"} fontSize={"sm"}>
+                <label className={styles.checkboxLabel}>
+                  <Checkbox
+                    checked={selectedFileIds.includes(file.id)}
+                    onCheckedChange={() => onToggleFile(file.id)}
+                  />
+                  <span className={styles.previewFileName}>{file.filename}</span>
+                </label>
+                <span className={styles.previewFileSize}>
                   {prettyPrintBytes(file.sizeBytes)}
-                </Text>
+                </span>
               </div>
             ))}
           </div>
           <div className={styles.completedPathSection}>
-            <Text fontSize={"sm"} fontWeight={500}>
-              Completed Path
-            </Text>
+            <p className={styles.completedPathLabel}>Completed Path</p>
             <div className={styles.completedPathInputRow}>
               <Input
                 placeholder="Leave empty to use default"
                 value={completedPathOverride}
                 onChange={(e) => onCompletedPathChange(e.target.value)}
-                size={"sm"}
               />
-              <Button size={"sm"} onClick={openPathPicker}>
+              <Button size="sm" onClick={openPathPicker} type="button">
                 Browse
               </Button>
             </div>
-            <Text fontSize={"xs"} color={"gray.500"}>
+            <p className={styles.completedPathHint}>
               Override where files are moved after download completes.
-            </Text>
+            </p>
           </div>
-          {addError && (
-            <Text className={styles.uploadError} color={"red.300"} fontSize={"sm"}>
-              {addError}
-            </Text>
-          )}
+          {addError && <p className={styles.uploadError}>{addError}</p>}
 
-          <Modal isOpen={isPathPickerOpen} onClose={() => setIsPathPickerOpen(false)} size={"xl"}>
-            <ModalOverlay />
-            <ModalContent>
-              <ModalHeader>Select Completed Path</ModalHeader>
-              <ModalCloseButton />
-              <ModalBody className={styles.pathPickerBody}>
+          <Dialog
+            open={isPathPickerOpen}
+            onOpenChange={(nextOpen) => setIsPathPickerOpen(nextOpen)}
+          >
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Select Completed Path</DialogTitle>
+              </DialogHeader>
+              <div className={styles.pathPickerBody}>
                 <div className={styles.pathPickerTopRow}>
-                  <Text fontSize={"sm"} noOfLines={1}>
+                  <p className={styles.pathPickerCurrentPath}>
                     {pathPickerCurrentPath || "Choose a root folder"}
-                  </Text>
+                  </p>
                   <Button
-                    size={"sm"}
+                    size="sm"
+                    variant="outline"
                     onClick={() => loadDirectories(pathPickerParentPath ?? undefined)}
-                    isDisabled={!pathPickerParentPath || isPathPickerLoading}
+                    disabled={!pathPickerParentPath || isPathPickerLoading}
+                    type="button"
                   >
                     Up
                   </Button>
                 </div>
                 <div className={styles.pathPickerList}>
-                  {isPathPickerLoading && <Text fontSize={"sm"}>Loading directories...</Text>}
+                  {isPathPickerLoading && (
+                    <p className={styles.pathPickerStatus}>Loading directories...</p>
+                  )}
                   {!isPathPickerLoading && pathPickerDirectories.length === 0 && (
-                    <Text fontSize={"sm"} color={"gray.400"}>
-                      No child directories.
-                    </Text>
+                    <p className={styles.pathPickerEmpty}>No child directories.</p>
                   )}
                   {!isPathPickerLoading &&
                     pathPickerDirectories.map((directory) => (
                       <Button
                         key={directory}
-                        justifyContent={"flex-start"}
-                        variant={pathPickerSelection === directory ? "solid" : "ghost"}
-                        colorScheme={pathPickerSelection === directory ? "blue" : undefined}
+                        className="justify-start"
+                        variant={pathPickerSelection === directory ? "default" : "ghost"}
                         onClick={() => setPathPickerSelection(directory)}
                         onDoubleClick={() => loadDirectories(directory)}
+                        type="button"
                       >
                         {directory}
                       </Button>
                     ))}
                 </div>
-                {pathPickerError && (
-                  <Text color={"red.300"} fontSize={"sm"}>
-                    {pathPickerError}
-                  </Text>
-                )}
-              </ModalBody>
-              <ModalFooter>
+                {pathPickerError && <p className={styles.uploadError}>{pathPickerError}</p>}
+              </div>
+              <DialogFooter className={styles.dialogFooterActions}>
                 <Button
-                  mr={3}
+                  variant="outline"
                   onClick={() => loadDirectories(pathPickerSelection || undefined)}
-                  isDisabled={!pathPickerSelection || isPathPickerLoading}
+                  disabled={!pathPickerSelection || isPathPickerLoading}
+                  type="button"
                 >
                   Open
                 </Button>
                 <Button
-                  colorScheme="blue"
-                  mr={3}
                   onClick={applySelectedPath}
-                  isDisabled={!pathPickerSelection}
+                  disabled={!pathPickerSelection}
+                  type="button"
                 >
                   Use Selected
                 </Button>
-                <Button onClick={() => setIsPathPickerOpen(false)}>Cancel</Button>
-              </ModalFooter>
-            </ModalContent>
-          </Modal>
-        </ModalBody>
-        <ModalFooter>
-          <Button
-            colorScheme="blue"
-            mr={3}
-            isLoading={isAddLoading}
-            onClick={onConfirm}
-          >
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsPathPickerOpen(false)}
+                  type="button"
+                >
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <DialogFooter className={styles.dialogFooterActions}>
+          <Button loading={isAddLoading} onClick={onConfirm} type="button">
             Add Torrent
           </Button>
-          <Button onClick={onClose}>Cancel</Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+          <Button variant="secondary" onClick={onClose} type="button">
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -834,10 +854,7 @@ function TorrentRow({
     <div className={className} onClick={() => toggleFocus()}>
       <div className={styles.torrent}>
         <div className={styles.torrentCheckbox}>
-          <Checkbox
-            isChecked={isSelected}
-            onChange={(_) => toggleSelect(infoHash)}
-          ></Checkbox>
+          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(infoHash)} />
         </div>
         <div className={styles.torrentInfo} key={infoHash}>
           <div className={styles.torrentInfoTitleRow}>
@@ -888,26 +905,28 @@ function TorrentRow({
                 />
               )}
             </div>
-            <Text className={styles.title} fontSize={"md"} noOfLines={1}>
-              {title}
-            </Text>
+            <p className={styles.title}>{title}</p>
           </div>
 
-          <Text className={styles.progress} fontSize={"xs"}>
+          <p className={styles.progress}>
             {`${prettyPrintBytes(totalBytes * progress)} of ${prettyPrintBytes(
               totalBytes
             )} (${(progress * 100).toFixed(1)}%)`}
-          </Text>
+          </p>
           <Progress
             value={progress * 100}
-            colorScheme={color}
-            color={"#1a1a1a"}
-            height={"1em"}
+            className={classNames(styles.progressBar, {
+              [styles.progressBarGreen]: color === "green",
+              [styles.progressBarOrange]: color === "orange",
+              [styles.progressBarBlue]: color === "blue",
+              [styles.progressBarGray]: color === "gray",
+            })}
           />
-          <Text className={styles.progressDetails} fontSize={"xs"}>
+          <p className={styles.progressDetails}>
             <span>{status}</span>
-            {` • `}
-            <Tooltip label={`${seeders + leechers} peers`}>
+            {" | "}
+            <Tooltip>
+              <TooltipTrigger asChild>
               <span>
                 <FontAwesomeIcon
                   icon={faUserGroup}
@@ -916,9 +935,12 @@ function TorrentRow({
                 />
                 {`${seeders + leechers}`}
               </span>
+              </TooltipTrigger>
+              <TooltipContent>{`${seeders + leechers} peers`}</TooltipContent>
             </Tooltip>
-            {` • `}
-            <Tooltip label={`${seeders} seeders`}>
+            {" | "}
+            <Tooltip>
+              <TooltipTrigger asChild>
               <span>
                 <FontAwesomeIcon
                   icon={faSeedling}
@@ -927,6 +949,8 @@ function TorrentRow({
                 />
                 {seeders}
               </span>
+              </TooltipTrigger>
+              <TooltipContent>{`${seeders} seeders`}</TooltipContent>
             </Tooltip>
             <span>
               <FontAwesomeIcon
@@ -944,11 +968,11 @@ function TorrentRow({
               />
               {prettyPrintBytes(uploadRate) + "/s"}
             </span>
-          </Text>
+          </p>
         </div>
       </div>
       <div className={styles.torrentDivider}>
-        <Divider orientation="horizontal" />
+        <Separator orientation="horizontal" />
       </div>
     </div>
   );
@@ -979,44 +1003,47 @@ function TorrentRemoveConfirmationModal({
   const torrents = useSelector(selectTorrentsByInfoHashes(infoHashes));
 
   return (
-    <Modal isOpen={open} onClose={onClose} size={"lg"}>
-      <ModalOverlay />
-      <ModalContent className={styles.deleteModal}>
-        <ModalHeader>{title}</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody className={styles.deleteModalBody}>
-          <Text>{"Are you sure you want remove: "}</Text>
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className={`max-w-2xl ${styles.deleteModal}`}>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>Are you sure you want remove:</DialogDescription>
+        </DialogHeader>
+        <div className={styles.deleteModalBody}>
           <ul style={{ paddingLeft: "2em" }}>
             {infoHashes.map((hash) => {
               return (
                 <li key={hash}>
-                  <Text>{torrents[hash].name}</Text>
+                  <p>{torrents[hash].name}</p>
                 </li>
               );
             })}
           </ul>
-          <Checkbox
-            className={styles.deleteFilesCheckbox}
-            defaultChecked={false}
-            onChange={(e) => setDeleteFiles(e.target.checked)}
-          >
-            Delete Files on Disk
-          </Checkbox>
-        </ModalBody>
-        <ModalFooter>
+          <label className={styles.checkboxLabel}>
+            <Checkbox
+              className={styles.deleteFilesCheckbox}
+              checked={deleteFiles}
+              onCheckedChange={(checked) => setDeleteFiles(checked === true)}
+            />
+            <span>Delete Files on Disk</span>
+          </label>
+        </div>
+        <DialogFooter className={styles.dialogFooterActions}>
           <Button
-            colorScheme="red"
-            mr={3}
+            variant="destructive"
             onClick={() => {
               onRemove(infoHashes, deleteFiles);
               onClose();
             }}
+            type="button"
           >
             Remove
           </Button>
-          <Button onClick={onClose}>Close</Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+          <Button variant="secondary" onClick={onClose} type="button">
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,15 +1,32 @@
 "use client";
 
-import { Divider, Grid, GridItem, IconButton, Text } from "@chakra-ui/react";
 import { faCheck } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useForm, useWatch } from "react-hook-form";
 import styles from "./settings.module.css";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, type ReactNode } from "react";
 import { FormInput } from "../../components/Form/FormInput";
 import { FormNumericInput } from "../../components/Form/FormNumericInput";
 import { FormCheckbox } from "../../components/Form/FormCheckbox";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import Layout from "../layout";
+
+interface FileSettings {
+  downloadPath: string;
+  completedPath: string;
+}
+
+interface ConnectionSettings {
+  maxConnectionsPerTorrent: string;
+  maxConnectionsGlobal: string;
+  maxHalfOpenConnections: string;
+}
+
+interface TcpListenerSettings {
+  port: string;
+  enabled: boolean;
+}
 
 export default function SettingsPage() {
   return (
@@ -24,25 +41,25 @@ function GeneralSettings() {
     control: fileSettingsControl,
     formState: { isDirty: isFileSettingsDirty },
     reset: resetFileSettings,
-  } = useForm({
+  } = useForm<FileSettings>({
     defaultValues: {
       downloadPath: "",
       completedPath: "",
     },
   });
-  const fileSettingsValues = useWatch({ control: fileSettingsControl });
+  const fileSettingsValues = useWatch({ control: fileSettingsControl }) as FileSettings;
   const fetchFilesettings = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/settings/file`
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/file`);
       const json = await response.json();
       console.log(json);
       const { downloadPath, completedPath } = json.data;
       resetFileSettings({ downloadPath, completedPath });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to fetch file settings", error);
+    }
   }, [resetFileSettings]);
-  const saveFileSettings = useCallback(async (values: any) => {
+  const saveFileSettings = useCallback(async (values: FileSettings) => {
     try {
       await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/file`, {
         method: "POST",
@@ -51,14 +68,16 @@ function GeneralSettings() {
           "Content-Type": "application/json",
         },
       });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to save file settings", error);
+    }
   }, []);
 
   const {
     control: connectionSettingsControl,
     formState: { isDirty: isConnectionSettingsDirty },
     reset: resetConnectionSettings,
-  } = useForm({
+  } = useForm<ConnectionSettings>({
     defaultValues: {
       maxConnectionsPerTorrent: "",
       maxConnectionsGlobal: "",
@@ -67,7 +86,7 @@ function GeneralSettings() {
   });
   const connectionSettingsValues = useWatch({
     control: connectionSettingsControl,
-  });
+  }) as ConnectionSettings;
   const fetchConnectionSettings = useCallback(async () => {
     try {
       const response = await fetch(
@@ -85,9 +104,11 @@ function GeneralSettings() {
         maxConnectionsPerTorrent: `${maxConnectionsPerTorrent}`,
         maxHalfOpenConnections: `${maxHalfOpenConnections}`,
       });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to fetch connection settings", error);
+    }
   }, [resetConnectionSettings]);
-  const saveConnectionSettings = useCallback(async (values: any) => {
+  const saveConnectionSettings = useCallback(async (values: ConnectionSettings) => {
     try {
       await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/connection`, {
         method: "POST",
@@ -96,14 +117,16 @@ function GeneralSettings() {
           "Content-Type": "application/json",
         },
       });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to save connection settings", error);
+    }
   }, []);
 
   const {
     control: tcpListenerSettingsControl,
     formState: { isDirty: isTcpListenerSettingsDirty },
     reset: resetTcpListenerSettings,
-  } = useForm({
+  } = useForm<TcpListenerSettings>({
     defaultValues: {
       port: "53123",
       enabled: true,
@@ -111,12 +134,10 @@ function GeneralSettings() {
   });
   const tcpListenerSettingsValue = useWatch({
     control: tcpListenerSettingsControl,
-  });
+  }) as TcpListenerSettings;
   const fetchTcpListenerSettings = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/settings/tcp`
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/tcp`);
       const json = await response.json();
       console.log(json);
       const { enabled, port } = json.data;
@@ -124,9 +145,11 @@ function GeneralSettings() {
         enabled,
         port: `${port}`,
       });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to fetch TCP listener settings", error);
+    }
   }, [resetTcpListenerSettings]);
-  const saveTcpSettings = useCallback(async (values: any) => {
+  const saveTcpSettings = useCallback(async (values: TcpListenerSettings) => {
     try {
       await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/tcp`, {
         method: "POST",
@@ -135,31 +158,22 @@ function GeneralSettings() {
           "Content-Type": "application/json",
         },
       });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to save TCP settings", error);
+    }
   }, []);
 
   useEffect(() => {
     fetchFilesettings();
     fetchTcpListenerSettings();
     fetchConnectionSettings();
-  }, []);
+  }, [fetchConnectionSettings, fetchFilesettings, fetchTcpListenerSettings]);
 
   return (
     <>
-      <div
-        style={{
-          padding: "1em",
-          flexGrow: 1,
-          display: "flex",
-          flexDirection: "column",
-          gap: "16px",
-          alignItems: "center",
-        }}
-      >
-        <Text alignSelf={"flex-start"} fontSize={30}>
-          Settings
-        </Text>
-        <Divider />
+      <div className={styles.settingsRoot}>
+        <h1 className={styles.pageTitle}>Settings</h1>
+        <Separator />
         <SectionHeader name="Files" />
 
         <RowComponent label="Download Path">
@@ -169,7 +183,7 @@ function GeneralSettings() {
           <FormInput fieldName="completedPath" control={fileSettingsControl} />
         </RowComponent>
 
-        <Divider />
+        <Separator />
         <SectionHeader name="Connections" />
 
         <RowComponent label="Max connections (per torrent)">
@@ -199,7 +213,7 @@ function GeneralSettings() {
           />
         </RowComponent>
 
-        <Divider />
+        <Separator />
         <SectionHeader name="Inbound Connections" />
 
         <FormCheckbox
@@ -218,22 +232,11 @@ function GeneralSettings() {
           />
         </RowComponent>
       </div>
-      <IconButton
-        position={"absolute"}
-        bottom={0}
-        right={0}
-        mr={8}
-        mb={8}
-        isRound={true}
-        variant="solid"
-        colorScheme="green"
-        aria-label="Done"
-        fontSize="30px"
-        size={"lg"}
-        isDisabled={
-          !isFileSettingsDirty &&
-          !isConnectionSettingsDirty &&
-          !isTcpListenerSettingsDirty
+      <Button
+        className={styles.saveButton}
+        size="icon"
+        disabled={
+          !isFileSettingsDirty && !isConnectionSettingsDirty && !isTcpListenerSettingsDirty
         }
         onClick={() => {
           if (isFileSettingsDirty) {
@@ -255,35 +258,28 @@ function GeneralSettings() {
             resetTcpListenerSettings(tcpListenerSettingsValue);
           }
         }}
-        icon={<FontAwesomeIcon icon={faCheck} />}
-      />
+        type="button"
+      >
+        <FontAwesomeIcon icon={faCheck} />
+      </Button>
     </>
   );
 }
 
-interface SectionHeaderProps {
-  name: string;
-}
-function SectionHeader({ name }: SectionHeaderProps) {
-  return (
-    <Text alignSelf={"flex-start"} fontSize={20} fontWeight={500} pb={4}>
-      {name}
-    </Text>
-  );
+function SectionHeader({ name }: { name: string }) {
+  return <h2 className={styles.sectionTitle}>{name}</h2>;
 }
 
 interface RowInputProps {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
-const RowComponent: React.FC<RowInputProps> = ({ label, children }) => {
+const RowComponent = ({ label, children }: RowInputProps) => {
   return (
-    <Grid templateColumns="repeat(2, 1fr)" alignItems={"center"} gap={8}>
-      <GridItem>
-        <Text align={"right"}>{label}</Text>
-      </GridItem>
-      {children}
-    </Grid>
+    <div className={styles.settingRow}>
+      <p className={styles.settingLabel}>{label}</p>
+      <div>{children}</div>
+    </div>
   );
 };

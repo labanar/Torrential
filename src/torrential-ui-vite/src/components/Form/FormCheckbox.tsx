@@ -1,33 +1,36 @@
-import { Checkbox } from "@chakra-ui/react";
-import { Control, Controller } from "react-hook-form";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Control, Controller, FieldValues, Path } from "react-hook-form";
 
-interface FormCheckboxProps {
+interface FormCheckboxProps<TFieldValues extends FieldValues> {
   className?: string;
-  fieldName: string;
+  fieldName: Path<TFieldValues>;
   text?: string;
-  control: Control<any, any>;
+  control: Control<TFieldValues>;
 }
 
-export const FormCheckbox: React.FC<FormCheckboxProps> = ({
+export const FormCheckbox = <TFieldValues extends FieldValues>({
   className,
   fieldName,
   control,
   text,
-}) => {
+}: FormCheckboxProps<TFieldValues>) => {
   return (
     <Controller
       name={fieldName}
       control={control}
       render={({ field: { onChange, onBlur, value, ref } }) => (
-        <Checkbox
-          onChange={(e) => onChange(e.target.checked)}
-          onBlur={onBlur}
-          isChecked={value}
-          ref={ref}
+        <label
           className={className}
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}
         >
+          <Checkbox
+            checked={Boolean(value)}
+            onCheckedChange={(checked) => onChange(checked === true)}
+            onBlur={onBlur}
+            ref={ref}
+          />
           {text ?? ""}
-        </Checkbox>
+        </label>
       )}
     />
   );

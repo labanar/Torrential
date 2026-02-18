@@ -1,8 +1,7 @@
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./layout.module.css";
-import { Box, Divider, IconButton, Text, useColorMode } from "@chakra-ui/react";
 import {
   IconDefinition,
   faGear,
@@ -17,6 +16,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useNavigate } from "react-router-dom";
 import Alfred from "../components/Alfred/alfred";
 import SignalRService from "../services/signalR";
+import { Separator } from "@/components/ui/separator";
 config.autoAddCss = false;
 
 export default function RootLayout({
@@ -42,7 +42,7 @@ export default function RootLayout({
       <SideBar />
       {alfred}
       <div className={styles.divider}>
-        <Divider orientation="vertical" />
+        <Separator orientation="vertical" className={styles.verticalDivider} />
       </div>
       <div id="main" className={styles.main}>
         {children}
@@ -52,7 +52,17 @@ export default function RootLayout({
 }
 
 function SideBar() {
-  const { colorMode, toggleColorMode } = useColorMode();
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    document.documentElement.classList.contains("dark") ? "dark" : "light"
+  );
+
+  const toggleTheme = useCallback(() => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    document.documentElement.classList.toggle("dark", nextTheme === "dark");
+    document.documentElement.style.colorScheme = nextTheme;
+    window.localStorage.setItem("theme", nextTheme);
+  }, [theme]);
 
   return (
     <div id="sidebar" className={styles.sidebar}>
@@ -67,31 +77,21 @@ function SideBar() {
           opacity: 0.1,
         }}
       />
-      <Text className={styles.sidebarTitle}>TORRENTIAL</Text>
+      <span className={styles.sidebarTitle}>TORRENTIAL</span>
       <SideBarItem label="TORRENTS" linksTo="/" icon={faUpDown} />
       <SideBarItem label="PEERS" linksTo="/peers" icon={faUsers} />
       <SideBarItem label="INTEGRATIONS" linksTo="/integrations" icon={faPlug} />
       <SideBarItem label="SETTINGS" linksTo="/settings" icon={faGear} />
 
-      <div
-        style={{
-          flex: 1,
-          alignContent: "flex-end",
-        }}
-      >
-        <IconButton
-          icon={
-            <Box width={"24px"} height={"24px"}>
-              <FontAwesomeIcon
-                icon={colorMode === "dark" ? faSun : faMoon}
-                fontSize={24}
-              />
-            </Box>
-          }
-          onClick={toggleColorMode}
-          aria-label={""}
-          variant={"ghost"}
-        />
+      <div className={styles.sidebarFooter}>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className={styles.themeToggle}
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          <FontAwesomeIcon icon={theme === "dark" ? faSun : faMoon} fontSize={24} />
+        </button>
       </div>
     </div>
   );
@@ -107,13 +107,15 @@ function SideBarItem({ label, linksTo, icon }: SideBarItemProps) {
   const navigate = useNavigate();
 
   return (
-    <div className={styles.sidebarItem} onClick={() => navigate(linksTo)}>
-      <Box width="24px" textAlign="center">
+    <button
+      type="button"
+      className={styles.sidebarItem}
+      onClick={() => navigate(linksTo)}
+    >
+      <span className={styles.sidebarIcon}>
         <FontAwesomeIcon icon={icon} size={"lg"} />
-      </Box>
-      <Text fontSize={"md"} textAlign={"right"} flexGrow={1}>
-        {label}
-      </Text>
-    </div>
+      </span>
+      <span className={styles.sidebarItemText}>{label}</span>
+    </button>
   );
 }

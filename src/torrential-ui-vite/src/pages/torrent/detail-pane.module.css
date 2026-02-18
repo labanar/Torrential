@@ -3,7 +3,7 @@
   flex-direction: column;
   min-height: 200px;
   overflow-y: auto;
-  border-top: 1px solid var(--chakra-colors-chakra-border-color);
+  border-top: 1px solid hsl(var(--border));
 }
 
 .detailHeader {
@@ -27,7 +27,7 @@
   display: flex;
   flex-direction: row;
   gap: 0;
-  border-bottom: 1px solid var(--chakra-colors-chakra-border-color);
+  border-bottom: 1px solid hsl(var(--border));
   padding: 0 1.25em;
 }
 
@@ -49,7 +49,7 @@
 
 .tabActive {
   opacity: 1;
-  border-bottom-color: var(--chakra-colors-blue-400);
+  border-bottom-color: hsl(var(--primary));
 }
 
 .tabContent {
@@ -72,7 +72,7 @@
   letter-spacing: 0.04em;
   font-size: 0.85em;
   opacity: 0.7;
-  border-bottom: 1px solid var(--chakra-colors-chakra-border-color);
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 .peersTable td {
@@ -112,11 +112,11 @@
 }
 
 .bitfieldPieceHave {
-  background-color: var(--chakra-colors-green-400);
+  background-color: #22c55e;
 }
 
 .bitfieldPieceMissing {
-  background-color: var(--chakra-colors-whiteAlpha-200);
+  background-color: hsl(var(--muted));
 }
 
 /* Files section */
@@ -133,7 +133,7 @@
   letter-spacing: 0.04em;
   font-size: 0.85em;
   opacity: 0.7;
-  border-bottom: 1px solid var(--chakra-colors-chakra-border-color);
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 .filesTable td {
@@ -153,4 +153,12 @@
   opacity: 0.4;
   font-size: 0.85em;
   letter-spacing: 0.05em;
+}
+
+.loadingSpinner {
+  margin-right: 8px;
+}
+
+.seedIcon {
+  color: #22c55e;
 }

@@ -1,13 +1,4 @@
 import {
-  Divider,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalOverlay,
-  Text,
-} from "@chakra-ui/react";
-import {
   IconDefinition,
   faGear,
   faPeopleGroup,
@@ -15,13 +6,16 @@ import {
   faUpDown,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
 import styles from "./alfred.module.css";
 import { NavigateFunction, useNavigate } from "react-router-dom";
 import { AppDispatch, useAppDispatch } from "../../store";
 import { AlfredContext } from "../../store/slices/alfredSlice";
 import classNames from "classnames";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 export default function Alfred() {
   const { enableScope, disableScope, enabledScopes } = useHotkeysContext();
@@ -31,27 +25,23 @@ export default function Alfred() {
 
   const [isOpen, setSearchOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(0);
-  const [suggestions, setSuggestions] = useState(globalSuggestions);
+  const [suggestions] = useState(globalSuggestions);
   const [scopesToEnableOnClose, setScopesToEnableOnClose] = useState<string[]>(
     []
   );
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setSelectedId(0);
   }, [suggestions]);
 
   const onToggle = () => {
-    if (isOpen) {
-      setSearchOpen(false);
-    } else {
-      setSearchOpen(true);
-    }
+    setSearchOpen((prevOpen) => !prevOpen);
   };
 
   useHotkeys(
     "mod+ ",
     () => {
-      console.log("alfred open/close");
       onToggle();
     },
     {
@@ -65,10 +55,9 @@ export default function Alfred() {
     if (isOpen) {
       setScopesToEnableOnClose(enabledScopes);
       enabledScopes.forEach((s) => disableScope(s));
-      console.log("search open");
       enableScope("search");
+      window.setTimeout(() => inputRef.current?.focus(), 0);
     } else {
-      console.log("search closed");
       disableScope("search");
       scopesToEnableOnClose.forEach((s) => {
         enableScope(s);
@@ -76,8 +65,8 @@ export default function Alfred() {
       enableScope("global");
       setSelectedId(0);
     }
-    return () => disableScope("search"); // Clean up on unmount
-  }, [isOpen]);
+    return () => disableScope("search");
+  }, [disableScope, enableScope, enabledScopes, isOpen, scopesToEnableOnClose]);
 
   useHotkeys(
     "up",
@@ -85,7 +74,6 @@ export default function Alfred() {
       let nextId = selectedId - 1;
       if (nextId < 0) nextId = suggestions.length - 1;
       setSelectedId(nextId);
-      console.log(nextId);
     },
     {
       scopes: ["search"],
@@ -99,7 +87,6 @@ export default function Alfred() {
       let nextId = selectedId + 1;
       if (nextId > suggestions.length - 1) nextId = nextId - suggestions.length;
       setSelectedId(nextId);
-      console.log(nextId);
     },
     {
       scopes: ["search"],
@@ -134,16 +121,13 @@ export default function Alfred() {
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={() => {}} size={"xl"}>
-      <ModalOverlay bg={"none"} />
-      <ModalContent mt={"16%"}>
-        <div>
+    <Dialog open={isOpen} onOpenChange={setSearchOpen}>
+      <DialogContent className={styles.dialogContent}>
+        <div className={styles.inputContainer}>
           <Input
+            ref={inputRef}
             placeholder="Type to search"
-            border={0}
-            height={14}
-            focusBorderColor="none"
-            _focus={{ boxShadow: "none" }}
+            className={styles.searchInput}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 e.preventDefault();
@@ -151,19 +135,20 @@ export default function Alfred() {
             }}
           />
         </div>
-        <Divider />
+        <Separator />
 
-        <ModalBody p={0}>
+        <div className={styles.modalBody}>
           {suggestions.map((s, i) => (
             <SearchSuggestion
+              key={s.title}
               selected={selectedId === i}
               icon={s.icon}
               title={s.title}
             />
           ))}
-        </ModalBody>
-      </ModalContent>
-    </Modal>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -175,16 +160,14 @@ interface SearchSuggestionProps {
 
 function SearchSuggestion({ selected, icon, title }: SearchSuggestionProps) {
   return (
-    <>
-      <div
-        className={classNames(styles.suggestion, {
-          [styles.selected]: selected,
-        })}
-      >
-        <FontAwesomeIcon icon={icon!} size="xl" width={"28px"} />
-        <Text fontSize={14}>{title}</Text>
-      </div>
-    </>
+    <div
+      className={classNames(styles.suggestion, {
+        [styles.selected]: selected,
+      })}
+    >
+      <FontAwesomeIcon icon={icon!} size="xl" width={"28px"} />
+      <span className={styles.suggestionLabel}>{title}</span>
+    </div>
   );
 }
 
