@@ -18,9 +18,12 @@ using Torrential.Web.Api.Models.Torrents;
 using Torrential.Web.Api.Requests.Torrents;
 using Torrential.Web.Api.Requests.Settings;
 using Torrential.Web.Api.Requests.Torrents;
+using Torrential.Web.Api.Requests.Integrations;
 using Torrential.Web.Api.Responses;
+using Torrential.Web.Api.Responses.Integrations;
 using Torrential.Web.Api.Responses.Settings;
 using Torrential.Web.Api.Responses.Torrents;
+using Torrential.Integrations;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMemoryCache();
@@ -367,6 +370,105 @@ app.MapPost("settings/connection", async (ConnectionSettingsUpdateRequest reques
     });
     return ActionResponse.SuccessResponse;
 });
+
+app.MapGet(
+    "/integrations",
+    async (TorrentialDb db) =>
+    {
+        var hooks = await db.IntegrationHooks.ToArrayAsync();
+        var vms = hooks.Select(h => new IntegrationHookVm
+        {
+            Id = h.Id,
+            Name = h.Name,
+            Type = h.Type.ToString(),
+            Trigger = h.Trigger.ToString(),
+            Configuration = h.Configuration,
+            Enabled = h.Enabled,
+            CreatedAt = h.CreatedAt
+        }).ToArray();
+        return new IntegrationHookListResponse(vms);
+    });
+
+app.MapGet(
+    "/integrations/{id:guid}",
+    async (Guid id, TorrentialDb db) =>
+    {
+        var hook = await db.IntegrationHooks.FindAsync(id);
+        if (hook == null)
+            return IntegrationHookGetResponse.ErrorResponse(ErrorCode.Unknown);
+
+        return new IntegrationHookGetResponse(new IntegrationHookVm
+        {
+            Id = hook.Id,
+            Name = hook.Name,
+            Type = hook.Type.ToString(),
+            Trigger = hook.Trigger.ToString(),
+            Configuration = hook.Configuration,
+            Enabled = hook.Enabled,
+            CreatedAt = hook.CreatedAt
+        });
+    });
+
+app.MapPost(
+    "/integrations",
+    async (IntegrationHookCreateRequest request, TorrentialDb db) =>
+    {
+        var hook = new IntegrationHook
+        {
+            Id = Guid.NewGuid(),
+            Name = request.Name,
+            Type = Enum.Parse<IntegrationHookType>(request.Type),
+            Trigger = Enum.Parse<TorrentEventTrigger>(request.Trigger),
+            Configuration = request.Configuration,
+            Enabled = request.Enabled,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        db.IntegrationHooks.Add(hook);
+        await db.SaveChangesAsync();
+
+        return new IntegrationHookGetResponse(new IntegrationHookVm
+        {
+            Id = hook.Id,
+            Name = hook.Name,
+            Type = hook.Type.ToString(),
+            Trigger = hook.Trigger.ToString(),
+            Configuration = hook.Configuration,
+            Enabled = hook.Enabled,
+            CreatedAt = hook.CreatedAt
+        });
+    });
+
+app.MapPut(
+    "/integrations/{id:guid}",
+    async (Guid id, IntegrationHookUpdateRequest request, TorrentialDb db) =>
+    {
+        var hook = await db.IntegrationHooks.FindAsync(id);
+        if (hook == null)
+            return ActionResponse.ErrorResponse(ErrorCode.Unknown);
+
+        hook.Name = request.Name;
+        hook.Type = Enum.Parse<IntegrationHookType>(request.Type);
+        hook.Trigger = Enum.Parse<TorrentEventTrigger>(request.Trigger);
+        hook.Configuration = request.Configuration;
+        hook.Enabled = request.Enabled;
+
+        await db.SaveChangesAsync();
+        return ActionResponse.SuccessResponse;
+    });
+
+app.MapDelete(
+    "/integrations/{id:guid}",
+    async (Guid id, TorrentialDb db) =>
+    {
+        var hook = await db.IntegrationHooks.FindAsync(id);
+        if (hook == null)
+            return ActionResponse.ErrorResponse(ErrorCode.Unknown);
+
+        db.IntegrationHooks.Remove(hook);
+        await db.SaveChangesAsync();
+        return ActionResponse.SuccessResponse;
+    });
 
 app.MapGet("filesystem/directories", (string? path) =>
 {
