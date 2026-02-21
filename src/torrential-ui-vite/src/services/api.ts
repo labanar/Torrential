@@ -254,3 +254,52 @@ export async function browseDirectories(path?: string): Promise<DirectoryBrowseA
 
   return result.data;
 }
+
+// Integrations API
+
+export interface IntegrationApiModel {
+  id: string;
+  name: string;
+  type: string;
+  enabled: boolean;
+  triggerEvent: string;
+  configuration: string;
+}
+
+export async function fetchIntegrations(): Promise<IntegrationApiModel[]> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/integrations`);
+  if (!response.ok) throw new Error("Error fetching integrations");
+  const result: ApiResponse<IntegrationApiModel[]> = await response.json();
+  return result.data ?? [];
+}
+
+export async function createIntegration(data: Omit<IntegrationApiModel, "id">): Promise<IntegrationApiModel> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/integrations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error("Error creating integration");
+  const result: ApiResponse<IntegrationApiModel> = await response.json();
+  if (!result.data) throw new Error("Create integration returned no data");
+  return result.data;
+}
+
+export async function updateIntegration(id: string, data: Omit<IntegrationApiModel, "id">): Promise<IntegrationApiModel> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/integrations/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error("Error updating integration");
+  const result: ApiResponse<IntegrationApiModel> = await response.json();
+  if (!result.data) throw new Error("Update integration returned no data");
+  return result.data;
+}
+
+export async function deleteIntegration(id: string): Promise<boolean> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/integrations/${id}`, {
+    method: "DELETE",
+  });
+  return response.ok;
+}
