@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Torrential.Files;
+using Torrential.Integrations;
 
 namespace Torrential
 {
@@ -7,6 +8,7 @@ namespace Torrential
     {
         public DbSet<TorrentConfiguration> Torrents { get; set; }
         public DbSet<TorrentialSettings> Settings { get; set; }
+        public DbSet<Integration> Integrations { get; set; }
         public TorrentialDb(DbContextOptions<TorrentialDb> options) : base(options)
         {
 
@@ -23,6 +25,15 @@ namespace Torrential
                 .HasConversion(
                     v => v.ToString(),
                     v => (TorrentStatus)Enum.Parse(typeof(TorrentStatus), v));
+
+            modelBuilder.Entity<Integration>()
+                .HasKey(x => x.Id);
+
+            modelBuilder.Entity<Integration>()
+                .Property(p => p.Type)
+                .HasConversion(
+                    v => v.ToString(),
+                    v => (IntegrationType)Enum.Parse(typeof(IntegrationType), v));
 
             modelBuilder.Entity<TorrentialSettings>()
                 .ComplexProperty(p => p.FileSettings);

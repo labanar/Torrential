@@ -18,7 +18,10 @@ using Torrential.Web.Api.Models.Torrents;
 using Torrential.Web.Api.Requests.Torrents;
 using Torrential.Web.Api.Requests.Settings;
 using Torrential.Web.Api.Requests.Torrents;
+using Torrential.Integrations;
+using Torrential.Web.Api.Requests.Integrations;
 using Torrential.Web.Api.Responses;
+using Torrential.Web.Api.Responses.Integrations;
 using Torrential.Web.Api.Responses.Settings;
 using Torrential.Web.Api.Responses.Torrents;
 
@@ -368,6 +371,99 @@ app.MapPost("settings/connection", async (ConnectionSettingsUpdateRequest reques
     return ActionResponse.SuccessResponse;
 });
 
+// Integration CRUD
+app.MapGet("/integrations", async (IntegrationService svc) =>
+{
+    var integrations = await svc.GetAll();
+    var vms = integrations.Select(i => new IntegrationVm
+    {
+        Id = i.Id,
+        Name = i.Name,
+        Type = i.Type.ToString(),
+        Enabled = i.Enabled,
+        TriggerEvent = i.TriggerEvent,
+        Configuration = i.Configuration
+    }).ToArray();
+    return new IntegrationListResponse(vms);
+});
+
+app.MapGet("/integrations/{id:guid}", async (Guid id, IntegrationService svc) =>
+{
+    var integration = await svc.GetById(id);
+    if (integration is null)
+        return IntegrationGetResponse.ErrorResponse(ErrorCode.Unknown);
+
+    return new IntegrationGetResponse(new IntegrationVm
+    {
+        Id = integration.Id,
+        Name = integration.Name,
+        Type = integration.Type.ToString(),
+        Enabled = integration.Enabled,
+        TriggerEvent = integration.TriggerEvent,
+        Configuration = integration.Configuration
+    });
+});
+
+app.MapPost("/integrations", async (IntegrationCreateRequest request, IntegrationService svc) =>
+{
+    if (!Enum.TryParse<IntegrationType>(request.Type, true, out var type))
+        return Results.BadRequest(new { Error = $"Invalid integration type: {request.Type}" });
+
+    var integration = new Integration
+    {
+        Name = request.Name,
+        Type = type,
+        TriggerEvent = request.TriggerEvent,
+        Enabled = request.Enabled,
+        Configuration = request.Configuration
+    };
+
+    var created = await svc.Create(integration);
+    return Results.Ok(new IntegrationGetResponse(new IntegrationVm
+    {
+        Id = created.Id,
+        Name = created.Name,
+        Type = created.Type.ToString(),
+        Enabled = created.Enabled,
+        TriggerEvent = created.TriggerEvent,
+        Configuration = created.Configuration
+    }));
+});
+
+app.MapPut("/integrations/{id:guid}", async (Guid id, IntegrationUpdateRequest request, IntegrationService svc) =>
+{
+    if (!Enum.TryParse<IntegrationType>(request.Type, true, out var type))
+        return Results.BadRequest(new { Error = $"Invalid integration type: {request.Type}" });
+
+    var updated = await svc.Update(id, new Integration
+    {
+        Name = request.Name,
+        Type = type,
+        TriggerEvent = request.TriggerEvent,
+        Enabled = request.Enabled,
+        Configuration = request.Configuration
+    });
+
+    if (updated is null)
+        return Results.NotFound();
+
+    return Results.Ok(new IntegrationGetResponse(new IntegrationVm
+    {
+        Id = updated.Id,
+        Name = updated.Name,
+        Type = updated.Type.ToString(),
+        Enabled = updated.Enabled,
+        TriggerEvent = updated.TriggerEvent,
+        Configuration = updated.Configuration
+    }));
+});
+
+app.MapDelete("/integrations/{id:guid}", async (Guid id, IntegrationService svc) =>
+{
+    var deleted = await svc.Delete(id);
+    return deleted ? Results.Ok(ActionResponse.SuccessResponse) : Results.NotFound();
+});
+
 app.MapGet("filesystem/directories", (string? path) =>
 {
     try
@@ -463,6 +559,13 @@ static void WireEventBus(IServiceProvider services)
 
     // --- File selection changed -> SignalR ---
     bus.OnFileSelectionChanged(hubDispatcher.HandleFileSelectionChanged);
+
+    // --- Integrations -> mock execution ---
+    var integrationExecutor = services.GetRequiredService<IntegrationExecutor>();
+    bus.OnTorrentComplete(integrationExecutor.HandleTorrentComplete);
+    bus.OnTorrentAdded(integrationExecutor.HandleTorrentAdded);
+    bus.OnTorrentStarted(integrationExecutor.HandleTorrentStarted);
+    bus.OnTorrentStopped(integrationExecutor.HandleTorrentStopped);
 
     // Start the validation channel background reader
     bus.Start();
