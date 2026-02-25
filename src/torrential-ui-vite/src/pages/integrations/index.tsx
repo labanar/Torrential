@@ -443,9 +443,9 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
 
 interface IndexerFormValues {
   name: string;
-  type: "Torznab" | "Rss";
+  type: "Torznab" | "Rss" | "TorrentLeech";
   baseUrl: string;
-  authMode: "None" | "ApiKey" | "BasicAuth";
+  authMode: "None" | "ApiKey" | "BasicAuth" | "Cookie";
   apiKey: string;
   username: string;
   password: string;
@@ -462,7 +462,7 @@ interface IndexerFormDialogProps {
 function IndexerFormDialog({ open, onOpenChange, editing, onSaved }: IndexerFormDialogProps) {
   const [saving, setSaving] = useState(false);
 
-  const { control, handleSubmit, reset } = useForm<IndexerFormValues>({
+  const { control, handleSubmit, reset, setValue } = useForm<IndexerFormValues>({
     defaultValues: {
       name: "",
       type: "Torznab",
@@ -482,9 +482,9 @@ function IndexerFormDialog({ open, onOpenChange, editing, onSaved }: IndexerForm
       if (editing) {
         reset({
           name: editing.name,
-          type: editing.type as "Torznab" | "Rss",
+          type: editing.type as IndexerFormValues["type"],
           baseUrl: editing.baseUrl,
-          authMode: editing.authMode as "None" | "ApiKey" | "BasicAuth",
+          authMode: editing.authMode as IndexerFormValues["authMode"],
           apiKey: "",
           username: "",
           password: "",
@@ -505,17 +505,25 @@ function IndexerFormDialog({ open, onOpenChange, editing, onSaved }: IndexerForm
     }
   }, [open, editing, reset]);
 
+  // When TorrentLeech is selected, force auth mode to Cookie
+  useEffect(() => {
+    if (watchedValues.type === "TorrentLeech" && watchedValues.authMode !== "Cookie") {
+      setValue("authMode", "Cookie");
+    }
+  }, [watchedValues.type, watchedValues.authMode, setValue]);
+
   const onSubmit = async (values: IndexerFormValues) => {
     setSaving(true);
     try {
+      const needsCredentials = values.authMode === "BasicAuth" || values.authMode === "Cookie";
       const req: CreateIndexerRequest = {
         name: values.name,
         type: values.type,
         baseUrl: values.baseUrl,
         authMode: values.authMode,
         apiKey: values.authMode === "ApiKey" ? values.apiKey : undefined,
-        username: values.authMode === "BasicAuth" ? values.username : undefined,
-        password: values.authMode === "BasicAuth" ? values.password : undefined,
+        username: needsCredentials ? values.username : undefined,
+        password: needsCredentials ? values.password : undefined,
         enabled: values.enabled,
       };
 
@@ -550,21 +558,23 @@ function IndexerFormDialog({ open, onOpenChange, editing, onSaved }: IndexerForm
           <FormField label="Name" control={control} name="name" />
           <div className={styles.formRow}>
             <label className={styles.formLabel}>Type</label>
-            <SelectField control={control} name="type" options={["Torznab", "Rss"]} />
+            <SelectField control={control} name="type" options={["Torznab", "Rss", "TorrentLeech"]} />
           </div>
           <FormField label="Base URL" control={control} name="baseUrl" />
-          <div className={styles.formRow}>
-            <label className={styles.formLabel}>Auth</label>
-            <SelectField
-              control={control}
-              name="authMode"
-              options={["None", "ApiKey", "BasicAuth"]}
-            />
-          </div>
+          {watchedValues.type !== "TorrentLeech" && (
+            <div className={styles.formRow}>
+              <label className={styles.formLabel}>Auth</label>
+              <SelectField
+                control={control}
+                name="authMode"
+                options={["None", "ApiKey", "BasicAuth"]}
+              />
+            </div>
+          )}
           {watchedValues.authMode === "ApiKey" && (
             <FormField label="API Key" control={control} name="apiKey" />
           )}
-          {watchedValues.authMode === "BasicAuth" && (
+          {(watchedValues.authMode === "BasicAuth" || watchedValues.authMode === "Cookie") && (
             <>
               <FormField label="Username" control={control} name="username" />
               <FormField label="Password" control={control} name="password" type="password" />

@@ -269,9 +269,9 @@ export interface IndexerVm {
 
 export interface CreateIndexerRequest {
   name: string;
-  type: "Torznab" | "Rss";
+  type: "Torznab" | "Rss" | "TorrentLeech";
   baseUrl: string;
-  authMode: "None" | "ApiKey" | "BasicAuth";
+  authMode: "None" | "ApiKey" | "BasicAuth" | "Cookie";
   apiKey?: string;
   username?: string;
   password?: string;

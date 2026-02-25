@@ -3,6 +3,7 @@ using Torrential.Extensions.Indexing.Metadata;
 using Torrential.Extensions.Indexing.Models;
 using Torrential.Extensions.Indexing.Services;
 using Torrential.Extensions.Indexing.Persistence;
+using Torrential.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -57,8 +58,14 @@ internal class StubIndexerClient : IIndexerClient
     private readonly List<TorrentSearchResult> _results = new();
     private bool _failOnSearch;
     private bool _testConnectionResult = true;
+    private readonly IndexerType _supportedType;
 
-    public IndexerType SupportedType => IndexerType.Torznab;
+    public StubIndexerClient(IndexerType supportedType = IndexerType.Torznab)
+    {
+        _supportedType = supportedType;
+    }
+
+    public IndexerType SupportedType => _supportedType;
 
     public void SetResults(params TorrentSearchResult[] results) => _results.AddRange(results);
     public void SetFailOnSearch() => _failOnSearch = true;
@@ -482,5 +489,418 @@ public class NoOpMetadataProviderTests
         var enrichment = await provider.EnrichAsync(result);
 
         Assert.Null(enrichment);
+    }
+}
+
+public class TorrentLeechParsingTests
+{
+    private static readonly IndexerDefinition TestIndexer = new()
+    {
+        Id = Guid.NewGuid(),
+        Name = "TL",
+        Type = IndexerType.TorrentLeech,
+        BaseUrl = "https://www.torrentleech.org",
+        AuthMode = AuthMode.Cookie,
+        Username = "user",
+        Password = "pass"
+    };
+
+    [Fact]
+    public void ParseSearchResponse_WithValidJson_ReturnsResults()
+    {
+        var json = """
+            {
+                "numFound": 2,
+                "torrentList": [
+                    {
+                        "fid": "241659300",
+                        "filename": "Test.Torrent.2025.torrent",
+                        "name": "Test Torrent 2025",
+                        "addedTimestamp": "2025-12-10 23:13:44",
+                        "categoryID": 31,
+                        "size": 65229542385,
+                        "completed": 174,
+                        "seeders": 16,
+                        "leechers": 8,
+                        "numComments": 0,
+                        "tags": ["FREELEECH"],
+                        "imdbID": "",
+                        "rating": 0,
+                        "genres": "",
+                        "download_multiplier": 0
+                    },
+                    {
+                        "fid": "241652459",
+                        "filename": "Another.Torrent.1080p.torrent",
+                        "name": "Another Torrent 1080p",
+                        "addedTimestamp": "2025-11-30 03:29:16",
+                        "categoryID": 36,
+                        "size": 3133136453,
+                        "seeders": 8,
+                        "leechers": 0,
+                        "imdbID": "tt0096251",
+                        "rating": 7,
+                        "genres": "Horror, Sci-Fi, Thriller"
+                    }
+                ]
+            }
+            """;
+
+        var results = TorrentLeechClient.ParseSearchResponse(json, TestIndexer);
+
+        Assert.Equal(2, results.Count);
+
+        var first = results[0];
+        Assert.Equal("Test Torrent 2025", first.Title);
+        Assert.Equal(65229542385L, first.SizeBytes);
+        Assert.Equal(16, first.Seeders);
+        Assert.Equal(8, first.Leechers);
+        Assert.Equal("31", first.Category);
+        Assert.Equal(TestIndexer.Id, first.IndexerId);
+        Assert.Equal("TL", first.IndexerName);
+        Assert.Equal("https://www.torrentleech.org/download/241659300/Test.Torrent.2025.torrent", first.DownloadUrl);
+        Assert.Equal("https://www.torrentleech.org/torrent/241659300", first.DetailsUrl);
+        Assert.NotNull(first.PublishDate);
+
+        var second = results[1];
+        Assert.Equal("Another Torrent 1080p", second.Title);
+        Assert.Equal(3133136453L, second.SizeBytes);
+        Assert.Equal(8, second.Seeders);
+        Assert.Equal(0, second.Leechers);
+    }
+
+    [Fact]
+    public void ParseSearchResponse_WithDateParsing_ExtractsCorrectDate()
+    {
+        var json = """
+            {
+                "numFound": 1,
+                "torrentList": [
+                    {
+                        "fid": "100",
+                        "filename": "test.torrent",
+                        "name": "Date Test",
+                        "addedTimestamp": "2025-12-10 23:13:44",
+                        "categoryID": 14,
+                        "size": 1000,
+                        "seeders": 1,
+                        "leechers": 0
+                    }
+                ]
+            }
+            """;
+
+        var results = TorrentLeechClient.ParseSearchResponse(json, TestIndexer);
+
+        Assert.Single(results);
+        Assert.NotNull(results[0].PublishDate);
+        Assert.Equal(2025, results[0].PublishDate!.Value.Year);
+        Assert.Equal(12, results[0].PublishDate!.Value.Month);
+        Assert.Equal(10, results[0].PublishDate!.Value.Day);
+    }
+
+    [Fact]
+    public void ParseSearchResponse_WithMissingOptionalFields_HandlesGracefully()
+    {
+        var json = """
+            {
+                "numFound": 1,
+                "torrentList": [
+                    {
+                        "name": "Minimal Torrent"
+                    }
+                ]
+            }
+            """;
+
+        var results = TorrentLeechClient.ParseSearchResponse(json, TestIndexer);
+
+        Assert.Single(results);
+        Assert.Equal("Minimal Torrent", results[0].Title);
+        Assert.Equal(0, results[0].SizeBytes);
+        Assert.Equal(0, results[0].Seeders);
+        Assert.Equal(0, results[0].Leechers);
+        Assert.Null(results[0].DownloadUrl);
+        Assert.Null(results[0].DetailsUrl);
+        Assert.Null(results[0].Category);
+        Assert.Null(results[0].PublishDate);
+    }
+
+    [Fact]
+    public void ParseSearchResponse_WithEmptyTorrentList_ReturnsEmpty()
+    {
+        var json = """
+            {
+                "numFound": 0,
+                "torrentList": []
+            }
+            """;
+
+        var results = TorrentLeechClient.ParseSearchResponse(json, TestIndexer);
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void ParseSearchResponse_WithMissingTorrentList_ReturnsEmpty()
+    {
+        var json = """{ "numFound": 0 }""";
+
+        var results = TorrentLeechClient.ParseSearchResponse(json, TestIndexer);
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void ParseSearchResponse_WithMalformedJson_ReturnsEmpty()
+    {
+        var json = "this is not json";
+
+        var results = TorrentLeechClient.ParseSearchResponse(json, TestIndexer);
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void ParseSearchResponse_SkipsItemsWithEmptyName()
+    {
+        var json = """
+            {
+                "numFound": 2,
+                "torrentList": [
+                    {
+                        "fid": "1",
+                        "filename": "a.torrent",
+                        "name": "",
+                        "size": 100,
+                        "seeders": 1,
+                        "leechers": 0
+                    },
+                    {
+                        "fid": "2",
+                        "filename": "b.torrent",
+                        "name": "Valid Name",
+                        "size": 200,
+                        "seeders": 2,
+                        "leechers": 1
+                    }
+                ]
+            }
+            """;
+
+        var results = TorrentLeechClient.ParseSearchResponse(json, TestIndexer);
+
+        Assert.Single(results);
+        Assert.Equal("Valid Name", results[0].Title);
+    }
+
+    [Fact]
+    public void ParseSearchResponse_WithStringNumericValues_ParsesCorrectly()
+    {
+        // Some JSON responses may have numeric values as strings
+        var json = """
+            {
+                "numFound": 1,
+                "torrentList": [
+                    {
+                        "fid": "500",
+                        "filename": "test.torrent",
+                        "name": "String Numbers Test",
+                        "size": 999999,
+                        "seeders": 42,
+                        "leechers": 7,
+                        "categoryID": 14
+                    }
+                ]
+            }
+            """;
+
+        var results = TorrentLeechClient.ParseSearchResponse(json, TestIndexer);
+
+        Assert.Single(results);
+        Assert.Equal(999999L, results[0].SizeBytes);
+        Assert.Equal(42, results[0].Seeders);
+        Assert.Equal(7, results[0].Leechers);
+        Assert.Equal("14", results[0].Category);
+    }
+
+    [Fact]
+    public void ParseSearchResponse_UrlGeneration_WithTrailingSlash()
+    {
+        var indexerWithSlash = new IndexerDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "TL",
+            Type = IndexerType.TorrentLeech,
+            BaseUrl = "https://www.torrentleech.org/",
+            AuthMode = AuthMode.Cookie,
+            Username = "user",
+            Password = "pass"
+        };
+
+        var json = """
+            {
+                "numFound": 1,
+                "torrentList": [
+                    {
+                        "fid": "12345",
+                        "filename": "My.File.torrent",
+                        "name": "My File",
+                        "size": 100
+                    }
+                ]
+            }
+            """;
+
+        var results = TorrentLeechClient.ParseSearchResponse(json, indexerWithSlash);
+
+        Assert.Single(results);
+        Assert.Equal("https://www.torrentleech.org/download/12345/My.File.torrent", results[0].DownloadUrl);
+        Assert.Equal("https://www.torrentleech.org/torrent/12345", results[0].DetailsUrl);
+    }
+}
+
+public class EngineDispatchTests
+{
+    [Fact]
+    public async Task Search_DispatchesToCorrectClientByType()
+    {
+        var repo = new StubIndexerRepository();
+        var torznabIndexer = new IndexerDefinition
+        {
+            Id = Guid.NewGuid(), Name = "Torznab Indexer", Type = IndexerType.Torznab,
+            BaseUrl = "https://torznab.example.com", AuthMode = AuthMode.ApiKey, Enabled = true
+        };
+        var tlIndexer = new IndexerDefinition
+        {
+            Id = Guid.NewGuid(), Name = "TL Indexer", Type = IndexerType.TorrentLeech,
+            BaseUrl = "https://www.torrentleech.org", AuthMode = AuthMode.Cookie, Enabled = true
+        };
+        repo.Seed(torznabIndexer, tlIndexer);
+
+        var torznabClient = new StubIndexerClient(IndexerType.Torznab);
+        torznabClient.SetResults(new TorrentSearchResult { Title = "Torznab Result", SizeBytes = 100 });
+
+        var tlClient = new StubIndexerClient(IndexerType.TorrentLeech);
+        tlClient.SetResults(new TorrentSearchResult { Title = "TL Result", SizeBytes = 200 });
+
+        var metadata = new StubMetadataProvider();
+        var service = new IndexerSearchService(
+            repo, [torznabClient, tlClient], metadata,
+            NullLogger<IndexerSearchService>.Instance);
+
+        var results = await service.SearchAsync(new SearchRequest { Query = "test" });
+
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, r => r.Result.Title == "Torznab Result");
+        Assert.Contains(results, r => r.Result.Title == "TL Result");
+    }
+
+    [Fact]
+    public async Task Search_WithUnsupportedType_SkipsIndexer()
+    {
+        var repo = new StubIndexerRepository();
+        // Create an indexer with TorrentLeech type but only register Torznab client
+        var indexer = new IndexerDefinition
+        {
+            Id = Guid.NewGuid(), Name = "Unsupported", Type = IndexerType.TorrentLeech,
+            BaseUrl = "https://example.com", AuthMode = AuthMode.Cookie, Enabled = true
+        };
+        repo.Seed(indexer);
+
+        var torznabClient = new StubIndexerClient(IndexerType.Torznab);
+        torznabClient.SetResults(new TorrentSearchResult { Title = "Should Not Appear" });
+
+        var metadata = new StubMetadataProvider();
+        var service = new IndexerSearchService(
+            repo, [torznabClient], metadata,
+            NullLogger<IndexerSearchService>.Instance);
+
+        var results = await service.SearchAsync(new SearchRequest { Query = "test" });
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task Search_FailureInOneIndexer_DoesNotAffectOthers()
+    {
+        var repo = new StubIndexerRepository();
+        var torznabIndexer = new IndexerDefinition
+        {
+            Id = Guid.NewGuid(), Name = "Good Indexer", Type = IndexerType.Torznab,
+            BaseUrl = "https://good.example.com", AuthMode = AuthMode.ApiKey, Enabled = true
+        };
+        var tlIndexer = new IndexerDefinition
+        {
+            Id = Guid.NewGuid(), Name = "Bad Indexer", Type = IndexerType.TorrentLeech,
+            BaseUrl = "https://bad.example.com", AuthMode = AuthMode.Cookie, Enabled = true
+        };
+        repo.Seed(torznabIndexer, tlIndexer);
+
+        var goodClient = new StubIndexerClient(IndexerType.Torznab);
+        goodClient.SetResults(new TorrentSearchResult { Title = "Good Result", SizeBytes = 100 });
+
+        var badClient = new StubIndexerClient(IndexerType.TorrentLeech);
+        badClient.SetFailOnSearch();
+
+        var metadata = new StubMetadataProvider();
+        var service = new IndexerSearchService(
+            repo, [goodClient, badClient], metadata,
+            NullLogger<IndexerSearchService>.Instance);
+
+        var results = await service.SearchAsync(new SearchRequest { Query = "test" });
+
+        Assert.Single(results);
+        Assert.Equal("Good Result", results[0].Result.Title);
+    }
+
+    [Fact]
+    public async Task TestConnection_ForTorrentLeechType_DelegatesToCorrectClient()
+    {
+        var repo = new StubIndexerRepository();
+        var indexer = new IndexerDefinition
+        {
+            Id = Guid.NewGuid(), Name = "TL", Type = IndexerType.TorrentLeech,
+            BaseUrl = "https://www.torrentleech.org", AuthMode = AuthMode.Cookie, Enabled = true
+        };
+        repo.Seed(indexer);
+
+        var torznabClient = new StubIndexerClient(IndexerType.Torznab);
+        torznabClient.SetTestConnectionResult(false);
+
+        var tlClient = new StubIndexerClient(IndexerType.TorrentLeech);
+        tlClient.SetTestConnectionResult(true);
+
+        var metadata = new StubMetadataProvider();
+        var service = new IndexerSearchService(
+            repo, [torznabClient, tlClient], metadata,
+            NullLogger<IndexerSearchService>.Instance);
+
+        var result = await service.TestIndexerAsync(indexer.Id);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task TestConnection_WithNoMatchingClient_ReturnsFalse()
+    {
+        var repo = new StubIndexerRepository();
+        var indexer = new IndexerDefinition
+        {
+            Id = Guid.NewGuid(), Name = "TL", Type = IndexerType.TorrentLeech,
+            BaseUrl = "https://www.torrentleech.org", AuthMode = AuthMode.Cookie, Enabled = true
+        };
+        repo.Seed(indexer);
+
+        // Only register Torznab client, but indexer is TorrentLeech
+        var torznabClient = new StubIndexerClient(IndexerType.Torznab);
+        var metadata = new StubMetadataProvider();
+        var service = new IndexerSearchService(
+            repo, [torznabClient], metadata,
+            NullLogger<IndexerSearchService>.Instance);
+
+        var result = await service.TestIndexerAsync(indexer.Id);
+
+        Assert.False(result);
     }
 }

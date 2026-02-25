@@ -21,6 +21,7 @@ public enum IndexerType
 {
     Torznab,
     Rss,
+    TorrentLeech,
     Custom = Rss
 }
 
@@ -29,5 +30,6 @@ public enum AuthMode
 {
     None,
     ApiKey,
-    BasicAuth
+    BasicAuth,
+    Cookie
 }
