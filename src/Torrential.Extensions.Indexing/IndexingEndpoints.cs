@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Torrential.Extensions.Indexing.Api;
 using Torrential.Extensions.Indexing.Models;
+using Torrential.Models;
 using Torrential.Extensions.Indexing.Persistence;
 using Torrential.Extensions.Indexing.Services;
 

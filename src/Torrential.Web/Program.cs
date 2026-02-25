@@ -142,6 +142,52 @@ app.MapPost(
     })
     .DisableAntiforgery();
 
+app.MapPost(
+    "/torrents/add-url",
+    async (TorrentAddFromUrlRequest request, IHttpClientFactory httpClientFactory, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory) =>
+    {
+        if (string.IsNullOrWhiteSpace(request.Url))
+            return Results.BadRequest(new { Error = new { Code = "ValidationError", Message = "Url is required" } });
+
+        var logger = loggerFactory.CreateLogger("TorrentAddUrlEndpoint");
+
+        TorrentMetadata meta;
+        try
+        {
+            using var client = httpClientFactory.CreateClient("Indexer");
+            var bytes = await client.GetByteArrayAsync(request.Url);
+            using var ms = new MemoryStream(bytes);
+            meta = TorrentMetadataParser.FromStream(ms);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to download torrent file from {Url}", request.Url);
+            return Results.BadRequest(new { Error = new { Code = "DownloadFailed", Message = "Failed to download torrent file from URL" } });
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = scopeFactory.CreateScope();
+                var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<TorrentAddCommand, TorrentAddResponse>>();
+                await handler.Execute(new()
+                {
+                    Metadata = meta,
+                    DownloadPath = "",
+                    CompletedPath = "",
+                    SelectedFileIds = null
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to add torrent {InfoHash} from URL in background task", meta.InfoHash);
+            }
+        });
+
+        return Results.Accepted($"/torrents/{meta.InfoHash}", new { infoHash = meta.InfoHash });
+    });
+
 app.MapGet(
     "/torrents",
     async (PeerSwarm swarms,
@@ -401,8 +447,6 @@ app.MapGet("filesystem/directories", (string? path) =>
     }
 });
 
-
-await app.Services.InitializeIndexingAsync();
 
 var initService = app.Services.GetRequiredService<InitializationService>();
 await initService.Initialize(CancellationToken.None);

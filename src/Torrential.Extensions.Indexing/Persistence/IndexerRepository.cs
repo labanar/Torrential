@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Torrential.Extensions.Indexing.Models;
+using Torrential.Models;
 
 namespace Torrential.Extensions.Indexing.Persistence;
 
@@ -19,21 +19,21 @@ internal sealed class IndexerRepository(IServiceScopeFactory scopeFactory) : IIn
     public async Task<IReadOnlyList<IndexerDefinition>> GetAllAsync(CancellationToken ct = default)
     {
         using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<IndexingDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
         return await db.Indexers.AsNoTracking().OrderBy(i => i.Name).ToListAsync(ct);
     }
 
     public async Task<IndexerDefinition?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<IndexingDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
         return await db.Indexers.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id, ct);
     }
 
     public async Task<IndexerDefinition> AddAsync(IndexerDefinition indexer, CancellationToken ct = default)
     {
         using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<IndexingDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
         db.Indexers.Add(indexer);
         await db.SaveChangesAsync(ct);
         return indexer;
@@ -42,7 +42,7 @@ internal sealed class IndexerRepository(IServiceScopeFactory scopeFactory) : IIn
     public async Task<IndexerDefinition?> UpdateAsync(IndexerDefinition indexer, CancellationToken ct = default)
     {
         using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<IndexingDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
 
         var existing = await db.Indexers.FirstOrDefaultAsync(i => i.Id == indexer.Id, ct);
         if (existing is null) return null;
@@ -63,7 +63,7 @@ internal sealed class IndexerRepository(IServiceScopeFactory scopeFactory) : IIn
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
     {
         using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<IndexingDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
 
         var existing = await db.Indexers.FirstOrDefaultAsync(i => i.Id == id, ct);
         if (existing is null) return false;
@@ -76,7 +76,7 @@ internal sealed class IndexerRepository(IServiceScopeFactory scopeFactory) : IIn
     public async Task<IReadOnlyList<IndexerDefinition>> GetEnabledAsync(CancellationToken ct = default)
     {
         using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<IndexingDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
         return await db.Indexers.AsNoTracking().Where(i => i.Enabled).OrderBy(i => i.Name).ToListAsync(ct);
     }
 }

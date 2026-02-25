@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Torrential.Extensions.Indexing.Clients;
 using Torrential.Extensions.Indexing.Metadata;
 using Torrential.Extensions.Indexing.Models;
+using Torrential.Models;
 using Torrential.Extensions.Indexing.Persistence;
 
 namespace Torrential.Extensions.Indexing.Services;

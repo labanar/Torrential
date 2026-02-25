@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using Torrential.Extensions.Indexing.Models;
+using Torrential.Models;
 
 namespace Torrential.Extensions.Indexing.Clients;
 

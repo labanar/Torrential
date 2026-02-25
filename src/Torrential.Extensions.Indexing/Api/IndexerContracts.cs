@@ -1,4 +1,4 @@
-using Torrential.Extensions.Indexing.Models;
+using Torrential.Models;
 
 namespace Torrential.Extensions.Indexing.Api;
 
