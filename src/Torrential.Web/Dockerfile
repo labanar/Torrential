@@ -12,6 +12,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["src/Torrential.Web/Torrential.Web.csproj", "src/Torrential.Web/"]
+COPY ["src/Torrential.Extensions.Indexing/Torrential.Extensions.Indexing.csproj", "src/Torrential.Extensions.Indexing/"]
 COPY ["src/Torrential.Extensions.SignalR/Torrential.Extensions.SignalR.csproj", "src/Torrential.Extensions.SignalR/"]
 COPY ["src/Torrential/Torrential.csproj", "src/Torrential/"]
 RUN dotnet restore "./src/Torrential.Web/Torrential.Web.csproj"

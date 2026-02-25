@@ -20,6 +20,7 @@ using Torrential.Web.Api.Requests.Settings;
 using Torrential.Web.Api.Requests.Torrents;
 using Torrential.Web.Api.Responses;
 using Torrential.Web.Api.Responses.Settings;
+using Torrential.Extensions.Indexing;
 using Torrential.Web.Api.Responses.Torrents;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,6 +28,7 @@ builder.Services.AddMemoryCache();
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(BuildLogger(builder.Configuration));
 builder.Services.AddTorrential();
+builder.Services.AddTorrentialIndexing(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
@@ -75,6 +77,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors();
 app.MapHub<TorrentHub>("/torrents/hub");
+app.MapTorrentialIndexingEndpoints();
 
 
 app.MapPost(
@@ -398,6 +401,8 @@ app.MapGet("filesystem/directories", (string? path) =>
     }
 });
 
+
+await app.Services.InitializeIndexingAsync();
 
 var initService = app.Services.GetRequiredService<InitializationService>();
 await initService.Initialize(CancellationToken.None);

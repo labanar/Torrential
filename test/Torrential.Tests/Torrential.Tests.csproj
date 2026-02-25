@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Torrential\Torrential.csproj" />
+    <ProjectReference Include="..\..\src\Torrential.Extensions.Indexing\Torrential.Extensions.Indexing.csproj" />
   </ItemGroup>
 
   <ItemGroup>
