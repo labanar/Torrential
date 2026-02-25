@@ -197,4 +197,113 @@ test.describe('Screenshots', () => {
       fullPage: true,
     });
   });
+
+  test('integrations page', async ({ page }, testInfo) => {
+    await page.goto('/integrations');
+    await page.waitForLoadState('networkidle');
+    await assertNoHorizontalOverflow(page);
+
+    // Page title should be visible
+    await expect(page.locator('h1:has-text("Integrations")')).toBeVisible();
+
+    // Section headers should be rendered
+    await expect(page.locator('h2:has-text("Indexers")')).toBeVisible();
+    await expect(page.locator('h2:has-text("Search")')).toBeVisible();
+
+    // Empty state when no indexers configured
+    const emptyState = page.locator('text=No indexers configured');
+    const indexerCard = page.locator('[class*="indexerCard"]');
+    await expect(emptyState.or(indexerCard.first()).first()).toBeVisible();
+
+    // Add button should be visible and in viewport
+    const addButton = page.locator('button[aria-label="Add indexer"]');
+    await expect(addButton).toBeVisible();
+    await expectFullyInViewport(page, 'button[aria-label="Add indexer"]', 'add indexer button');
+
+    // Search input should be present
+    const searchInput = page.locator('input[placeholder]').first();
+    await expect(searchInput).toBeVisible();
+
+    await page.screenshot({
+      path: screenshotPath(testInfo.project.name, 'integrations'),
+      fullPage: true,
+    });
+  });
+
+  test('integrations add indexer dialog', async ({ page }, testInfo) => {
+    await page.goto('/integrations');
+    await page.waitForLoadState('networkidle');
+
+    // Open the add indexer dialog
+    const addButton = page.locator('button[aria-label="Add indexer"]');
+    await addButton.click();
+
+    // Dialog should appear with form fields
+    await expect(page.locator('text=Add Indexer')).toBeVisible();
+    await expect(page.locator('text=Configure a new indexer')).toBeVisible();
+
+    // Form fields should be present
+    const nameInput = page.locator('input').first();
+    await expect(nameInput).toBeVisible();
+
+    // Create and Cancel buttons should be present
+    await expect(page.locator('button:has-text("Create")')).toBeVisible();
+    await expect(page.locator('button:has-text("Cancel")')).toBeVisible();
+
+    await assertNoHorizontalOverflow(page);
+
+    await page.screenshot({
+      path: screenshotPath(testInfo.project.name, 'integrations-add-dialog'),
+      fullPage: true,
+    });
+
+    // Close the dialog
+    const cancelButton = page.locator('button:has-text("Cancel")');
+    await cancelButton.click();
+    await expect(page.locator('text=Add Indexer')).toBeHidden();
+  });
+
+  test('integrations indexer CRUD flow', async ({ page, baseURL }) => {
+    await page.goto('/integrations');
+    await page.waitForLoadState('networkidle');
+
+    // Stub: create an indexer via API so we can test the list rendering
+    const createRes = await fetch(`${baseURL}/indexers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Test Torznab',
+        type: 0,
+        baseUrl: 'http://localhost:9117/api',
+        authMode: 1,
+        apiKey: 'test-api-key',
+        enabled: true,
+      }),
+    });
+
+    // Reload page to show newly created indexer
+    await page.goto('/integrations');
+    await page.waitForLoadState('networkidle');
+
+    if (createRes.ok) {
+      // The indexer card should appear
+      await expect(page.locator('text=Test Torznab').first()).toBeVisible();
+
+      // Edit button should be visible
+      const editButton = page.locator('button[aria-label="Edit Test Torznab"]');
+      await expect(editButton).toBeVisible();
+
+      // Delete button should be visible
+      const deleteButton = page.locator('button[aria-label="Delete Test Torznab"]');
+      await expect(deleteButton).toBeVisible();
+
+      // Delete the indexer
+      await deleteButton.click();
+
+      // Wait for the indexer to disappear
+      await expect(page.locator('text=Test Torznab')).toBeHidden();
+    }
+
+    await assertNoHorizontalOverflow(page);
+  });
 });

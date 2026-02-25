@@ -1,0 +1,291 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: auto;
+  padding: 1rem;
+  gap: 1rem;
+  max-width: 62rem;
+  margin: 0 auto;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pageTitle {
+  font-size: clamp(1.6rem, 4vw, 1.9rem);
+  font-weight: 600;
+  margin: 0;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0;
+  padding-bottom: 4px;
+}
+
+/* Indexer list */
+.indexerList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.indexerCard {
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.indexerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.indexerName {
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+}
+
+.indexerMeta {
+  font-size: 0.78rem;
+  color: hsl(var(--muted-foreground));
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.indexerActions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.enabledBadge {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.enabledBadgeOn {
+  background: hsl(142 76% 36% / 0.15);
+  color: hsl(142 76% 36%);
+}
+
+.enabledBadgeOff {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+
+/* Search section */
+.searchSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.searchRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.searchInput {
+  flex: 1;
+}
+
+/* Search results table */
+.resultsWrap {
+  overflow: auto;
+}
+
+.resultsTable {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+
+.resultsTable th {
+  text-align: left;
+  padding: 0.5em 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 0.85em;
+  opacity: 0.7;
+  border-bottom: 1px solid hsl(var(--border));
+  position: sticky;
+  top: 0;
+  background: hsl(var(--background));
+}
+
+.resultsTable td {
+  padding: 0.4em 0.75em;
+  font-size: 0.9em;
+}
+
+.resultsTable tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.resultTitle {
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seeders {
+  color: #22c55e;
+}
+
+.leechers {
+  color: #ef4444;
+}
+
+/* Search result cards for mobile */
+.resultCards {
+  display: none;
+}
+
+.resultCard {
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cardRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cardLabel {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.cardValue {
+  text-align: right;
+  font-size: 0.85rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  opacity: 0.4;
+  font-size: 0.85em;
+  letter-spacing: 0.05em;
+}
+
+/* Form dialog fields */
+.formGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.formLabel {
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+/* Metadata enrichment */
+.metadataRow {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.5rem 0;
+}
+
+.metadataPoster {
+  width: 60px;
+  height: auto;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.metadataInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  color: hsl(var(--muted-foreground));
+}
+
+@media (max-width: 768px) {
+  .root {
+    padding: 0.75rem;
+    gap: 0.75rem;
+  }
+
+  .searchRow {
+    flex-direction: column;
+  }
+
+  .formRow {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+
+  .formLabel {
+    text-align: left;
+  }
+
+  .indexerCard {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .indexerActions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 700px) {
+  .resultsWrap {
+    display: none;
+  }
+
+  .resultCards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

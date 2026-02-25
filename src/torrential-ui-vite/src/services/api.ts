@@ -254,3 +254,141 @@ export async function browseDirectories(path?: string): Promise<DirectoryBrowseA
 
   return result.data;
 }
+
+// --- Indexer API ---
+
+export interface IndexerVm {
+  id: string;
+  name: string;
+  type: string;
+  baseUrl: string;
+  authMode: string;
+  enabled: boolean;
+  dateAdded: string;
+}
+
+export interface CreateIndexerRequest {
+  name: string;
+  type: "Torznab" | "Custom";
+  baseUrl: string;
+  authMode: "None" | "ApiKey" | "BasicAuth";
+  apiKey?: string;
+  username?: string;
+  password?: string;
+  enabled: boolean;
+}
+
+export interface UpdateIndexerRequest extends CreateIndexerRequest {}
+
+export interface SearchResultVm {
+  title: string;
+  sizeBytes: number;
+  seeders: number;
+  leechers: number;
+  infoHash: string | null;
+  downloadUrl: string | null;
+  detailsUrl: string | null;
+  category: string | null;
+  publishDate: string | null;
+  indexerName: string | null;
+  metadata: MetadataVm | null;
+}
+
+export interface MetadataVm {
+  description: string | null;
+  externalId: string | null;
+  artworkUrl: string | null;
+  genre: string | null;
+  year: number | null;
+}
+
+export async function fetchIndexers(): Promise<IndexerVm[]> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/indexers`);
+  if (!response.ok) throw new Error("Failed to fetch indexers");
+  const result: ApiResponse<IndexerVm[]> = await response.json();
+  return result.data ?? [];
+}
+
+export async function fetchIndexer(id: string): Promise<IndexerVm | null> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/indexers/${id}`);
+  if (!response.ok) return null;
+  const result: ApiResponse<IndexerVm> = await response.json();
+  return result.data ?? null;
+}
+
+export async function createIndexer(request: CreateIndexerRequest): Promise<IndexerVm> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/indexers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error?.message ?? "Failed to create indexer");
+  }
+  const result: ApiResponse<IndexerVm> = await response.json();
+  return result.data!;
+}
+
+export async function updateIndexer(id: string, request: UpdateIndexerRequest): Promise<IndexerVm> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/indexers/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error?.message ?? "Failed to update indexer");
+  }
+  const result: ApiResponse<IndexerVm> = await response.json();
+  return result.data!;
+}
+
+export async function deleteIndexer(id: string): Promise<boolean> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/indexers/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) return false;
+  const result = await response.json();
+  return result.data?.success ?? false;
+}
+
+export async function testIndexer(id: string): Promise<boolean> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/indexers/${id}/test`, {
+    method: "POST",
+  });
+  if (!response.ok) return false;
+  const result = await response.json();
+  return result.data?.success ?? false;
+}
+
+export interface IndexerSearchRequest {
+  query: string;
+  category?: string;
+  limit?: number;
+}
+
+export async function searchIndexers(request: IndexerSearchRequest): Promise<SearchResultVm[]> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/indexers/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error?.message ?? "Search failed");
+  }
+  const result: ApiResponse<SearchResultVm[]> = await response.json();
+  return result.data ?? [];
+}
+
+export async function addTorrentFromUrl(downloadUrl: string): Promise<void> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/add-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: downloadUrl }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to add torrent from URL");
+  }
+}
