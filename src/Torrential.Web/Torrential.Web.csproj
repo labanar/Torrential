@@ -33,6 +33,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\Torrential.Extensions.Indexing\Torrential.Extensions.Indexing.csproj" />
 		<ProjectReference Include="..\Torrential.Extensions.SignalR\Torrential.Extensions.SignalR.csproj" />
 		<ProjectReference Include="..\Torrential\Torrential.csproj" />
 	</ItemGroup>

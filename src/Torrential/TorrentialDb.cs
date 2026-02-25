@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Torrential.Files;
+using Torrential.Models;
 
 namespace Torrential
 {
@@ -7,6 +8,7 @@ namespace Torrential
     {
         public DbSet<TorrentConfiguration> Torrents { get; set; }
         public DbSet<TorrentialSettings> Settings { get; set; }
+        public DbSet<IndexerDefinition> Indexers { get; set; }
         public TorrentialDb(DbContextOptions<TorrentialDb> options) : base(options)
         {
 
@@ -23,6 +25,38 @@ namespace Torrential
                 .HasConversion(
                     v => v.ToString(),
                     v => (TorrentStatus)Enum.Parse(typeof(TorrentStatus), v));
+
+            modelBuilder.Entity<IndexerDefinition>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Name)
+                    .IsRequired()
+                    .HasMaxLength(200);
+
+                entity.Property(e => e.BaseUrl)
+                    .IsRequired()
+                    .HasMaxLength(500);
+
+                entity.Property(e => e.Type)
+                    .HasConversion(
+                        v => v.ToString(),
+                        v => Enum.Parse<IndexerType>(v));
+
+                entity.Property(e => e.AuthMode)
+                    .HasConversion(
+                        v => v.ToString(),
+                        v => Enum.Parse<AuthMode>(v));
+
+                entity.Property(e => e.ApiKey)
+                    .HasMaxLength(500);
+
+                entity.Property(e => e.Username)
+                    .HasMaxLength(200);
+
+                entity.Property(e => e.Password)
+                    .HasMaxLength(200);
+            });
 
             modelBuilder.Entity<TorrentialSettings>()
                 .ComplexProperty(p => p.FileSettings);
@@ -117,7 +151,7 @@ namespace Torrential
         public static TcpListenerSettings Default { get; } = new()
         {
             Enabled = true,
-            Port = 53123
+            Port = 6881
         };
 
         public static bool Validate(TcpListenerSettings settings)

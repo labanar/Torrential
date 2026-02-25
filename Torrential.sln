@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Torrential.Sample", "src\To
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Torrential.Core.Tests", "test\Torrential.Core.Tests\Torrential.Core.Tests.csproj", "{EEDA8090-DC3C-4247-BE97-C9ACED34B4C7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Torrential.Extensions.Indexing", "src\Torrential.Extensions.Indexing\Torrential.Extensions.Indexing.csproj", "{B7A1D08E-5F42-4C5A-9E2B-6D8F3A4C1E72}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -51,6 +53,10 @@ Global
 		{EEDA8090-DC3C-4247-BE97-C9ACED34B4C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EEDA8090-DC3C-4247-BE97-C9ACED34B4C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EEDA8090-DC3C-4247-BE97-C9ACED34B4C7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7A1D08E-5F42-4C5A-9E2B-6D8F3A4C1E72}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7A1D08E-5F42-4C5A-9E2B-6D8F3A4C1E72}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7A1D08E-5F42-4C5A-9E2B-6D8F3A4C1E72}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7A1D08E-5F42-4C5A-9E2B-6D8F3A4C1E72}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

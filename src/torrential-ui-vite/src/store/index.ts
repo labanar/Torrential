@@ -3,6 +3,7 @@ import torrentsReducer from "./slices/torrentsSlice";
 import peersReducer from "./slices/peersSlice";
 import notificationsReducer from "./slices/notificationsSlice";
 import torrentDetailReducer from "./slices/torrentDetailSlice";
+import indexerReducer from "./slices/indexerSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { ConnectedPeer, TorrentSummary } from "../types";
 
@@ -12,6 +13,7 @@ const store = configureStore({
     peers: peersReducer,
     notifications: notificationsReducer,
     torrentDetail: torrentDetailReducer,
+    indexer: indexerReducer,
   },
 });
 
