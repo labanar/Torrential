@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Torrential.Extensions.Indexing.Models;
 
 public class IndexerDefinition
@@ -14,12 +16,15 @@ public class IndexerDefinition
     public DateTimeOffset DateAdded { get; set; } = DateTimeOffset.UtcNow;
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum IndexerType
 {
     Torznab,
-    Custom
+    Rss,
+    Custom = Rss
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum AuthMode
 {
     None,

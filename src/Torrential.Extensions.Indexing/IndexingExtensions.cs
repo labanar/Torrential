@@ -29,6 +29,7 @@ public static class IndexingExtensions
 
         services.AddSingleton<IIndexerRepository, IndexerRepository>();
         services.AddSingleton<IIndexerClient, TorznabClient>();
+        services.AddSingleton<IIndexerClient, RssClient>();
         services.AddSingleton<IIndexerSearchService, IndexerSearchService>();
 
         // Register the no-op metadata provider as the default.

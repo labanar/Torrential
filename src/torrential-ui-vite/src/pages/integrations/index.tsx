@@ -443,7 +443,7 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
 
 interface IndexerFormValues {
   name: string;
-  type: "Torznab" | "Custom";
+  type: "Torznab" | "Rss";
   baseUrl: string;
   authMode: "None" | "ApiKey" | "BasicAuth";
   apiKey: string;
@@ -482,7 +482,7 @@ function IndexerFormDialog({ open, onOpenChange, editing, onSaved }: IndexerForm
       if (editing) {
         reset({
           name: editing.name,
-          type: editing.type as "Torznab" | "Custom",
+          type: editing.type as "Torznab" | "Rss",
           baseUrl: editing.baseUrl,
           authMode: editing.authMode as "None" | "ApiKey" | "BasicAuth",
           apiKey: "",
@@ -550,7 +550,7 @@ function IndexerFormDialog({ open, onOpenChange, editing, onSaved }: IndexerForm
           <FormField label="Name" control={control} name="name" />
           <div className={styles.formRow}>
             <label className={styles.formLabel}>Type</label>
-            <SelectField control={control} name="type" options={["Torznab", "Custom"]} />
+            <SelectField control={control} name="type" options={["Torznab", "Rss"]} />
           </div>
           <FormField label="Base URL" control={control} name="baseUrl" />
           <div className={styles.formRow}>

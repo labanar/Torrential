@@ -117,7 +117,7 @@ namespace Torrential
         public static TcpListenerSettings Default { get; } = new()
         {
             Enabled = true,
-            Port = 53123
+            Port = 6881
         };
 
         public static bool Validate(TcpListenerSettings settings)

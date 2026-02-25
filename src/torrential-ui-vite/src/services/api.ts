@@ -269,7 +269,7 @@ export interface IndexerVm {
 
 export interface CreateIndexerRequest {
   name: string;
-  type: "Torznab" | "Custom";
+  type: "Torznab" | "Rss";
   baseUrl: string;
   authMode: "None" | "ApiKey" | "BasicAuth";
   apiKey?: string;
