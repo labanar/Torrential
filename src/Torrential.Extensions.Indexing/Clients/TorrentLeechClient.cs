@@ -117,7 +117,7 @@ internal sealed class TorrentLeechClient(IHttpClientFactory httpClientFactory, I
             return false;
         }
 
-        var baseUrl = indexer.BaseUrl.TrimEnd('/');
+        var baseUrl = NormalizeBaseUrl(indexer.BaseUrl);
         var loginUrl = $"{baseUrl}/user/account/login/";
 
         var formContent = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -147,9 +147,20 @@ internal sealed class TorrentLeechClient(IHttpClientFactory httpClientFactory, I
         client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
     }
 
+    private static string NormalizeBaseUrl(string baseUrl)
+    {
+        var trimmed = baseUrl.Trim().TrimEnd('/');
+        if (!trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = $"https://{trimmed}";
+        }
+        return trimmed;
+    }
+
     private static string BuildSearchUrl(IndexerDefinition indexer, string query, int page)
     {
-        var baseUrl = indexer.BaseUrl.TrimEnd('/');
+        var baseUrl = NormalizeBaseUrl(indexer.BaseUrl);
         var encodedQuery = Uri.EscapeDataString(query);
         return $"{baseUrl}/torrents/browse/list/query/{encodedQuery}/page/{page}";
     }
@@ -172,7 +183,13 @@ internal sealed class TorrentLeechClient(IHttpClientFactory httpClientFactory, I
                 if (string.IsNullOrWhiteSpace(name))
                     continue;
 
-                var fid = item.TryGetProperty("fid", out var fidProp) ? fidProp.GetString() : null;
+                string? fid = null;
+                if (item.TryGetProperty("fid", out var fidProp))
+                {
+                    fid = fidProp.ValueKind == JsonValueKind.Number
+                        ? fidProp.GetRawText()
+                        : fidProp.GetString();
+                }
                 var filename = item.TryGetProperty("filename", out var filenameProp) ? filenameProp.GetString() : null;
 
                 var result = new TorrentSearchResult
@@ -210,13 +227,20 @@ internal sealed class TorrentLeechClient(IHttpClientFactory httpClientFactory, I
                 }
 
                 // Publish date
-                if (item.TryGetProperty("addedTimestamp", out var dateProp) && dateProp.ValueKind == JsonValueKind.String)
+                if (item.TryGetProperty("addedTimestamp", out var dateProp))
                 {
-                    var dateStr = dateProp.GetString();
-                    if (!string.IsNullOrEmpty(dateStr) &&
-                        DateTimeOffset.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var pubDate))
+                    if (dateProp.ValueKind == JsonValueKind.String)
                     {
-                        result.PublishDate = pubDate;
+                        var dateStr = dateProp.GetString();
+                        if (!string.IsNullOrEmpty(dateStr) &&
+                            DateTimeOffset.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var pubDate))
+                        {
+                            result.PublishDate = pubDate;
+                        }
+                    }
+                    else if (dateProp.ValueKind == JsonValueKind.Number && dateProp.TryGetInt64(out var epoch))
+                    {
+                        result.PublishDate = DateTimeOffset.FromUnixTimeSeconds(epoch);
                     }
                 }
 
@@ -232,14 +256,14 @@ internal sealed class TorrentLeechClient(IHttpClientFactory httpClientFactory, I
                 // Build download URL: /download/{fid}/{filename}
                 if (!string.IsNullOrEmpty(fid) && !string.IsNullOrEmpty(filename))
                 {
-                    var baseUrl = indexer.BaseUrl.TrimEnd('/');
+                    var baseUrl = NormalizeBaseUrl(indexer.BaseUrl);
                     result.DownloadUrl = $"{baseUrl}/download/{fid}/{filename}";
                 }
 
                 // Build details URL: /torrent/{fid}
                 if (!string.IsNullOrEmpty(fid))
                 {
-                    var baseUrl = indexer.BaseUrl.TrimEnd('/');
+                    var baseUrl = NormalizeBaseUrl(indexer.BaseUrl);
                     result.DetailsUrl = $"{baseUrl}/torrent/{fid}";
                 }
 
