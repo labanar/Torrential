@@ -44,6 +44,15 @@ internal sealed class TorznabClient(IHttpClientFactory httpClientFactory, ILogge
         }
     }
 
+    public async Task<byte[]> DownloadTorrentAsync(IndexerDefinition indexer, string downloadUrl, CancellationToken ct = default)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(RequestTimeout);
+
+        var client = CreateHttpClient(indexer);
+        return await client.GetByteArrayAsync(downloadUrl, cts.Token);
+    }
+
     public async Task<bool> TestConnectionAsync(IndexerDefinition indexer, CancellationToken ct = default)
     {
         var url = BuildCapabilitiesUrl(indexer);

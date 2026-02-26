@@ -83,6 +83,26 @@ internal sealed class TorrentLeechClient(IHttpClientFactory httpClientFactory, I
         }
     }
 
+    public async Task<byte[]> DownloadTorrentAsync(IndexerDefinition indexer, string downloadUrl, CancellationToken ct = default)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(RequestTimeout);
+
+        var handler = new HttpClientHandler { CookieContainer = new CookieContainer(), UseCookies = true };
+        using var client = new HttpClient(handler) { Timeout = RequestTimeout };
+        SetCommonHeaders(client);
+
+        if (!await LoginAsync(client, indexer, cts.Token))
+        {
+            logger.LogWarning("Authentication failed for TorrentLeech indexer {IndexerName} during download", indexer.Name);
+            throw new HttpRequestException("Authentication failed for TorrentLeech indexer");
+        }
+
+        var bytes = await client.GetByteArrayAsync(downloadUrl, cts.Token);
+        logger.LogInformation("Downloaded {ByteCount} bytes from TorrentLeech for {Url}", bytes.Length, downloadUrl);
+        return bytes;
+    }
+
     public async Task<bool> TestConnectionAsync(IndexerDefinition indexer, CancellationToken ct = default)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

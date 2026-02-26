@@ -290,6 +290,7 @@ export interface SearchResultVm {
   detailsUrl: string | null;
   category: string | null;
   publishDate: string | null;
+  indexerId: string | null;
   indexerName: string | null;
   metadata: MetadataVm | null;
 }
@@ -382,11 +383,16 @@ export async function searchIndexers(request: IndexerSearchRequest): Promise<Sea
   return result.data ?? [];
 }
 
-export async function previewTorrentFromUrl(downloadUrl: string): Promise<TorrentPreviewApiModel> {
+export async function previewTorrentFromUrl(downloadUrl: string, indexerId?: string | null): Promise<TorrentPreviewApiModel> {
+  const body: Record<string, unknown> = { url: downloadUrl };
+  if (indexerId) {
+    body.indexerId = indexerId;
+  }
+
   const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/preview-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: downloadUrl }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -406,8 +412,12 @@ export async function addTorrentFromUrl(
   downloadUrl: string,
   selectedFileIds?: number[],
   completedPath?: string,
+  indexerId?: string | null,
 ): Promise<void> {
   const body: Record<string, unknown> = { url: downloadUrl };
+  if (indexerId) {
+    body.indexerId = indexerId;
+  }
   if (selectedFileIds) {
     body.selectedFileIds = selectedFileIds;
   }

@@ -11,6 +11,7 @@ public interface IIndexerSearchService
 {
     Task<IReadOnlyList<EnrichedSearchResult>> SearchAsync(SearchRequest request, CancellationToken ct = default);
     Task<bool> TestIndexerAsync(Guid indexerId, CancellationToken ct = default);
+    Task<byte[]> DownloadTorrentFileAsync(Guid indexerId, string downloadUrl, CancellationToken ct = default);
 }
 
 internal sealed class IndexerSearchService(
@@ -56,6 +57,22 @@ internal sealed class IndexerSearchService(
         }
 
         return await client.TestConnectionAsync(indexer, ct);
+    }
+
+    public async Task<byte[]> DownloadTorrentFileAsync(Guid indexerId, string downloadUrl, CancellationToken ct = default)
+    {
+        var indexer = await repository.GetByIdAsync(indexerId, ct);
+        if (indexer is null)
+            throw new InvalidOperationException($"Indexer {indexerId} not found");
+
+        var client = GetClientForType(indexer.Type);
+        if (client is null)
+            throw new InvalidOperationException($"No client available for indexer type {indexer.Type}");
+
+        logger.LogInformation("Downloading torrent file from {Url} via indexer {IndexerName} ({IndexerType})",
+            downloadUrl, indexer.Name, indexer.Type);
+
+        return await client.DownloadTorrentAsync(indexer, downloadUrl, ct);
     }
 
     private async Task<IReadOnlyList<TorrentSearchResult>> SearchSingleIndexer(

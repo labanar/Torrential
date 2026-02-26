@@ -286,6 +286,7 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
 
   // Preview modal state
   const [pendingDownloadUrl, setPendingDownloadUrl] = useState<string | null>(null);
+  const [pendingIndexerId, setPendingIndexerId] = useState<string | null>(null);
   const [preview, setPreview] = useState<TorrentPreviewSummary | null>(null);
   const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -296,6 +297,7 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
 
   const resetPreviewState = () => {
     setPendingDownloadUrl(null);
+    setPendingIndexerId(null);
     setPreview(null);
     setSelectedFileIds([]);
     setPreviewModalOpen(false);
@@ -337,9 +339,10 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
     setIsPreviewLoading(true);
     setAddError(null);
     setPendingDownloadUrl(result.downloadUrl);
+    setPendingIndexerId(result.indexerId);
 
     try {
-      const previewResult = await previewTorrentFromUrl(result.downloadUrl);
+      const previewResult = await previewTorrentFromUrl(result.downloadUrl, result.indexerId);
       const previewSummary = mapPreview(previewResult);
       setPreview(previewSummary);
       setSelectedFileIds(previewSummary.files.map((f) => f.id));
@@ -366,6 +369,7 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
         pendingDownloadUrl,
         selectedFileIds,
         completedPathOverride.trim() || undefined,
+        pendingIndexerId,
       );
       toast.success(`Added: ${preview?.name ?? "torrent"}`);
       resetPreviewState();

@@ -14,6 +14,15 @@ public static class TorrentMetadataParser
 
     public static TorrentMetadata FromStream(Stream fs)
     {
+        // Ensure we have a seekable stream - buffer non-seekable streams (e.g. network streams)
+        if (!fs.CanSeek)
+        {
+            var buffer = new MemoryStream();
+            fs.CopyTo(buffer);
+            buffer.Position = 0;
+            return FromStream(buffer);
+        }
+
         var parser = new BencodeParser();
         var torrent = parser.Parse<Torrent>(fs);
         fs.Seek(0, SeekOrigin.Begin);

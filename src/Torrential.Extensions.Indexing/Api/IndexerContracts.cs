@@ -59,6 +59,7 @@ public class SearchResultVm
     public string? DetailsUrl { get; set; }
     public string? Category { get; set; }
     public DateTimeOffset? PublishDate { get; set; }
+    public Guid? IndexerId { get; set; }
     public string? IndexerName { get; set; }
     public MetadataVm? Metadata { get; set; }
 }

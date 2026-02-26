@@ -135,6 +135,7 @@ internal static class IndexingEndpoints
             DetailsUrl = r.DetailsUrl,
             Category = r.Category,
             PublishDate = r.PublishDate,
+            IndexerId = r.IndexerId,
             IndexerName = r.IndexerName
         };
 
