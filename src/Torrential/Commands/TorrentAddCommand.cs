@@ -46,6 +46,19 @@ namespace Torrential.Commands
 
             await db.SaveChangesAsync();
             await mgr.Add(command.Metadata, recoveryResult);
+
+            // Auto-start the torrent immediately after add
+            var startResult = await mgr.Start(command.Metadata.InfoHash);
+            if (startResult.Success)
+            {
+                var torrentConfig = await db.Torrents.FindAsync(command.Metadata.InfoHash.AsString());
+                if (torrentConfig != null)
+                {
+                    torrentConfig.Status = TorrentStatus.Running;
+                    await db.SaveChangesAsync();
+                }
+            }
+
             return new() { InfoHash = command.Metadata.InfoHash };
         }
 

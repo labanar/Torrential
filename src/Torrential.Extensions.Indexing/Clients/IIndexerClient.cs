@@ -8,4 +8,5 @@ public interface IIndexerClient
     IndexerType SupportedType { get; }
     Task<IReadOnlyList<TorrentSearchResult>> SearchAsync(IndexerDefinition indexer, SearchRequest request, CancellationToken ct = default);
     Task<bool> TestConnectionAsync(IndexerDefinition indexer, CancellationToken ct = default);
+    Task<byte[]> DownloadTorrentAsync(IndexerDefinition indexer, string downloadUrl, CancellationToken ct = default);
 }

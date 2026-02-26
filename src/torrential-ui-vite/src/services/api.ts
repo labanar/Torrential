@@ -269,9 +269,9 @@ export interface IndexerVm {
 
 export interface CreateIndexerRequest {
   name: string;
-  type: "Torznab" | "Rss";
+  type: "Torznab" | "Rss" | "TorrentLeech";
   baseUrl: string;
-  authMode: "None" | "ApiKey" | "BasicAuth";
+  authMode: "None" | "ApiKey" | "BasicAuth" | "Cookie";
   apiKey?: string;
   username?: string;
   password?: string;
@@ -290,6 +290,7 @@ export interface SearchResultVm {
   detailsUrl: string | null;
   category: string | null;
   publishDate: string | null;
+  indexerId: string | null;
   indexerName: string | null;
   metadata: MetadataVm | null;
 }
@@ -382,11 +383,52 @@ export async function searchIndexers(request: IndexerSearchRequest): Promise<Sea
   return result.data ?? [];
 }
 
-export async function addTorrentFromUrl(downloadUrl: string): Promise<void> {
+export async function previewTorrentFromUrl(downloadUrl: string, indexerId?: string | null): Promise<TorrentPreviewApiModel> {
+  const body: Record<string, unknown> = { url: downloadUrl };
+  if (indexerId) {
+    body.indexerId = indexerId;
+  }
+
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/preview-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to preview torrent from URL");
+  }
+
+  const result: ApiResponse<TorrentPreviewApiModel> = await response.json();
+
+  if (result.error || !result.data) {
+    throw new Error("Preview URL endpoint returned an error");
+  }
+
+  return result.data;
+}
+
+export async function addTorrentFromUrl(
+  downloadUrl: string,
+  selectedFileIds?: number[],
+  completedPath?: string,
+  indexerId?: string | null,
+): Promise<void> {
+  const body: Record<string, unknown> = { url: downloadUrl };
+  if (indexerId) {
+    body.indexerId = indexerId;
+  }
+  if (selectedFileIds) {
+    body.selectedFileIds = selectedFileIds;
+  }
+  if (completedPath) {
+    body.completedPath = completedPath;
+  }
+
   const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/add-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: downloadUrl }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     throw new Error("Failed to add torrent from URL");

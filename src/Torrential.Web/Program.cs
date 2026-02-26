@@ -21,6 +21,7 @@ using Torrential.Web.Api.Requests.Torrents;
 using Torrential.Web.Api.Responses;
 using Torrential.Web.Api.Responses.Settings;
 using Torrential.Extensions.Indexing;
+using Torrential.Extensions.Indexing.Services;
 using Torrential.Web.Api.Responses.Torrents;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -143,8 +144,57 @@ app.MapPost(
     .DisableAntiforgery();
 
 app.MapPost(
+    "/torrents/preview-url",
+    async (TorrentAddFromUrlRequest request, IHttpClientFactory httpClientFactory, IIndexerSearchService indexerSearch, ILoggerFactory loggerFactory) =>
+    {
+        if (string.IsNullOrWhiteSpace(request.Url))
+            return Results.BadRequest(new { Error = new { Code = "ValidationError", Message = "Url is required" } });
+
+        var logger = loggerFactory.CreateLogger("TorrentPreviewUrlEndpoint");
+
+        try
+        {
+            byte[] bytes;
+            if (request.IndexerId.HasValue && request.IndexerId.Value != Guid.Empty)
+            {
+                logger.LogInformation("Downloading torrent via indexer {IndexerId} for preview", request.IndexerId.Value);
+                bytes = await indexerSearch.DownloadTorrentFileAsync(request.IndexerId.Value, request.Url);
+            }
+            else
+            {
+                using var client = httpClientFactory.CreateClient("Indexer");
+                bytes = await client.GetByteArrayAsync(request.Url);
+            }
+
+            using var ms = new MemoryStream(bytes);
+            var meta = TorrentMetadataParser.FromStream(ms);
+
+            var files = meta.Files.Select(x => new TorrentPreviewFileVm
+            {
+                Id = x.Id,
+                Filename = x.Filename,
+                SizeBytes = x.FileSize,
+                DefaultSelected = true
+            }).ToArray();
+
+            return Results.Ok(new TorrentPreviewResponse(new TorrentPreviewVm
+            {
+                Name = meta.Name,
+                InfoHash = meta.InfoHash,
+                TotalSizeBytes = meta.TotalSize,
+                Files = files
+            }));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to preview torrent file from {Url}", request.Url);
+            return Results.BadRequest(new { Error = new { Code = "DownloadFailed", Message = "Failed to download torrent file from URL" } });
+        }
+    });
+
+app.MapPost(
     "/torrents/add-url",
-    async (TorrentAddFromUrlRequest request, IHttpClientFactory httpClientFactory, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory) =>
+    async (TorrentAddFromUrlRequest request, IHttpClientFactory httpClientFactory, IIndexerSearchService indexerSearch, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory) =>
     {
         if (string.IsNullOrWhiteSpace(request.Url))
             return Results.BadRequest(new { Error = new { Code = "ValidationError", Message = "Url is required" } });
@@ -154,8 +204,18 @@ app.MapPost(
         TorrentMetadata meta;
         try
         {
-            using var client = httpClientFactory.CreateClient("Indexer");
-            var bytes = await client.GetByteArrayAsync(request.Url);
+            byte[] bytes;
+            if (request.IndexerId.HasValue && request.IndexerId.Value != Guid.Empty)
+            {
+                logger.LogInformation("Downloading torrent via indexer {IndexerId} for add", request.IndexerId.Value);
+                bytes = await indexerSearch.DownloadTorrentFileAsync(request.IndexerId.Value, request.Url);
+            }
+            else
+            {
+                using var client = httpClientFactory.CreateClient("Indexer");
+                bytes = await client.GetByteArrayAsync(request.Url);
+            }
+
             using var ms = new MemoryStream(bytes);
             meta = TorrentMetadataParser.FromStream(ms);
         }
@@ -175,8 +235,8 @@ app.MapPost(
                 {
                     Metadata = meta,
                     DownloadPath = "",
-                    CompletedPath = "",
-                    SelectedFileIds = null
+                    CompletedPath = request.CompletedPath ?? "",
+                    SelectedFileIds = request.SelectedFileIds
                 });
             }
             catch (Exception ex)
