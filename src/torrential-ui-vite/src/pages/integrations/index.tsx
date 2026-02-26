@@ -30,11 +30,15 @@ import {
   deleteIndexer as deleteIndexerApi,
   testIndexer as testIndexerApi,
   searchIndexers as searchIndexersApi,
+  previewTorrentFromUrl,
   addTorrentFromUrl,
   type IndexerVm,
   type CreateIndexerRequest,
   type SearchResultVm,
+  type TorrentPreviewApiModel,
 } from "../../services/api";
+import { TorrentPreviewSummary } from "../../types";
+import { TorrentFilePreviewModal } from "../../components/TorrentPreviewModal/torrent-preview-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -280,6 +284,37 @@ interface SearchSectionProps {
 function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }: SearchSectionProps) {
   const [searchInput, setSearchInput] = useState("");
 
+  // Preview modal state
+  const [pendingDownloadUrl, setPendingDownloadUrl] = useState<string | null>(null);
+  const [preview, setPreview] = useState<TorrentPreviewSummary | null>(null);
+  const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isAddLoading, setIsAddLoading] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [completedPathOverride, setCompletedPathOverride] = useState("");
+
+  const resetPreviewState = () => {
+    setPendingDownloadUrl(null);
+    setPreview(null);
+    setSelectedFileIds([]);
+    setPreviewModalOpen(false);
+    setIsAddLoading(false);
+    setAddError(null);
+    setCompletedPathOverride("");
+  };
+
+  const mapPreview = (model: TorrentPreviewApiModel): TorrentPreviewSummary => ({
+    name: model.name,
+    infoHash: model.infoHash,
+    totalSizeBytes: model.totalSizeBytes,
+    files: model.files.map((f) => ({
+      id: f.id,
+      filename: f.filename,
+      sizeBytes: f.sizeBytes,
+    })),
+  });
+
   const handleSearch = useCallback(async () => {
     const trimmed = searchInput.trim();
     if (!trimmed) return;
@@ -298,16 +333,79 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
       toast.error("No download URL available");
       return;
     }
+
+    setIsPreviewLoading(true);
+    setAddError(null);
+    setPendingDownloadUrl(result.downloadUrl);
+
     try {
-      await addTorrentFromUrl(result.downloadUrl);
-      toast.success(`Added: ${result.title}`);
+      const previewResult = await previewTorrentFromUrl(result.downloadUrl);
+      const previewSummary = mapPreview(previewResult);
+      setPreview(previewSummary);
+      setSelectedFileIds(previewSummary.files.map((f) => f.id));
+      setPreviewModalOpen(true);
     } catch {
-      toast.error("Failed to add torrent");
+      toast.error("Failed to preview torrent");
+      resetPreviewState();
+    } finally {
+      setIsPreviewLoading(false);
     }
   }, []);
 
+  const confirmAddTorrent = async () => {
+    if (!pendingDownloadUrl) {
+      setAddError("No download URL.");
+      return;
+    }
+
+    setAddError(null);
+    setIsAddLoading(true);
+
+    try {
+      await addTorrentFromUrl(
+        pendingDownloadUrl,
+        selectedFileIds,
+        completedPathOverride.trim() || undefined,
+      );
+      toast.success(`Added: ${preview?.name ?? "torrent"}`);
+      resetPreviewState();
+    } catch {
+      setAddError("Failed to add torrent.");
+    } finally {
+      setIsAddLoading(false);
+    }
+  };
+
+  const toggleFileSelection = (id: number) => {
+    setSelectedFileIds((current) =>
+      current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
+    );
+  };
+
+  const toggleAllFileSelection = () => {
+    if (!preview) return;
+    setSelectedFileIds((current) => {
+      const allIds = preview.files.map((f) => f.id);
+      return current.length === allIds.length ? [] : allIds;
+    });
+  };
+
   return (
     <div className={styles.searchSection}>
+      <TorrentFilePreviewModal
+        open={previewModalOpen}
+        preview={preview}
+        selectedFileIds={selectedFileIds}
+        isAddLoading={isAddLoading}
+        addError={addError}
+        completedPathOverride={completedPathOverride}
+        onCompletedPathChange={setCompletedPathOverride}
+        onClose={resetPreviewState}
+        onConfirm={confirmAddTorrent}
+        onToggleFile={toggleFileSelection}
+        onToggleAllFiles={toggleAllFileSelection}
+      />
+
       <div className={styles.searchRow}>
         <Input
           className={styles.searchInput}
@@ -368,6 +466,7 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
                           size="icon"
                           aria-label={`Add ${r.title}`}
                           onClick={() => handleAddTorrent(r)}
+                          loading={isPreviewLoading && pendingDownloadUrl === r.downloadUrl}
                         >
                           <FontAwesomeIcon icon={faDownload} />
                         </Button>
@@ -424,6 +523,7 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
                     variant="outline"
                     size="sm"
                     onClick={() => handleAddTorrent(r)}
+                    loading={isPreviewLoading && pendingDownloadUrl === r.downloadUrl}
                     aria-label={`Add ${r.title}`}
                   >
                     <FontAwesomeIcon icon={faDownload} />

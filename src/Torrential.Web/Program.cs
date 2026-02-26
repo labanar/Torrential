@@ -143,6 +143,45 @@ app.MapPost(
     .DisableAntiforgery();
 
 app.MapPost(
+    "/torrents/preview-url",
+    async (TorrentAddFromUrlRequest request, IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory) =>
+    {
+        if (string.IsNullOrWhiteSpace(request.Url))
+            return Results.BadRequest(new { Error = new { Code = "ValidationError", Message = "Url is required" } });
+
+        var logger = loggerFactory.CreateLogger("TorrentPreviewUrlEndpoint");
+
+        try
+        {
+            using var client = httpClientFactory.CreateClient("Indexer");
+            var bytes = await client.GetByteArrayAsync(request.Url);
+            using var ms = new MemoryStream(bytes);
+            var meta = TorrentMetadataParser.FromStream(ms);
+
+            var files = meta.Files.Select(x => new TorrentPreviewFileVm
+            {
+                Id = x.Id,
+                Filename = x.Filename,
+                SizeBytes = x.FileSize,
+                DefaultSelected = true
+            }).ToArray();
+
+            return Results.Ok(new TorrentPreviewResponse(new TorrentPreviewVm
+            {
+                Name = meta.Name,
+                InfoHash = meta.InfoHash,
+                TotalSizeBytes = meta.TotalSize,
+                Files = files
+            }));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to preview torrent file from {Url}", request.Url);
+            return Results.BadRequest(new { Error = new { Code = "DownloadFailed", Message = "Failed to download torrent file from URL" } });
+        }
+    });
+
+app.MapPost(
     "/torrents/add-url",
     async (TorrentAddFromUrlRequest request, IHttpClientFactory httpClientFactory, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory) =>
     {
@@ -175,8 +214,8 @@ app.MapPost(
                 {
                     Metadata = meta,
                     DownloadPath = "",
-                    CompletedPath = "",
-                    SelectedFileIds = null
+                    CompletedPath = request.CompletedPath ?? "",
+                    SelectedFileIds = request.SelectedFileIds
                 });
             }
             catch (Exception ex)

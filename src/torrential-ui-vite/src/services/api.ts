@@ -382,11 +382,43 @@ export async function searchIndexers(request: IndexerSearchRequest): Promise<Sea
   return result.data ?? [];
 }
 
-export async function addTorrentFromUrl(downloadUrl: string): Promise<void> {
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/add-url`, {
+export async function previewTorrentFromUrl(downloadUrl: string): Promise<TorrentPreviewApiModel> {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/preview-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url: downloadUrl }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to preview torrent from URL");
+  }
+
+  const result: ApiResponse<TorrentPreviewApiModel> = await response.json();
+
+  if (result.error || !result.data) {
+    throw new Error("Preview URL endpoint returned an error");
+  }
+
+  return result.data;
+}
+
+export async function addTorrentFromUrl(
+  downloadUrl: string,
+  selectedFileIds?: number[],
+  completedPath?: string,
+): Promise<void> {
+  const body: Record<string, unknown> = { url: downloadUrl };
+  if (selectedFileIds) {
+    body.selectedFileIds = selectedFileIds;
+  }
+  if (completedPath) {
+    body.completedPath = completedPath;
+  }
+
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/add-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     throw new Error("Failed to add torrent from URL");
