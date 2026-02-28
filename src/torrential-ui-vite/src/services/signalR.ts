@@ -22,19 +22,12 @@ import {
 } from "./api";
 import { PeerSummary } from "../types";
 import { removeTorrent, updateTorrent } from "../store/slices/torrentsSlice";
-import { queueNotification } from "../store/slices/notificationsSlice";
 import {
   applyVerifiedPiecesToDetailBitfield,
   updateDetailBitfield,
   updateDetailFiles,
 } from "../store/slices/torrentDetailSlice";
-import {
-  faCheckCircle,
-  faPlayCircle,
-  faPlusCircle,
-  faStopCircle,
-  faTrash,
-} from "@fortawesome/free-solid-svg-icons";
+import { toast } from "sonner";
 import store from "../store";
 
 export class SignalRService {
@@ -124,16 +117,7 @@ export class SignalRService {
 
       const { torrents } = store.getState();
       const { name } = torrents[infoHash];
-      store.dispatch(
-        queueNotification({
-          title: "Torrent Started",
-          description: name,
-          duration: 3500,
-          isClosable: true,
-          status: "success",
-          icon: faPlayCircle,
-        })
-      );
+      toast.success("Torrent Started", { description: name });
     });
 
     this.connection.on(
@@ -244,16 +228,7 @@ export class SignalRService {
       const { name } = torrents[infoHash];
 
       store.dispatch(updateTorrent(payload));
-      store.dispatch(
-        queueNotification({
-          title: "Torrent Stopped",
-          description: name,
-          duration: 3500,
-          isClosable: true,
-          status: "success",
-          icon: faStopCircle,
-        })
-      );
+      toast.success("Torrent Stopped", { description: name });
     });
 
     this.connection.on("TorrentRemoved", (event: TorrentRemovedEvent) => {
@@ -269,16 +244,7 @@ export class SignalRService {
 
       store.dispatch(clearPeers({ infoHash }));
       store.dispatch(removeTorrent(payload));
-      store.dispatch(
-        queueNotification({
-          title: "Torrent Removed",
-          description: name,
-          duration: 3500,
-          isClosable: true,
-          status: "warning",
-          icon: faTrash,
-        })
-      );
+      toast.warning("Torrent Removed", { description: name });
     });
 
     this.connection.on("TorrentCompleted", (event: TorrentRemovedEvent) => {
@@ -286,16 +252,7 @@ export class SignalRService {
       const { torrents } = store.getState();
       const { name } = torrents[infoHash];
 
-      store.dispatch(
-        queueNotification({
-          title: "Torrent Completed",
-          description: name,
-          duration: 3500,
-          isClosable: true,
-          status: "success",
-          icon: faCheckCircle,
-        })
-      );
+      toast.success("Torrent Completed", { description: name });
     });
 
     this.connection.on("TorrentStatsUpdated", (event: TorrentStatsEvent) => {
@@ -327,16 +284,7 @@ export class SignalRService {
       };
 
       store.dispatch(updateTorrent(payload));
-      store.dispatch(
-        queueNotification({
-          title: "Torrent Added",
-          description: name,
-          duration: 3500,
-          isClosable: true,
-          status: "success",
-          icon: faPlusCircle,
-        })
-      );
+      toast.success("Torrent Added", { description: name });
     });
 
     this.connection.on(
