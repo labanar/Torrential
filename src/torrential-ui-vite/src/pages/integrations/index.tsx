@@ -371,7 +371,6 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
         completedPathOverride.trim() || undefined,
         pendingIndexerId,
       );
-      toast.success(`Added: ${preview?.name ?? "torrent"}`);
       resetPreviewState();
     } catch {
       setAddError("Failed to add torrent.");

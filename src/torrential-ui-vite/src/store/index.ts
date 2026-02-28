@@ -1,7 +1,6 @@
 import { configureStore, createSelector } from "@reduxjs/toolkit";
 import torrentsReducer from "./slices/torrentsSlice";
 import peersReducer from "./slices/peersSlice";
-import notificationsReducer from "./slices/notificationsSlice";
 import torrentDetailReducer from "./slices/torrentDetailSlice";
 import indexerReducer from "./slices/indexerSlice";
 import { useDispatch, useSelector } from "react-redux";
@@ -11,7 +10,6 @@ const store = configureStore({
   reducer: {
     torrents: torrentsReducer,
     peers: peersReducer,
-    notifications: notificationsReducer,
     torrentDetail: torrentDetailReducer,
     indexer: indexerReducer,
   },
