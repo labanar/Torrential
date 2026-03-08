@@ -41,7 +41,6 @@ import { TorrentPreviewSummary } from "../../types";
 import { TorrentFilePreviewModal } from "../../components/TorrentPreviewModal/torrent-preview-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
@@ -51,7 +50,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Control, Controller, FieldValues, Path } from "react-hook-form";
@@ -148,40 +146,37 @@ function Page() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-4 overflow-auto p-4 md:p-6">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-2xl">Integrations</CardTitle>
-            <Button onClick={openCreate} size="sm" aria-label="Add indexer">
-              <FontAwesomeIcon icon={faPlus} />
-              <span>Add indexer</span>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <h2 className="text-lg font-semibold">Indexers</h2>
-          <IndexerList
-            indexers={indexers}
-            loading={indexersLoading}
-            testingId={testingId}
-            deletingId={deletingId}
-            onTest={handleTest}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-          />
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Integrations</h1>
+        <Button onClick={openCreate} size="sm" aria-label="Add indexer">
+          <FontAwesomeIcon icon={faPlus} />
+          <span>Add indexer</span>
+        </Button>
+      </header>
 
-          <Separator />
+      <section className="space-y-4 rounded-xl border border-border/70 bg-card/60 p-5">
+        <h2 className="text-lg font-semibold">Indexers</h2>
+        <IndexerList
+          indexers={indexers}
+          loading={indexersLoading}
+          testingId={testingId}
+          deletingId={deletingId}
+          onTest={handleTest}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+        />
+      </section>
 
-          <h2 className="text-lg font-semibold">Search</h2>
-          <SearchSection
-            loading={searchLoading}
-            results={searchResults}
-            query={searchQuery}
-            hasEnabledIndexers={indexers.some((i) => i.enabled)}
-            dispatch={dispatch}
-          />
-        </CardContent>
-      </Card>
+      <section className="space-y-4 rounded-xl border border-border/70 bg-card/60 p-5">
+        <h2 className="text-lg font-semibold">Search</h2>
+        <SearchSection
+          loading={searchLoading}
+          results={searchResults}
+          query={searchQuery}
+          hasEnabledIndexers={indexers.some((i) => i.enabled)}
+          dispatch={dispatch}
+        />
+      </section>
 
       <IndexerFormDialog
         open={dialogOpen}
@@ -221,11 +216,11 @@ function IndexerList({
   }
 
   return (
-    <div className="grid gap-2">
+    <div className="divide-y divide-border rounded-lg border border-border/70">
       {indexers.map((indexer) => (
         <div
           key={indexer.id}
-          className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_auto] md:items-center"
+          className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/40 md:grid-cols-[1fr_auto] md:items-center"
         >
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -436,10 +431,10 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
       )}
 
       {results.length > 0 && (
-        <ScrollArea className="max-h-[28rem] rounded-md border">
-          <div className="space-y-2 p-2">
+        <ScrollArea className="max-h-[28rem] rounded-lg border border-border/70">
+          <div className="divide-y divide-border/70">
             {results.map((r, i) => (
-              <div key={`${r.title}-${i}`} className="rounded-md border p-3">
+              <div key={`${r.title}-${i}`} className="px-4 py-3 transition-colors hover:bg-muted/40">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold" title={r.title}>

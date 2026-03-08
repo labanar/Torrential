@@ -13,7 +13,6 @@ import type { TorrentDetail, TorrentDetailPeer, TorrentFile } from "../../types"
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 type Tab = "peers" | "bitfield" | "files";
@@ -147,10 +146,10 @@ function PeersSection({ peers }: { peers: TorrentDetailPeer[] }) {
   }
 
   return (
-    <ScrollArea className="h-full rounded-md border">
-      <div className="space-y-2 p-2">
+    <ScrollArea className="h-full rounded-lg border border-border/70">
+      <div className="divide-y divide-border/70">
         {peers.map((peer) => (
-          <Card key={peer.peerId} className="p-3">
+          <div key={peer.peerId} className="px-3 py-3 transition-colors hover:bg-muted/40">
             <div className="grid gap-2 sm:grid-cols-3">
               <InfoPair label="Address" value={`${peer.ipAddress}:${peer.port}`} />
               <InfoPair label="Progress" value={`${(peer.progress * 100).toFixed(1)}%`} />
@@ -167,7 +166,7 @@ function PeersSection({ peers }: { peers: TorrentDetailPeer[] }) {
               <InfoPair label="Downloaded" value={prettyBytes(peer.bytesDownloaded)} />
               <InfoPair label="Uploaded" value={prettyBytes(peer.bytesUploaded)} />
             </div>
-          </Card>
+          </div>
         ))}
       </div>
     </ScrollArea>
@@ -283,10 +282,13 @@ function FilesSection({
   }
 
   return (
-    <ScrollArea className="h-full rounded-md border">
-      <div className="space-y-2 p-2">
+    <ScrollArea className="h-full rounded-lg border border-border/70">
+      <div className="divide-y divide-border/70">
         {files.map((file) => (
-          <Card key={file.id} className="flex items-center justify-between gap-3 p-3">
+          <div
+            key={file.id}
+            className="flex items-center justify-between gap-3 px-3 py-3 transition-colors hover:bg-muted/40"
+          >
             <label className="flex min-w-0 items-center gap-3">
               <Checkbox
                 checked={file.isSelected}
@@ -296,7 +298,7 @@ function FilesSection({
               <span className="truncate text-sm">{file.filename}</span>
             </label>
             <span className="text-xs text-muted-foreground">{prettyBytes(file.size)}</span>
-          </Card>
+          </div>
         ))}
       </div>
     </ScrollArea>

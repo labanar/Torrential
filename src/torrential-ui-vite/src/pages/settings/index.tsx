@@ -10,7 +10,6 @@ import { FormCheckbox } from "../../components/Form/FormCheckbox";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import Layout from "../layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 
 interface FileSettings {
@@ -166,69 +165,66 @@ function GeneralSettings() {
   }, [fetchConnectionSettings, fetchFilesettings, fetchTcpListenerSettings]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col overflow-auto p-4 md:p-6">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-2xl">Settings</CardTitle>
-            <Button
-              disabled={!isFileSettingsDirty && !isConnectionSettingsDirty && !isTcpListenerSettingsDirty}
-              aria-label="Save settings"
-              onClick={() => {
-                if (isFileSettingsDirty) {
-                  saveFileSettings(fileSettingsValues);
-                  resetFileSettings(fileSettingsValues);
-                }
-                if (isConnectionSettingsDirty) {
-                  saveConnectionSettings(connectionSettingsValues);
-                  resetConnectionSettings(connectionSettingsValues);
-                }
-                if (isTcpListenerSettingsDirty) {
-                  saveTcpSettings(tcpListenerSettingsValue);
-                  resetTcpListenerSettings(tcpListenerSettingsValue);
-                }
-              }}
-              type="button"
-            >
-              <FontAwesomeIcon icon={faCheck} />
-              <span>Save</span>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <SectionHeader name="Files" />
-          <RowComponent label="Download Path">
-            <FormInput fieldName="downloadPath" control={fileSettingsControl} />
-          </RowComponent>
-          <RowComponent label="Completed Path">
-            <FormInput fieldName="completedPath" control={fileSettingsControl} />
-          </RowComponent>
+    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-4 overflow-auto p-4 md:p-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <Button
+          disabled={!isFileSettingsDirty && !isConnectionSettingsDirty && !isTcpListenerSettingsDirty}
+          aria-label="Save settings"
+          onClick={() => {
+            if (isFileSettingsDirty) {
+              saveFileSettings(fileSettingsValues);
+              resetFileSettings(fileSettingsValues);
+            }
+            if (isConnectionSettingsDirty) {
+              saveConnectionSettings(connectionSettingsValues);
+              resetConnectionSettings(connectionSettingsValues);
+            }
+            if (isTcpListenerSettingsDirty) {
+              saveTcpSettings(tcpListenerSettingsValue);
+              resetTcpListenerSettings(tcpListenerSettingsValue);
+            }
+          }}
+          type="button"
+        >
+          <FontAwesomeIcon icon={faCheck} />
+          <span>Save</span>
+        </Button>
+      </header>
 
-          <Separator />
-          <SectionHeader name="Connections" />
-          <RowComponent label="Max connections (per torrent)">
-            <FormNumericInput min={0} control={connectionSettingsControl} fieldName="maxConnectionsPerTorrent" />
-          </RowComponent>
-          <RowComponent label="Max connections (global)">
-            <FormNumericInput min={0} control={connectionSettingsControl} fieldName="maxConnectionsGlobal" />
-          </RowComponent>
-          <RowComponent label="Max half-open connections">
-            <FormNumericInput min={0} control={connectionSettingsControl} fieldName="maxHalfOpenConnections" />
-          </RowComponent>
+      <section className="space-y-6 rounded-xl border border-border/70 bg-card/60 p-5">
+        <SectionHeader name="Files" />
+        <RowComponent label="Download Path">
+          <FormInput fieldName="downloadPath" control={fileSettingsControl} />
+        </RowComponent>
+        <RowComponent label="Completed Path">
+          <FormInput fieldName="completedPath" control={fileSettingsControl} />
+        </RowComponent>
 
-          <Separator />
-          <SectionHeader name="Inbound Connections" />
-          <FormCheckbox
-            control={tcpListenerSettingsControl}
-            fieldName="enabled"
-            text="Allow inbound connections"
-            className="inline-flex min-h-11 items-center gap-2"
-          />
-          <RowComponent label="Port">
-            <FormNumericInput min={0} control={tcpListenerSettingsControl} fieldName="port" />
-          </RowComponent>
-        </CardContent>
-      </Card>
+        <Separator />
+        <SectionHeader name="Connections" />
+        <RowComponent label="Max connections (per torrent)">
+          <FormNumericInput min={0} control={connectionSettingsControl} fieldName="maxConnectionsPerTorrent" />
+        </RowComponent>
+        <RowComponent label="Max connections (global)">
+          <FormNumericInput min={0} control={connectionSettingsControl} fieldName="maxConnectionsGlobal" />
+        </RowComponent>
+        <RowComponent label="Max half-open connections">
+          <FormNumericInput min={0} control={connectionSettingsControl} fieldName="maxHalfOpenConnections" />
+        </RowComponent>
+
+        <Separator />
+        <SectionHeader name="Inbound Connections" />
+        <FormCheckbox
+          control={tcpListenerSettingsControl}
+          fieldName="enabled"
+          text="Allow inbound connections"
+          className="inline-flex min-h-11 items-center gap-2"
+        />
+        <RowComponent label="Port">
+          <FormNumericInput min={0} control={tcpListenerSettingsControl} fieldName="port" />
+        </RowComponent>
+      </section>
     </div>
   );
 }

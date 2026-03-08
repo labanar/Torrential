@@ -57,7 +57,6 @@ import { AlfredContext, setContext } from "../../store/slices/alfredSlice";
 import { DetailPane } from "./detail-pane";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export default function TorrentPage() {
@@ -337,44 +336,48 @@ function Page() {
           {memoActionRow}
           <Separator />
           <ScrollArea className="min-h-0 flex-1">
-            <div className="space-y-2 p-3">
+            <div className="p-3">
               {filteredTorrents.length === 0 && (
                 <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
                   No torrents match your filter.
                 </div>
               )}
 
-              {filteredTorrents.map((torrent, index) => (
-                <TorrentRow
-                  toggleSelect={selectTorrent}
-                  toggleFocus={() => {
-                    setCurrentPosition(index);
-                    setOpenedInfoHash(torrent.infoHash);
-                  }}
-                  isFocused={currentPosition === index}
-                  isSelected={isSelected(torrent.infoHash)}
-                  uploadRate={torrent.uploadRate}
-                  downloadRate={torrent.downloadRate}
-                  status={torrent.status}
-                  key={torrent.infoHash}
-                  progress={torrent.progress ?? 0}
-                  infoHash={torrent.infoHash ?? ""}
-                  seeders={
-                    torrent.peers?.reduce((pv, cv) => {
-                      if (cv.isSeed) return pv + 1;
-                      return pv;
-                    }, 0) ?? 0
-                  }
-                  leechers={
-                    torrent.peers?.reduce((pv, cv) => {
-                      if (!cv.isSeed) return pv + 1;
-                      return pv;
-                    }, 0) ?? 0
-                  }
-                  totalBytes={torrent.sizeInBytes ?? 0}
-                  title={torrent.name ?? "???"}
-                />
-              ))}
+              {filteredTorrents.length > 0 && (
+                <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-card/60">
+                  {filteredTorrents.map((torrent, index) => (
+                    <TorrentRow
+                      toggleSelect={selectTorrent}
+                      toggleFocus={() => {
+                        setCurrentPosition(index);
+                        setOpenedInfoHash(torrent.infoHash);
+                      }}
+                      isFocused={currentPosition === index}
+                      isSelected={isSelected(torrent.infoHash)}
+                      uploadRate={torrent.uploadRate}
+                      downloadRate={torrent.downloadRate}
+                      status={torrent.status}
+                      key={torrent.infoHash}
+                      progress={torrent.progress ?? 0}
+                      infoHash={torrent.infoHash ?? ""}
+                      seeders={
+                        torrent.peers?.reduce((pv, cv) => {
+                          if (cv.isSeed) return pv + 1;
+                          return pv;
+                        }, 0) ?? 0
+                      }
+                      leechers={
+                        torrent.peers?.reduce((pv, cv) => {
+                          if (!cv.isSeed) return pv + 1;
+                          return pv;
+                        }, 0) ?? 0
+                      }
+                      totalBytes={torrent.sizeInBytes ?? 0}
+                      title={torrent.name ?? "???"}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </ScrollArea>
         </div>
@@ -763,17 +766,30 @@ function TorrentRow({
     faCircleNotch;
 
   return (
-    <Card
+    <div
       className={cn(
-        "cursor-pointer border-border/70 p-3 transition-colors",
-        isFocused && "ring-1 ring-ring",
-        isSelected && "bg-accent/50"
+        "cursor-pointer px-4 py-3 transition-colors hover:bg-muted/40",
+        isFocused && "bg-muted/50 ring-1 ring-inset ring-ring",
+        isSelected && "bg-accent/35"
       )}
+      tabIndex={0}
+      role="button"
+      aria-selected={isSelected}
       onClick={() => toggleFocus()}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          toggleFocus();
+        }
+      }}
     >
       <div className="flex items-start gap-3">
-        <div className="pt-1">
-          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(infoHash)} />
+        <div
+          className="pt-1"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(infoHash)} aria-label={`Select ${title}`} />
         </div>
 
         <div className="min-w-0 flex-1 space-y-2">
@@ -809,7 +825,7 @@ function TorrentRow({
           </div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 

@@ -12,7 +12,6 @@ import {
   TorrentApiModel,
 } from "../../services/api";
 import { PeerSummary, TorrentSummary } from "../../types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -76,47 +75,44 @@ function Page() {
   }, [hydrate]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col overflow-hidden p-4 md:p-6">
-      <Card className="flex min-h-0 flex-1 flex-col">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-xl">Peers</CardTitle>
-            <Badge variant="secondary">{peers.length} connected</Badge>
+    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Peers</h1>
+        <Badge variant="secondary">{peers.length} connected</Badge>
+      </header>
+
+      <section className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border/70 bg-card/60">
+        {peers.length === 0 ? (
+          <div className="flex h-full items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
+            No connected peers
           </div>
-        </CardHeader>
-        <CardContent className="min-h-0 flex-1 pt-0">
-          {peers.length === 0 ? (
-            <div className="flex h-full items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
-              No connected peers
-            </div>
-          ) : (
-            <ScrollArea className="h-full rounded-md border">
-              <div className="space-y-2 p-2">
-                {peers.map((peer) => (
-                  <div
-                    key={`${peer.infoHash}-${peer.peerId}`}
-                    className="grid gap-3 rounded-md border p-3 sm:grid-cols-2 lg:grid-cols-4"
-                  >
-                    <InfoPair label="IP" value={peer.ip} />
-                    <InfoPair label="Port" value={`${peer.port}`} />
-                    <InfoPair label="Torrent" value={peer.torrentName} />
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">Seed</span>
-                      {peer.isSeed ? (
-                        <Badge variant="outline" className="gap-1 text-emerald-500">
-                          <FontAwesomeIcon icon={faSeedling} /> Yes
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">No</Badge>
-                      )}
-                    </div>
+        ) : (
+          <ScrollArea className="h-full">
+            <div className="divide-y divide-border/70">
+              {peers.map((peer) => (
+                <div
+                  key={`${peer.infoHash}-${peer.peerId}`}
+                  className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/40 sm:grid-cols-2 lg:grid-cols-4"
+                >
+                  <InfoPair label="IP" value={peer.ip} />
+                  <InfoPair label="Port" value={`${peer.port}`} />
+                  <InfoPair label="Torrent" value={peer.torrentName} />
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Seed</span>
+                    {peer.isSeed ? (
+                      <Badge variant="outline" className="gap-1 text-emerald-500">
+                        <FontAwesomeIcon icon={faSeedling} /> Yes
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">No</Badge>
+                    )}
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
-          )}
-        </CardContent>
-      </Card>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </section>
     </div>
   );
 }

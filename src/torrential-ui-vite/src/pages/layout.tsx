@@ -17,7 +17,6 @@ import SignalRService from "../services/signalR";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Card } from "@/components/ui/card";
 import { Theme, applyTheme, resolveInitialTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -70,7 +69,7 @@ export default function RootLayout({
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background md:flex-row">
-      <aside className="hidden h-full w-72 shrink-0 border-r bg-card/30 p-4 md:flex md:flex-col">
+      <aside className="hidden h-full w-72 shrink-0 border-r bg-muted/20 p-4 md:flex md:flex-col">
         <DesktopNav
           pathname={location.pathname}
           theme={theme}
@@ -131,7 +130,7 @@ interface NavigationProps {
 
 function DesktopNav({ pathname, theme, onToggleTheme }: NavigationProps) {
   return (
-    <Card className="flex min-h-0 flex-1 flex-col border-border/70 bg-card/80 p-3 shadow-sm">
+    <section className="flex min-h-0 flex-1 flex-col border border-border/60 bg-background/70 p-3">
       <div className="px-2 pb-3 pt-1">
         <h1 className="text-base font-semibold tracking-tight">Torrential</h1>
         <p className="text-xs text-muted-foreground">Torrent operations dashboard</p>
@@ -142,7 +141,7 @@ function DesktopNav({ pathname, theme, onToggleTheme }: NavigationProps) {
       </nav>
       <Separator className="my-3" />
       <ThemeToggleButton theme={theme} onToggleTheme={onToggleTheme} />
-    </Card>
+    </section>
   );
 }
 
@@ -176,8 +175,8 @@ function NavItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
             className={cn(
               "flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium transition-colors",
               active
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-foreground hover:bg-muted"
+                ? "bg-primary/90 text-primary-foreground"
+                : "text-foreground hover:bg-muted/70"
             )}
           >
             <FontAwesomeIcon icon={item.icon} className="h-4 w-4" />
