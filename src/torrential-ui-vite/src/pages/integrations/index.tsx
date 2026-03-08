@@ -50,8 +50,11 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Control, Controller, FieldValues, Path } from "react-hook-form";
-import styles from "./integrations.module.css";
 
 export default function IntegrationsPage() {
   return (
@@ -85,24 +88,21 @@ function Page() {
     loadIndexers();
   }, [loadIndexers]);
 
-  const handleTest = useCallback(
-    async (id: string) => {
-      setTestingId(id);
-      try {
-        const success = await testIndexerApi(id);
-        if (success) {
-          toast.success("Connection test passed");
-        } else {
-          toast.error("Connection test failed");
-        }
-      } catch {
+  const handleTest = useCallback(async (id: string) => {
+    setTestingId(id);
+    try {
+      const success = await testIndexerApi(id);
+      if (success) {
+        toast.success("Connection test passed");
+      } else {
         toast.error("Connection test failed");
-      } finally {
-        setTestingId(null);
       }
-    },
-    []
-  );
+    } catch {
+      toast.error("Connection test failed");
+    } finally {
+      setTestingId(null);
+    }
+  }, []);
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -147,38 +147,41 @@ function Page() {
   );
 
   return (
-    <div className={`${styles.root} page-shell`}>
-      <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Integrations</h1>
-        <Button onClick={openCreate} size="sm" aria-label="Add indexer">
-          <FontAwesomeIcon icon={faPlus} />
-          <span>Add</span>
-        </Button>
-      </div>
+    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-4 overflow-auto p-4 md:p-6">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-2xl">Integrations</CardTitle>
+            <Button onClick={openCreate} size="sm" aria-label="Add indexer">
+              <FontAwesomeIcon icon={faPlus} />
+              <span>Add indexer</span>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <h2 className="text-lg font-semibold">Indexers</h2>
+          <IndexerList
+            indexers={indexers}
+            loading={indexersLoading}
+            testingId={testingId}
+            deletingId={deletingId}
+            onTest={handleTest}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+          />
 
-      <Separator />
+          <Separator />
 
-      <h2 className={styles.sectionTitle}>Indexers</h2>
-      <IndexerList
-        indexers={indexers}
-        loading={indexersLoading}
-        testingId={testingId}
-        deletingId={deletingId}
-        onTest={handleTest}
-        onEdit={openEdit}
-        onDelete={handleDelete}
-      />
-
-      <Separator />
-
-      <h2 className={styles.sectionTitle}>Search</h2>
-      <SearchSection
-        loading={searchLoading}
-        results={searchResults}
-        query={searchQuery}
-        hasEnabledIndexers={indexers.some((i) => i.enabled)}
-        dispatch={dispatch}
-      />
+          <h2 className="text-lg font-semibold">Search</h2>
+          <SearchSection
+            loading={searchLoading}
+            results={searchResults}
+            query={searchQuery}
+            hasEnabledIndexers={indexers.some((i) => i.enabled)}
+            dispatch={dispatch}
+          />
+        </CardContent>
+      </Card>
 
       <IndexerFormDialog
         open={dialogOpen}
@@ -189,8 +192,6 @@ function Page() {
     </div>
   );
 }
-
-// --- Indexer list ---
 
 interface IndexerListProps {
   indexers: IndexerVm[];
@@ -212,32 +213,33 @@ function IndexerList({
   onDelete,
 }: IndexerListProps) {
   if (loading && indexers.length === 0) {
-    return <div className={styles.emptyState}>Loading indexers...</div>;
+    return <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">Loading indexers...</div>;
   }
 
   if (indexers.length === 0) {
-    return <div className={styles.emptyState}>No indexers configured</div>;
+    return <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">No indexers configured</div>;
   }
 
   return (
-    <div className={styles.indexerList}>
+    <div className="grid gap-2">
       {indexers.map((indexer) => (
-        <div key={indexer.id} className={styles.indexerCard}>
-          <div className={styles.indexerInfo}>
-            <span className={styles.indexerName}>{indexer.name}</span>
-            <span className={styles.indexerMeta}>
-              <span>{indexer.type}</span>
-              <span>{indexer.baseUrl}</span>
-              <span
-                className={`${styles.enabledBadge} ${
-                  indexer.enabled ? styles.enabledBadgeOn : styles.enabledBadgeOff
-                }`}
-              >
+        <div
+          key={indexer.id}
+          className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_auto] md:items-center"
+        >
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate text-sm font-semibold">{indexer.name}</p>
+              <Badge variant={indexer.enabled ? "secondary" : "outline"}>
                 {indexer.enabled ? "Enabled" : "Disabled"}
-              </span>
-            </span>
+              </Badge>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span>{indexer.type}</span>
+              <span className="truncate">{indexer.baseUrl}</span>
+            </div>
           </div>
-          <div className={styles.indexerActions}>
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
@@ -271,8 +273,6 @@ function IndexerList({
   );
 }
 
-// --- Search ---
-
 interface SearchSectionProps {
   loading: boolean;
   results: SearchResultVm[];
@@ -284,7 +284,6 @@ interface SearchSectionProps {
 function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }: SearchSectionProps) {
   const [searchInput, setSearchInput] = useState("");
 
-  // Preview modal state
   const [pendingDownloadUrl, setPendingDownloadUrl] = useState<string | null>(null);
   const [pendingIndexerId, setPendingIndexerId] = useState<string | null>(null);
   const [preview, setPreview] = useState<TorrentPreviewSummary | null>(null);
@@ -369,7 +368,7 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
         pendingDownloadUrl,
         selectedFileIds,
         completedPathOverride.trim() || undefined,
-        pendingIndexerId,
+        pendingIndexerId
       );
       resetPreviewState();
     } catch {
@@ -394,7 +393,7 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
   };
 
   return (
-    <div className={styles.searchSection}>
+    <div className="space-y-3">
       <TorrentFilePreviewModal
         open={previewModalOpen}
         preview={preview}
@@ -409,9 +408,8 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
         onToggleAllFiles={toggleAllFileSelection}
       />
 
-      <div className={styles.searchRow}>
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Input
-          className={styles.searchInput}
           placeholder={hasEnabledIndexers ? "Search torrents..." : "Enable an indexer to search"}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
@@ -432,117 +430,63 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
       </div>
 
       {query && !loading && results.length === 0 && (
-        <div className={styles.emptyState}>No results for &quot;{query}&quot;</div>
+        <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+          No results for "{query}"
+        </div>
       )}
 
       {results.length > 0 && (
-        <>
-          {/* Desktop table */}
-          <div className={styles.resultsWrap}>
-            <table className={styles.resultsTable}>
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Size</th>
-                  <th>S</th>
-                  <th>L</th>
-                  <th>Indexer</th>
-                  <th>Date</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((r, i) => (
-                  <tr key={`${r.title}-${i}`}>
-                    <td className={styles.resultTitle} title={r.title}>
-                      {r.title}
-                    </td>
-                    <td>{formatSize(r.sizeBytes)}</td>
-                    <td className={styles.seeders}>{r.seeders}</td>
-                    <td className={styles.leechers}>{r.leechers}</td>
-                    <td>{r.indexerName ?? "-"}</td>
-                    <td>{r.publishDate ? formatDate(r.publishDate) : "-"}</td>
-                    <td>
-                      {r.downloadUrl && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Add ${r.title}`}
-                          onClick={() => handleAddTorrent(r)}
-                          loading={isPreviewLoading && pendingDownloadUrl === r.downloadUrl}
-                        >
-                          <FontAwesomeIcon icon={faDownload} />
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile cards */}
-          <div className={styles.resultCards}>
+        <ScrollArea className="max-h-[28rem] rounded-md border">
+          <div className="space-y-2 p-2">
             {results.map((r, i) => (
-              <div key={`${r.title}-${i}`} className={styles.resultCard}>
-                <div className={styles.cardRow}>
-                  <span className={styles.cardLabel}>Title</span>
-                  <span className={styles.cardValue}>{r.title}</span>
-                </div>
-                <div className={styles.cardRow}>
-                  <span className={styles.cardLabel}>Size</span>
-                  <span className={styles.cardValue}>{formatSize(r.sizeBytes)}</span>
-                </div>
-                <div className={styles.cardRow}>
-                  <span className={styles.cardLabel}>S / L</span>
-                  <span className={styles.cardValue}>
-                    <span className={styles.seeders}>{r.seeders}</span>
-                    {" / "}
-                    <span className={styles.leechers}>{r.leechers}</span>
-                  </span>
-                </div>
-                <div className={styles.cardRow}>
-                  <span className={styles.cardLabel}>Indexer</span>
-                  <span className={styles.cardValue}>{r.indexerName ?? "-"}</span>
-                </div>
-                {r.metadata && (
-                  <div className={styles.metadataRow}>
-                    {r.metadata.artworkUrl && (
-                      <img
-                        src={r.metadata.artworkUrl}
-                        alt=""
-                        className={styles.metadataPoster}
-                      />
-                    )}
-                    <div className={styles.metadataInfo}>
-                      {r.metadata.year && <span>Year: {r.metadata.year}</span>}
-                      {r.metadata.genre && <span>Genre: {r.metadata.genre}</span>}
-                      {r.metadata.description && <span>{r.metadata.description}</span>}
+              <div key={`${r.title}-${i}`} className="rounded-md border p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold" title={r.title}>
+                      {r.title}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <span>{formatSize(r.sizeBytes)}</span>
+                      <span className="text-emerald-500">S: {r.seeders}</span>
+                      <span className="text-red-500">L: {r.leechers}</span>
+                      <span>{r.indexerName ?? "-"}</span>
+                      <span>{r.publishDate ? formatDate(r.publishDate) : "-"}</span>
                     </div>
                   </div>
-                )}
-                {r.downloadUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleAddTorrent(r)}
-                    loading={isPreviewLoading && pendingDownloadUrl === r.downloadUrl}
-                    aria-label={`Add ${r.title}`}
-                  >
-                    <FontAwesomeIcon icon={faDownload} />
-                    <span>Add</span>
-                  </Button>
+                  {r.downloadUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Add ${r.title}`}
+                      onClick={() => handleAddTorrent(r)}
+                      loading={isPreviewLoading && pendingDownloadUrl === r.downloadUrl}
+                    >
+                      <FontAwesomeIcon icon={faDownload} />
+                      Add
+                    </Button>
+                  )}
+                </div>
+
+                {r.metadata && (
+                  <div className="mt-3 flex gap-3 border-t pt-3">
+                    {r.metadata.artworkUrl && (
+                      <img src={r.metadata.artworkUrl} alt="" className="h-20 w-14 rounded object-cover" />
+                    )}
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      {r.metadata.year && <p>Year: {r.metadata.year}</p>}
+                      {r.metadata.genre && <p>Genre: {r.metadata.genre}</p>}
+                      {r.metadata.description && <p>{r.metadata.description}</p>}
+                    </div>
+                  </div>
                 )}
               </div>
             ))}
           </div>
-        </>
+        </ScrollArea>
       )}
     </div>
   );
 }
-
-// --- Indexer form dialog ---
 
 interface IndexerFormValues {
   name: string;
@@ -608,7 +552,6 @@ function IndexerFormDialog({ open, onOpenChange, editing, onSaved }: IndexerForm
     }
   }, [open, editing, reset]);
 
-  // When TorrentLeech is selected, force auth mode to Cookie
   useEffect(() => {
     if (watchedValues.type === "TorrentLeech" && watchedValues.authMode !== "Cookie") {
       setValue("authMode", "Cookie");
@@ -657,21 +600,17 @@ function IndexerFormDialog({ open, onOpenChange, editing, onSaved }: IndexerForm
               : "Configure a new indexer to search for torrents."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className={styles.formGrid}>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <FormField label="Name" control={control} name="name" />
-          <div className={styles.formRow}>
-            <label className={styles.formLabel}>Type</label>
+          <div className="grid gap-2">
+            <Label>Type</Label>
             <SelectField control={control} name="type" options={["Torznab", "Rss", "TorrentLeech"]} />
           </div>
           <FormField label="Base URL" control={control} name="baseUrl" />
           {watchedValues.type !== "TorrentLeech" && (
-            <div className={styles.formRow}>
-              <label className={styles.formLabel}>Auth</label>
-              <SelectField
-                control={control}
-                name="authMode"
-                options={["None", "ApiKey", "BasicAuth"]}
-              />
+            <div className="grid gap-2">
+              <Label>Auth</Label>
+              <SelectField control={control} name="authMode" options={["None", "ApiKey", "BasicAuth"]} />
             </div>
           )}
           {watchedValues.authMode === "ApiKey" && (
@@ -683,8 +622,7 @@ function IndexerFormDialog({ open, onOpenChange, editing, onSaved }: IndexerForm
               <FormField label="Password" control={control} name="password" type="password" />
             </>
           )}
-          <div className={styles.formRow}>
-            <label className={styles.formLabel}>Enabled</label>
+          <div className="flex items-center gap-2">
             <Controller
               name="enabled"
               control={control}
@@ -696,13 +634,10 @@ function IndexerFormDialog({ open, onOpenChange, editing, onSaved }: IndexerForm
                 />
               )}
             />
+            <Label>Enabled</Label>
           </div>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" loading={saving}>
@@ -714,8 +649,6 @@ function IndexerFormDialog({ open, onOpenChange, editing, onSaved }: IndexerForm
     </Dialog>
   );
 }
-
-// --- Tiny form helpers ---
 
 function FormField<T extends FieldValues>({
   label,
@@ -729,13 +662,9 @@ function FormField<T extends FieldValues>({
   type?: string;
 }) {
   return (
-    <div className={styles.formRow}>
-      <label className={styles.formLabel}>{label}</label>
-      <Controller
-        name={name}
-        control={control}
-        render={({ field }) => <Input {...field} type={type} />}
-      />
+    <div className="grid gap-2">
+      <Label>{label}</Label>
+      <Controller name={name} control={control} render={({ field }) => <Input {...field} type={type} />} />
     </div>
   );
 }
@@ -756,7 +685,7 @@ function SelectField<T extends FieldValues>({
       render={({ field }) => (
         <select
           {...field}
-          className="flex h-10 md:h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           {options.map((o) => (
             <option key={o} value={o}>
@@ -768,8 +697,6 @@ function SelectField<T extends FieldValues>({
     />
   );
 }
-
-// --- Formatting helpers ---
 
 function formatSize(bytes: number): string {
   if (bytes === 0) return "0 B";

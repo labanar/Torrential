@@ -3,7 +3,6 @@
 import { faCheck } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useForm, useWatch } from "react-hook-form";
-import styles from "./settings.module.css";
 import { useCallback, useEffect, type ReactNode } from "react";
 import { FormInput } from "../../components/Form/FormInput";
 import { FormNumericInput } from "../../components/Form/FormNumericInput";
@@ -11,6 +10,8 @@ import { FormCheckbox } from "../../components/Form/FormCheckbox";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import Layout from "../layout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 
 interface FileSettings {
   downloadPath: string;
@@ -52,7 +53,6 @@ function GeneralSettings() {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/file`);
       const json = await response.json();
-      console.log(json);
       const { downloadPath, completedPath } = json.data;
       resetFileSettings({ downloadPath, completedPath });
     } catch (error) {
@@ -89,11 +89,8 @@ function GeneralSettings() {
   }) as ConnectionSettings;
   const fetchConnectionSettings = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/settings/connection`
-      );
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/connection`);
       const json = await response.json();
-      console.log(json);
       const {
         maxConnectionsGlobal,
         maxConnectionsPerTorrent,
@@ -139,7 +136,6 @@ function GeneralSettings() {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/tcp`);
       const json = await response.json();
-      console.log(json);
       const { enabled, port } = json.data;
       resetTcpListenerSettings({
         enabled,
@@ -170,113 +166,75 @@ function GeneralSettings() {
   }, [fetchConnectionSettings, fetchFilesettings, fetchTcpListenerSettings]);
 
   return (
-    <div className={`${styles.settingsRoot} page-shell`}>
-      <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Settings</h1>
-        <Button
-          className={styles.saveButton}
-          disabled={
-            !isFileSettingsDirty && !isConnectionSettingsDirty && !isTcpListenerSettingsDirty
-          }
-          aria-label="Save settings"
-          onClick={() => {
-            if (isFileSettingsDirty) {
-              console.log("Saving file settings");
-              console.log(fileSettingsValues);
-              saveFileSettings(fileSettingsValues);
-              resetFileSettings(fileSettingsValues);
-            }
-            if (isConnectionSettingsDirty) {
-              console.log("Saving connection settings");
-              console.log(connectionSettingsValues);
-              saveConnectionSettings(connectionSettingsValues);
-              resetConnectionSettings(connectionSettingsValues);
-            }
-            if (isTcpListenerSettingsDirty) {
-              console.log("Saving TCP Listener settings");
-              console.log(tcpListenerSettingsValue);
-              saveTcpSettings(tcpListenerSettingsValue);
-              resetTcpListenerSettings(tcpListenerSettingsValue);
-            }
-          }}
-          type="button"
-        >
-          <FontAwesomeIcon icon={faCheck} />
-          <span className={styles.saveButtonLabel}>Save</span>
-        </Button>
-      </div>
-      <Separator />
-      <SectionHeader name="Files" />
+    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col overflow-auto p-4 md:p-6">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-2xl">Settings</CardTitle>
+            <Button
+              disabled={!isFileSettingsDirty && !isConnectionSettingsDirty && !isTcpListenerSettingsDirty}
+              aria-label="Save settings"
+              onClick={() => {
+                if (isFileSettingsDirty) {
+                  saveFileSettings(fileSettingsValues);
+                  resetFileSettings(fileSettingsValues);
+                }
+                if (isConnectionSettingsDirty) {
+                  saveConnectionSettings(connectionSettingsValues);
+                  resetConnectionSettings(connectionSettingsValues);
+                }
+                if (isTcpListenerSettingsDirty) {
+                  saveTcpSettings(tcpListenerSettingsValue);
+                  resetTcpListenerSettings(tcpListenerSettingsValue);
+                }
+              }}
+              type="button"
+            >
+              <FontAwesomeIcon icon={faCheck} />
+              <span>Save</span>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <SectionHeader name="Files" />
+          <RowComponent label="Download Path">
+            <FormInput fieldName="downloadPath" control={fileSettingsControl} />
+          </RowComponent>
+          <RowComponent label="Completed Path">
+            <FormInput fieldName="completedPath" control={fileSettingsControl} />
+          </RowComponent>
 
-      <RowComponent label="Download Path">
-        <FormInput
-          fieldName="downloadPath"
-          control={fileSettingsControl}
-          className={styles.pathInput}
-        />
-      </RowComponent>
-      <RowComponent label="Completed Path">
-        <FormInput
-          fieldName="completedPath"
-          control={fileSettingsControl}
-          className={styles.pathInput}
-        />
-      </RowComponent>
+          <Separator />
+          <SectionHeader name="Connections" />
+          <RowComponent label="Max connections (per torrent)">
+            <FormNumericInput min={0} control={connectionSettingsControl} fieldName="maxConnectionsPerTorrent" />
+          </RowComponent>
+          <RowComponent label="Max connections (global)">
+            <FormNumericInput min={0} control={connectionSettingsControl} fieldName="maxConnectionsGlobal" />
+          </RowComponent>
+          <RowComponent label="Max half-open connections">
+            <FormNumericInput min={0} control={connectionSettingsControl} fieldName="maxHalfOpenConnections" />
+          </RowComponent>
 
-      <Separator />
-      <SectionHeader name="Connections" />
-
-      <RowComponent label="Max connections (per torrent)">
-        <FormNumericInput
-          min={0}
-          control={connectionSettingsControl}
-          fieldName="maxConnectionsPerTorrent"
-          className={styles.connectionNumericInput}
-        />
-      </RowComponent>
-
-      <RowComponent label="Max connections (Global)">
-        <FormNumericInput
-          min={0}
-          control={connectionSettingsControl}
-          fieldName="maxConnectionsGlobal"
-          className={styles.connectionNumericInput}
-        />
-      </RowComponent>
-
-      <RowComponent label="Max Half-open connections">
-        <FormNumericInput
-          min={0}
-          control={connectionSettingsControl}
-          fieldName="maxHalfOpenConnections"
-          className={styles.connectionNumericInput}
-        />
-      </RowComponent>
-
-      <Separator />
-      <SectionHeader name="Inbound Connections" />
-
-      <FormCheckbox
-        control={tcpListenerSettingsControl}
-        fieldName="enabled"
-        text="Allow inbound connections"
-        className={styles.tcpInboundCheckbox}
-      />
-
-      <RowComponent label="Port">
-        <FormNumericInput
-          min={0}
-          control={tcpListenerSettingsControl}
-          fieldName="port"
-          className={styles.portInput}
-        />
-      </RowComponent>
+          <Separator />
+          <SectionHeader name="Inbound Connections" />
+          <FormCheckbox
+            control={tcpListenerSettingsControl}
+            fieldName="enabled"
+            text="Allow inbound connections"
+            className="inline-flex min-h-11 items-center gap-2"
+          />
+          <RowComponent label="Port">
+            <FormNumericInput min={0} control={tcpListenerSettingsControl} fieldName="port" />
+          </RowComponent>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
 function SectionHeader({ name }: { name: string }) {
-  return <h2 className={styles.sectionTitle}>{name}</h2>;
+  return <h2 className="text-lg font-semibold">{name}</h2>;
 }
 
 interface RowInputProps {
@@ -286,9 +244,9 @@ interface RowInputProps {
 
 const RowComponent = ({ label, children }: RowInputProps) => {
   return (
-    <div className={styles.settingRow}>
-      <p className={styles.settingLabel}>{label}</p>
-      <div className={styles.settingControl}>{children}</div>
+    <div className="grid gap-2 md:grid-cols-[220px_1fr] md:items-center">
+      <Label className="text-muted-foreground md:text-right">{label}</Label>
+      <div>{children}</div>
     </div>
   );
 };
