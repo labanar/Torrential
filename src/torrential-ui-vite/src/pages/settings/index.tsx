@@ -165,7 +165,7 @@ function GeneralSettings() {
   }, [fetchConnectionSettings, fetchFilesettings, fetchTcpListenerSettings]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-4 overflow-auto p-4 md:p-6">
+    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-6 overflow-auto p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <Button
@@ -192,7 +192,7 @@ function GeneralSettings() {
         </Button>
       </header>
 
-      <section className="space-y-6 rounded-xl border border-border/70 bg-card/60 p-5">
+      <section className="space-y-6">
         <SectionHeader name="Files" />
         <RowComponent label="Download Path">
           <FormInput fieldName="downloadPath" control={fileSettingsControl} />
@@ -230,7 +230,7 @@ function GeneralSettings() {
 }
 
 function SectionHeader({ name }: { name: string }) {
-  return <h2 className="text-lg font-semibold">{name}</h2>;
+  return <h2 className="text-sm font-medium text-muted-foreground">{name}</h2>;
 }
 
 interface RowInputProps {

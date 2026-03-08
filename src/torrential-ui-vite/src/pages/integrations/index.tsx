@@ -145,7 +145,7 @@ function Page() {
   );
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-4 overflow-auto p-4 md:p-6">
+    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-6 overflow-auto p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Integrations</h1>
         <Button onClick={openCreate} size="sm" aria-label="Add indexer">
@@ -154,8 +154,8 @@ function Page() {
         </Button>
       </header>
 
-      <section className="space-y-4 rounded-xl border border-border/70 bg-card/60 p-5">
-        <h2 className="text-lg font-semibold">Indexers</h2>
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium text-muted-foreground">Indexers</h2>
         <IndexerList
           indexers={indexers}
           loading={indexersLoading}
@@ -167,8 +167,8 @@ function Page() {
         />
       </section>
 
-      <section className="space-y-4 rounded-xl border border-border/70 bg-card/60 p-5">
-        <h2 className="text-lg font-semibold">Search</h2>
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium text-muted-foreground">Search</h2>
         <SearchSection
           loading={searchLoading}
           results={searchResults}
@@ -208,19 +208,19 @@ function IndexerList({
   onDelete,
 }: IndexerListProps) {
   if (loading && indexers.length === 0) {
-    return <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">Loading indexers...</div>;
+    return <div className="p-8 text-center text-sm text-muted-foreground">Loading indexers...</div>;
   }
 
   if (indexers.length === 0) {
-    return <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">No indexers configured</div>;
+    return <div className="p-8 text-center text-sm text-muted-foreground">No indexers configured</div>;
   }
 
   return (
-    <div className="divide-y divide-border rounded-lg border border-border/70">
+    <div className="divide-y divide-border rounded-lg border">
       {indexers.map((indexer) => (
         <div
           key={indexer.id}
-          className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/40 md:grid-cols-[1fr_auto] md:items-center"
+          className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/50 md:grid-cols-[1fr_auto] md:items-center"
         >
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -425,16 +425,16 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
       </div>
 
       {query && !loading && results.length === 0 && (
-        <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+        <div className="p-6 text-center text-sm text-muted-foreground">
           No results for "{query}"
         </div>
       )}
 
       {results.length > 0 && (
-        <ScrollArea className="max-h-[28rem] rounded-lg border border-border/70">
-          <div className="divide-y divide-border/70">
+        <ScrollArea className="max-h-[28rem] rounded-lg border">
+          <div className="divide-y divide-border">
             {results.map((r, i) => (
-              <div key={`${r.title}-${i}`} className="px-4 py-3 transition-colors hover:bg-muted/40">
+              <div key={`${r.title}-${i}`} className="px-4 py-3 transition-colors hover:bg-muted/50">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold" title={r.title}>
@@ -680,7 +680,7 @@ function SelectField<T extends FieldValues>({
       render={({ field }) => (
         <select
           {...field}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring dark:bg-muted/30"
         >
           {options.map((o) => (
             <option key={o} value={o}>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleNotch, faSeedling } from "@fortawesome/free-solid-svg-icons";
+import { faCircleNotch, faSeedling, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
   fetchDetailStart,
@@ -98,37 +98,30 @@ export function DetailPane({ infoHash, onClose }: DetailPaneProps) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden border-t bg-background/70">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{detail.name}</p>
-          <p className="text-xs text-muted-foreground">{detail.infoHash}</p>
-        </div>
-        <Button variant="ghost" size="sm" onClick={onClose} type="button">
-          Close
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as Tab)} className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      <div className="flex items-center gap-2 px-4 py-2">
+        <TabsList className="flex-1 justify-start bg-transparent p-0">
+          <TabsTrigger value="peers">Peers</TabsTrigger>
+          <TabsTrigger value="bitfield">Bitfield</TabsTrigger>
+          <TabsTrigger value="files">Files</TabsTrigger>
+        </TabsList>
+        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onClose} type="button">
+          <FontAwesomeIcon icon={faXmark} className="text-sm" />
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 p-4">
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as Tab)} className="h-full">
-          <TabsList>
-            <TabsTrigger value="peers">Peers</TabsTrigger>
-            <TabsTrigger value="bitfield">Bitfield</TabsTrigger>
-            <TabsTrigger value="files">Files</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="peers" className="h-[calc(100%-3rem)]">
-            <PeersSection peers={detail.peers} />
-          </TabsContent>
-          <TabsContent value="bitfield" className="h-[calc(100%-3rem)]">
-            <BitfieldSection bitfield={detail.bitfield} />
-          </TabsContent>
-          <TabsContent value="files" className="h-[calc(100%-3rem)]">
-            <FilesSection infoHash={infoHash} files={detail.files} onRefresh={loadDetail} />
-          </TabsContent>
-        </Tabs>
+      <div className="min-h-0 flex-1 px-4 pb-4">
+        <TabsContent value="peers" className="h-full mt-0">
+          <PeersSection peers={detail.peers} />
+        </TabsContent>
+        <TabsContent value="bitfield" className="h-full mt-0">
+          <BitfieldSection bitfield={detail.bitfield} />
+        </TabsContent>
+        <TabsContent value="files" className="h-full mt-0">
+          <FilesSection infoHash={infoHash} files={detail.files} onRefresh={loadDetail} />
+        </TabsContent>
       </div>
-    </div>
+    </Tabs>
   );
 }
 
@@ -146,10 +139,10 @@ function PeersSection({ peers }: { peers: TorrentDetailPeer[] }) {
   }
 
   return (
-    <ScrollArea className="h-full rounded-lg border border-border/70">
-      <div className="divide-y divide-border/70">
+    <ScrollArea className="h-full">
+      <div className="divide-y divide-border">
         {peers.map((peer) => (
-          <div key={peer.peerId} className="px-3 py-3 transition-colors hover:bg-muted/40">
+          <div key={peer.peerId} className="px-3 py-3 transition-colors hover:bg-muted/50">
             <div className="grid gap-2 sm:grid-cols-3">
               <InfoPair label="Address" value={`${peer.ipAddress}:${peer.port}`} />
               <InfoPair label="Progress" value={`${(peer.progress * 100).toFixed(1)}%`} />
@@ -238,7 +231,7 @@ function BitfieldSection({
         <Badge variant="outline">{pct}% complete</Badge>
         <Badge variant="outline">{buckets.length} buckets</Badge>
       </div>
-      <div className="flex flex-wrap gap-[2px] rounded-md border p-3">
+      <div className="flex flex-wrap gap-[2px] rounded-md bg-muted/30 p-3">
         {buckets.map((bucket, i) => (
           <div
             key={i}
@@ -282,12 +275,12 @@ function FilesSection({
   }
 
   return (
-    <ScrollArea className="h-full rounded-lg border border-border/70">
-      <div className="divide-y divide-border/70">
+    <ScrollArea className="h-full">
+      <div className="divide-y divide-border">
         {files.map((file) => (
           <div
             key={file.id}
-            className="flex items-center justify-between gap-3 px-3 py-3 transition-colors hover:bg-muted/40"
+            className="flex items-center justify-between gap-3 px-3 py-3 transition-colors hover:bg-muted/50"
           >
             <label className="flex min-w-0 items-center gap-3">
               <Checkbox
@@ -307,7 +300,7 @@ function FilesSection({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="flex h-full items-center justify-center rounded-md border border-dashed p-8 text-sm text-muted-foreground">
+    <div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">
       {text}
     </div>
   );

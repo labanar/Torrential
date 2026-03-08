@@ -75,24 +75,24 @@ function Page() {
   }, [hydrate]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
+    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-6 overflow-hidden p-4 md:p-6">
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Peers</h1>
         <Badge variant="secondary">{peers.length} connected</Badge>
       </header>
 
-      <section className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border/70 bg-card/60">
+      <section className="min-h-0 flex-1 overflow-hidden">
         {peers.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             No connected peers
           </div>
         ) : (
           <ScrollArea className="h-full">
-            <div className="divide-y divide-border/70">
+            <div className="divide-y divide-border">
               {peers.map((peer) => (
                 <div
                   key={`${peer.infoHash}-${peer.peerId}`}
-                  className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/40 sm:grid-cols-2 lg:grid-cols-4"
+                  className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/50 sm:grid-cols-2 lg:grid-cols-4"
                 >
                   <InfoPair label="IP" value={peer.ip} />
                   <InfoPair label="Port" value={`${peer.port}`} />

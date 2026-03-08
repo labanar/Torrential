@@ -336,15 +336,14 @@ function Page() {
           {memoActionRow}
           <Separator />
           <ScrollArea className="min-h-0 flex-1">
-            <div className="p-3">
               {filteredTorrents.length === 0 && (
-                <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                <div className="p-8 text-center text-sm text-muted-foreground">
                   No torrents match your filter.
                 </div>
               )}
 
               {filteredTorrents.length > 0 && (
-                <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-card/60">
+                <div className="divide-y divide-border">
                   {filteredTorrents.map((torrent, index) => (
                     <TorrentRow
                       toggleSelect={selectTorrent}
@@ -378,7 +377,6 @@ function Page() {
                   ))}
                 </div>
               )}
-            </div>
           </ScrollArea>
         </div>
 
@@ -386,8 +384,8 @@ function Page() {
           <>
             <div
               className={cn(
-                "flex h-4 cursor-ns-resize items-center justify-center border-y text-muted-foreground",
-                isResizingDetailPane && "bg-muted text-foreground"
+                "flex h-4 cursor-ns-resize items-center justify-center border-t text-muted-foreground/50 hover:text-muted-foreground",
+                isResizingDetailPane && "bg-muted/50 text-foreground"
               )}
               role="separator"
               aria-label="Resize torrent details pane"
@@ -645,9 +643,9 @@ const ActionsRow = ({
           <TooltipTrigger asChild>
             <Button
               size="icon"
-              variant="outline"
+              variant="ghost"
               disabled={torrentActionsDisabled}
-              className="border-emerald-600 text-emerald-600 hover:bg-emerald-600/10"
+              className="text-emerald-600 hover:bg-emerald-600/10 hover:text-emerald-600"
               aria-label="Start"
               type="button"
               onClick={() => startTorrents()}
@@ -662,10 +660,10 @@ const ActionsRow = ({
           <TooltipTrigger asChild>
             <Button
               size="icon"
-              variant="outline"
+              variant="ghost"
               type="button"
               disabled={torrentActionsDisabled}
-              className="border-amber-500 text-amber-500 hover:bg-amber-500/10"
+              className="text-amber-500 hover:bg-amber-500/10 hover:text-amber-500"
               aria-label="Stop"
               onClick={() => stopTorrents()}
             >
@@ -768,9 +766,9 @@ function TorrentRow({
   return (
     <div
       className={cn(
-        "cursor-pointer px-4 py-3 transition-colors hover:bg-muted/40",
-        isFocused && "bg-muted/50 ring-1 ring-inset ring-ring",
-        isSelected && "bg-accent/35"
+        "cursor-pointer px-4 py-3 transition-colors hover:bg-muted/50",
+        isFocused && "bg-muted/60",
+        isSelected && "bg-accent/40"
       )}
       tabIndex={0}
       role="button"
