@@ -12,7 +12,8 @@ import {
   TorrentApiModel,
 } from "../../services/api";
 import { PeerSummary, TorrentSummary } from "../../types";
-import styles from "./peers.module.css";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function PeersPage() {
   return (
@@ -30,24 +31,21 @@ function Page() {
     try {
       const data = await fetchTorrentsApi();
 
-      const mappedTorrents = data.reduce(
-        (pv: TorrentsState, cv: TorrentApiModel) => {
-          const summary: TorrentSummary = {
-            name: cv.name,
-            infoHash: cv.infoHash,
-            progress: cv.progress,
-            uploadRate: cv.uploadRate,
-            downloadRate: cv.downloadRate,
-            sizeInBytes: cv.totalSizeBytes,
-            status: cv.status,
-            bytesUploaded: cv.bytesUploaded,
-            bytesDownloaded: cv.bytesDownloaded,
-          };
-          pv[cv.infoHash] = summary;
-          return pv;
-        },
-        {}
-      );
+      const mappedTorrents = data.reduce((pv: TorrentsState, cv: TorrentApiModel) => {
+        const summary: TorrentSummary = {
+          name: cv.name,
+          infoHash: cv.infoHash,
+          progress: cv.progress,
+          uploadRate: cv.uploadRate,
+          downloadRate: cv.downloadRate,
+          sizeInBytes: cv.totalSizeBytes,
+          status: cv.status,
+          bytesUploaded: cv.bytesUploaded,
+          bytesDownloaded: cv.bytesDownloaded,
+        };
+        pv[cv.infoHash] = summary;
+        return pv;
+      }, {});
       dispatch(setTorrents(mappedTorrents));
 
       data.forEach((torrent: TorrentApiModel) => {
@@ -67,7 +65,7 @@ function Page() {
         );
         dispatch(setPeers({ infoHash: torrent.infoHash, peers: torrentPeers }));
       });
-    } catch (error) {
+    } catch {
       console.log("error fetching torrents");
     }
   }, [dispatch]);
@@ -76,87 +74,54 @@ function Page() {
     hydrate();
   }, [hydrate]);
 
-  if (peers.length === 0) {
-    return (
-      <div className={`${styles.root} page-shell`}>
-        <div className={styles.emptyState}>
-          <p>No connected peers</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className={`${styles.root} page-shell`}>
-      <div className={styles.header}>
-        <h2 className={styles.title}>Peers</h2>
-        <span className={styles.peerCount}>{peers.length} connected</span>
-      </div>
-      <div className={styles.tableWrap}>
-        <table className={styles.peersTable}>
-          <thead>
-            <tr>
-              <th>IP</th>
-              <th>Port</th>
-              <th>Torrent</th>
-              <th>Seed</th>
-            </tr>
-          </thead>
-          <tbody>
-            {peers.map((peer) => (
-              <tr key={`${peer.infoHash}-${peer.peerId}`}>
-                <td>{peer.ip}</td>
-                <td>{peer.port}</td>
-                <td className={styles.torrentNameCell}>{peer.torrentName}</td>
-                <td>
-                  {peer.isSeed && (
-                    <FontAwesomeIcon
-                      icon={faSeedling}
-                      size="sm"
-                      className={styles.seedIcon}
-                    />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className={styles.peerCards}>
-        {peers.map((peer) => (
-          <div
-            key={`${peer.infoHash}-${peer.peerId}`}
-            className={styles.peerCard}
-          >
-            <div className={styles.cardRow}>
-              <span className={styles.cardLabel}>IP</span>
-              <span className={styles.cardValue}>{peer.ip}</span>
-            </div>
-            <div className={styles.cardRow}>
-              <span className={styles.cardLabel}>Port</span>
-              <span className={styles.cardValue}>{peer.port}</span>
-            </div>
-            <div className={styles.cardRow}>
-              <span className={styles.cardLabel}>Torrent</span>
-              <span className={styles.cardValue}>{peer.torrentName}</span>
-            </div>
-            <div className={styles.cardRow}>
-              <span className={styles.cardLabel}>Seed</span>
-              <span className={styles.cardValue}>
-                {peer.isSeed ? (
-                  <FontAwesomeIcon
-                    icon={faSeedling}
-                    size="sm"
-                    className={styles.seedIcon}
-                  />
-                ) : (
-                  "No"
-                )}
-              </span>
-            </div>
+    <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-6 overflow-hidden p-4 md:p-6">
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Peers</h1>
+        <Badge variant="secondary">{peers.length} connected</Badge>
+      </header>
+
+      <section className="min-h-0 flex-1 overflow-hidden">
+        {peers.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            No connected peers
           </div>
-        ))}
-      </div>
+        ) : (
+          <ScrollArea className="h-full">
+            <div className="divide-y divide-border">
+              {peers.map((peer) => (
+                <div
+                  key={`${peer.infoHash}-${peer.peerId}`}
+                  className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/50 sm:grid-cols-2 lg:grid-cols-4"
+                >
+                  <InfoPair label="IP" value={peer.ip} />
+                  <InfoPair label="Port" value={`${peer.port}`} />
+                  <InfoPair label="Torrent" value={peer.torrentName} />
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Seed</span>
+                    {peer.isSeed ? (
+                      <Badge variant="outline" className="gap-1 text-emerald-500">
+                        <FontAwesomeIcon icon={faSeedling} /> Yes
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">No</Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function InfoPair({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="truncate text-sm">{value}</p>
     </div>
   );
 }

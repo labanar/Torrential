@@ -14,48 +14,48 @@
     --space-lg: 1.5rem;
     --space-xl: 2rem;
     --touch-target-min: 44px;
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 210 33% 98%;
+    --foreground: 222.2 47.4% 11.2%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222.2 47.4% 11.2%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
     --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
+    --secondary: 210 26% 95%;
     --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
+    --muted: 210 24% 95%;
+    --muted-foreground: 215 16% 38%;
+    --accent: 210 24% 95%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 214 24% 88%;
+    --input: 214 24% 88%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 220 26% 14%;
+    --background: 220 16% 4%;
     --foreground: 210 40% 98%;
-    --card: 220 26% 14%;
+    --card: 220 14% 7%;
     --card-foreground: 210 40% 98%;
-    --popover: 220 26% 14%;
+    --popover: 220 14% 7%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary: 142 72% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 12% 10%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --muted: 220 12% 10%;
+    --muted-foreground: 215 16% 56%;
+    --accent: 220 12% 12%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --border: 220 10% 14%;
+    --input: 220 10% 14%;
+    --ring: 142 72% 45%;
   }
 
   * {
@@ -79,8 +79,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue",
-      sans-serif;
+    font-family: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
   }
 
   #root {
@@ -96,20 +95,6 @@
   canvas,
   svg {
     max-width: 100%;
-  }
-
-  .page-shell {
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-
-  .responsive-table-wrap {
-    width: 100%;
-    min-width: 0;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   @media (max-width: 768px) {

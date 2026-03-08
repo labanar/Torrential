@@ -1,5 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Control, Controller, FieldValues, Path } from "react-hook-form";
+import { cn } from "@/lib/utils";
 
 interface FormCheckboxProps<TFieldValues extends FieldValues> {
   className?: string;
@@ -20,15 +21,10 @@ export const FormCheckbox = <TFieldValues extends FieldValues>({
       control={control}
       render={({ field: { onChange, onBlur, value, ref } }) => (
         <label
-          className={className}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            minHeight: "var(--touch-target-min)",
-            cursor: "pointer",
-            lineHeight: 1.35,
-          }}
+          className={cn(
+            "inline-flex min-h-11 cursor-pointer items-center gap-2 leading-[1.35]",
+            className
+          )}
         >
           <Checkbox
             checked={Boolean(value)}

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleNotch, faSeedling, faXmark } from "@fortawesome/free-solid-svg-icons";
-import classNames from "classnames";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
   fetchDetailStart,
@@ -11,7 +10,10 @@ import {
 } from "../../store/slices/torrentDetailSlice";
 import { fetchTorrentDetail, updateFileSelection } from "../../services/api";
 import type { TorrentDetail, TorrentDetailPeer, TorrentFile } from "../../types";
-import styles from "./detail-pane.module.css";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 
 type Tab = "peers" | "bitfield" | "files";
 
@@ -72,86 +74,54 @@ export function DetailPane({ infoHash, onClose }: DetailPaneProps) {
 
   if (loading && !detail) {
     return (
-      <div className={styles.detailPane}>
-        <div className={styles.emptyState}>
-          <FontAwesomeIcon icon={faCircleNotch} spin className={styles.loadingSpinner} />
-          <p>Loading details...</p>
-        </div>
+      <div className="flex h-full items-center justify-center p-6 text-muted-foreground">
+        <FontAwesomeIcon icon={faCircleNotch} spin className="mr-2" />
+        <p>Loading details...</p>
       </div>
     );
   }
 
   if (error && !detail) {
     return (
-      <div className={styles.detailPane}>
-        <div className={styles.emptyState}>
-          <p>{error}</p>
-        </div>
+      <div className="flex h-full items-center justify-center p-6 text-muted-foreground">
+        <p>{error}</p>
       </div>
     );
   }
 
   if (!detail) {
     return (
-      <div className={styles.detailPane}>
-        <div className={styles.emptyState}>
-          <p>No details available</p>
-        </div>
+      <div className="flex h-full items-center justify-center p-6 text-muted-foreground">
+        <p>No details available</p>
       </div>
     );
   }
 
   return (
-    <div className={styles.detailPane}>
-      <div className={styles.detailHeader}>
-        <span className={styles.detailHeaderTitle}>{detail.name}</span>
-        <div className={styles.detailHeaderActions}>
-          <button
-            type="button"
-            className={styles.detailCloseButton}
-            aria-label="Close torrent details"
-            onClick={onClose}
-          >
-            <FontAwesomeIcon icon={faXmark} />
-          </button>
-        </div>
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as Tab)} className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      <div className="flex items-center gap-2 px-4 py-2">
+        <TabsList className="flex-1 justify-start bg-transparent p-0">
+          <TabsTrigger value="peers">Peers</TabsTrigger>
+          <TabsTrigger value="bitfield">Bitfield</TabsTrigger>
+          <TabsTrigger value="files">Files</TabsTrigger>
+        </TabsList>
+        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onClose} type="button">
+          <FontAwesomeIcon icon={faXmark} className="text-sm" />
+        </Button>
       </div>
-      <div className={styles.tabs}>
-        <TabButton label="PEERS" tab="peers" active={activeTab} onClick={setActiveTab} />
-        <TabButton label="BITFIELD" tab="bitfield" active={activeTab} onClick={setActiveTab} />
-        <TabButton label="FILES" tab="files" active={activeTab} onClick={setActiveTab} />
-      </div>
-      <div className={styles.tabContent}>
-        {activeTab === "peers" && <PeersSection peers={detail.peers} />}
-        {activeTab === "bitfield" && <BitfieldSection bitfield={detail.bitfield} />}
-        {activeTab === "files" && (
-          <FilesSection infoHash={infoHash} files={detail.files} onRefresh={loadDetail} />
-        )}
-      </div>
-    </div>
-  );
-}
 
-function TabButton({
-  label,
-  tab,
-  active,
-  onClick,
-}: {
-  label: string;
-  tab: Tab;
-  active: Tab;
-  onClick: (t: Tab) => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={classNames(styles.tab, { [styles.tabActive]: active === tab })}
-      onClick={() => onClick(tab)}
-      aria-pressed={active === tab}
-    >
-      {label}
-    </button>
+      <div className="min-h-0 flex-1 px-4 pb-4">
+        <TabsContent value="peers" className="h-full mt-0">
+          <PeersSection peers={detail.peers} />
+        </TabsContent>
+        <TabsContent value="bitfield" className="h-full mt-0">
+          <BitfieldSection bitfield={detail.bitfield} />
+        </TabsContent>
+        <TabsContent value="files" className="h-full mt-0">
+          <FilesSection infoHash={infoHash} files={detail.files} onRefresh={loadDetail} />
+        </TabsContent>
+      </div>
+    </Tabs>
   );
 }
 
@@ -165,82 +135,34 @@ function prettyBytes(bytes: number) {
 
 function PeersSection({ peers }: { peers: TorrentDetailPeer[] }) {
   if (peers.length === 0) {
-    return (
-      <div className={styles.emptyState}>
-        <p>No connected peers</p>
-      </div>
-    );
+    return <EmptyState text="No connected peers" />;
   }
 
   return (
-    <>
-      <div className={styles.tableScroller}>
-        <table className={styles.peersTable}>
-          <thead>
-            <tr>
-              <th>IP</th>
-              <th>Port</th>
-              <th>Progress</th>
-              <th>Downloaded</th>
-              <th>Uploaded</th>
-              <th>Seed</th>
-            </tr>
-          </thead>
-          <tbody>
-            {peers.map((peer) => (
-              <tr key={peer.peerId}>
-                <td>{peer.ipAddress}</td>
-                <td>{peer.port}</td>
-                <td>{(peer.progress * 100).toFixed(1)}%</td>
-                <td>{prettyBytes(peer.bytesDownloaded)}</td>
-                <td>{prettyBytes(peer.bytesUploaded)}</td>
-                <td>
-                  {peer.isSeed && (
-                    <FontAwesomeIcon icon={faSeedling} size="sm" className={styles.seedIcon} />
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className={styles.peerCards}>
+    <ScrollArea className="h-full">
+      <div className="divide-y divide-border">
         {peers.map((peer) => (
-          <div key={peer.peerId} className={styles.detailCard}>
-            <div className={styles.detailCardRow}>
-              <span className={styles.detailCardLabel}>IP</span>
-              <span className={styles.detailCardValue}>{peer.ipAddress}</span>
-            </div>
-            <div className={styles.detailCardRow}>
-              <span className={styles.detailCardLabel}>Port</span>
-              <span className={styles.detailCardValue}>{peer.port}</span>
-            </div>
-            <div className={styles.detailCardRow}>
-              <span className={styles.detailCardLabel}>Progress</span>
-              <span className={styles.detailCardValue}>{(peer.progress * 100).toFixed(1)}%</span>
-            </div>
-            <div className={styles.detailCardRow}>
-              <span className={styles.detailCardLabel}>Downloaded</span>
-              <span className={styles.detailCardValue}>{prettyBytes(peer.bytesDownloaded)}</span>
-            </div>
-            <div className={styles.detailCardRow}>
-              <span className={styles.detailCardLabel}>Uploaded</span>
-              <span className={styles.detailCardValue}>{prettyBytes(peer.bytesUploaded)}</span>
-            </div>
-            <div className={styles.detailCardRow}>
-              <span className={styles.detailCardLabel}>Seed</span>
-              <span className={styles.detailCardValue}>
+          <div key={peer.peerId} className="px-3 py-3 transition-colors hover:bg-muted/50">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <InfoPair label="Address" value={`${peer.ipAddress}:${peer.port}`} />
+              <InfoPair label="Progress" value={`${(peer.progress * 100).toFixed(1)}%`} />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Role</span>
                 {peer.isSeed ? (
-                  <FontAwesomeIcon icon={faSeedling} size="sm" className={styles.seedIcon} />
+                  <Badge variant="secondary" className="gap-1">
+                    <FontAwesomeIcon icon={faSeedling} className="text-emerald-500" /> Seed
+                  </Badge>
                 ) : (
-                  "No"
+                  <Badge variant="outline">Peer</Badge>
                 )}
-              </span>
+              </div>
+              <InfoPair label="Downloaded" value={prettyBytes(peer.bytesDownloaded)} />
+              <InfoPair label="Uploaded" value={prettyBytes(peer.bytesUploaded)} />
             </div>
           </div>
         ))}
       </div>
-    </>
+    </ScrollArea>
   );
 }
 
@@ -268,7 +190,6 @@ function BitfieldSection({
         return ((bytes[byteIndex] >> bitOffset) & 1) === 1;
       };
 
-      // Bounded sampling keeps rendering responsive even for very large torrents.
       return Array.from({ length: bucketCount }, (_, bucketIndex) => {
         const startPiece = Math.floor((bucketIndex * bitfield.pieceCount) / bucketCount);
         const endPiece = Math.max(
@@ -304,22 +225,18 @@ function BitfieldSection({
       : "0.0";
 
   return (
-    <div className={styles.bitfieldContainer}>
-      <div className={styles.bitfieldStats}>
-        <span>
-          Pieces: {bitfield.haveCount} / {bitfield.pieceCount} ({pct}%)
-        </span>
-        <span>{buckets.length} buckets</span>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <Badge variant="outline">Pieces: {bitfield.haveCount} / {bitfield.pieceCount}</Badge>
+        <Badge variant="outline">{pct}% complete</Badge>
+        <Badge variant="outline">{buckets.length} buckets</Badge>
       </div>
-      <div className={styles.bitfieldGrid}>
+      <div className="flex flex-wrap gap-[2px] rounded-md bg-muted/30 p-3">
         {buckets.map((bucket, i) => (
           <div
             key={i}
-            className={classNames(
-              styles.bitfieldPiece,
-              bucket.ratio > 0 ? styles.bitfieldPieceHave : styles.bitfieldPieceMissing
-            )}
-            style={{ opacity: Math.max(0.2, bucket.ratio) }}
+            className="h-1 w-1 rounded-sm bg-emerald-500"
+            style={{ opacity: Math.max(0.15, bucket.ratio) }}
             title={`Pieces ${bucket.startPiece} - ${bucket.endPiece - 1}`}
           />
         ))}
@@ -349,66 +266,51 @@ function FilesSection({
       newIds = [...currentIds, fileId];
     }
     await updateFileSelection(infoHash, newIds);
-    // The SignalR FileSelectionChanged event will update the store,
-    // but also refresh to get the latest state.
     onRefresh();
     setPending(false);
   };
 
   if (files.length === 0) {
-    return (
-      <div className={styles.emptyState}>
-        <p>No files</p>
-      </div>
-    );
+    return <EmptyState text="No files" />;
   }
 
   return (
-    <>
-      <div className={styles.tableScroller}>
-        <table className={styles.filesTable}>
-          <thead>
-            <tr>
-              <th style={{ width: "40px" }}></th>
-              <th>Filename</th>
-              <th>Size</th>
-            </tr>
-          </thead>
-          <tbody>
-            {files.map((file) => (
-              <tr key={file.id}>
-                <td>
-                  <Checkbox
-                    checked={file.isSelected}
-                    disabled={pending}
-                    onCheckedChange={() => toggleFile(file.id, file.isSelected)}
-                  />
-                </td>
-                <td>{file.filename}</td>
-                <td>{prettyBytes(file.size)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className={styles.fileCards}>
+    <ScrollArea className="h-full">
+      <div className="divide-y divide-border">
         {files.map((file) => (
-          <div key={file.id} className={styles.detailCard}>
-            <label className={styles.fileCardToggle}>
+          <div
+            key={file.id}
+            className="flex items-center justify-between gap-3 px-3 py-3 transition-colors hover:bg-muted/50"
+          >
+            <label className="flex min-w-0 items-center gap-3">
               <Checkbox
                 checked={file.isSelected}
                 disabled={pending}
                 onCheckedChange={() => toggleFile(file.id, file.isSelected)}
               />
-              <span className={styles.fileCardFilename}>{file.filename}</span>
+              <span className="truncate text-sm">{file.filename}</span>
             </label>
-            <div className={styles.detailCardRow}>
-              <span className={styles.detailCardLabel}>Size</span>
-              <span className={styles.detailCardValue}>{prettyBytes(file.size)}</span>
-            </div>
+            <span className="text-xs text-muted-foreground">{prettyBytes(file.size)}</span>
           </div>
         ))}
       </div>
-    </>
+    </ScrollArea>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">
+      {text}
+    </div>
+  );
+}
+
+function InfoPair({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="truncate text-sm">{value}</p>
+    </div>
   );
 }

@@ -6,16 +6,16 @@ import {
   faUpDown,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
-import styles from "./alfred.module.css";
 import { NavigateFunction, useNavigate } from "react-router-dom";
 import { AppDispatch, useAppDispatch } from "../../store";
 import { AlfredContext } from "../../store/slices/alfredSlice";
-import classNames from "classnames";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 export default function Alfred() {
   const { enableScope, disableScope, enabledScopes } = useHotkeysContext();
@@ -23,56 +23,93 @@ export default function Alfred() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
-  const [isOpen, setSearchOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(0);
-  const [suggestions] = useState(globalSuggestions);
-  const [scopesToEnableOnClose, setScopesToEnableOnClose] = useState<string[]>(
-    []
-  );
+  const [scopesToEnableOnClose, setScopesToEnableOnClose] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setSelectedId(0);
-  }, [suggestions]);
+  const filteredSuggestions = useMemo(() => {
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) {
+      return globalSuggestions;
+    }
 
-  const onToggle = () => {
-    setSearchOpen((prevOpen) => !prevOpen);
-  };
+    return globalSuggestions.filter((command) => {
+      const target = `${command.group} ${command.title}`.toLowerCase();
+      return target.includes(trimmed);
+    });
+  }, [query]);
+
+  const groupedSuggestions = useMemo(() => {
+    return filteredSuggestions.reduce<Record<string, SearchSuggestion[]>>((acc, item) => {
+      const group = item.group;
+      acc[group] ??= [];
+      acc[group].push(item);
+      return acc;
+    }, {});
+  }, [filteredSuggestions]);
+
+  useEffect(() => {
+    if (selectedId >= filteredSuggestions.length) {
+      setSelectedId(0);
+    }
+  }, [filteredSuggestions.length, selectedId]);
 
   useHotkeys(
-    "mod+ ",
-    () => {
-      onToggle();
+    "mod+k",
+    (event) => {
+      event.preventDefault();
+      setIsOpen((prev) => !prev);
     },
     {
       scopes: ["global"],
       enableOnFormTags: ["input", "textarea", "select"],
+    }
+  );
+
+  useHotkeys(
+    "mod+ ",
+    (event) => {
+      event.preventDefault();
+      setIsOpen((prev) => !prev);
     },
-    [onToggle]
+    {
+      scopes: ["global"],
+      enableOnFormTags: ["input", "textarea", "select"],
+    }
   );
 
   useEffect(() => {
     if (isOpen) {
       setScopesToEnableOnClose(enabledScopes);
-      enabledScopes.forEach((s) => disableScope(s));
+      enabledScopes.forEach((scope) => disableScope(scope));
       enableScope("search");
       window.setTimeout(() => inputRef.current?.focus(), 0);
-    } else {
-      disableScope("search");
-      scopesToEnableOnClose.forEach((s) => {
-        enableScope(s);
-      });
-      enableScope("global");
-      setSelectedId(0);
+      return;
     }
-    return () => disableScope("search");
+
+    disableScope("search");
+    scopesToEnableOnClose.forEach((scope) => {
+      enableScope(scope);
+    });
+    enableScope("global");
+    setSelectedId(0);
+    setQuery("");
   }, [disableScope, enableScope, enabledScopes, isOpen, scopesToEnableOnClose]);
 
   useHotkeys(
     "up",
-    () => {
+    (event) => {
+      event.preventDefault();
+      if (filteredSuggestions.length === 0) {
+        return;
+      }
+
       let nextId = selectedId - 1;
-      if (nextId < 0) nextId = suggestions.length - 1;
+      if (nextId < 0) {
+        nextId = filteredSuggestions.length - 1;
+      }
       setSelectedId(nextId);
     },
     {
@@ -83,9 +120,16 @@ export default function Alfred() {
 
   useHotkeys(
     "down",
-    () => {
+    (event) => {
+      event.preventDefault();
+      if (filteredSuggestions.length === 0) {
+        return;
+      }
+
       let nextId = selectedId + 1;
-      if (nextId > suggestions.length - 1) nextId = nextId - suggestions.length;
+      if (nextId > filteredSuggestions.length - 1) {
+        nextId = 0;
+      }
       setSelectedId(nextId);
     },
     {
@@ -96,11 +140,12 @@ export default function Alfred() {
 
   useHotkeys(
     "enter",
-    () => {
-      if (selectedId >= 0 && suggestions.length > selectedId) {
-        const suggestion = suggestions[selectedId];
+    (event) => {
+      event.preventDefault();
+      if (selectedId >= 0 && filteredSuggestions.length > selectedId) {
+        const suggestion = filteredSuggestions[selectedId];
         suggestion.action({ dispatch, navigate });
-        setSearchOpen(false);
+        setIsOpen(false);
       }
     },
     {
@@ -111,8 +156,9 @@ export default function Alfred() {
 
   useHotkeys(
     "esc",
-    () => {
-      setSearchOpen(false);
+    (event) => {
+      event.preventDefault();
+      setIsOpen(false);
     },
     {
       scopes: ["search"],
@@ -120,60 +166,75 @@ export default function Alfred() {
     }
   );
 
+  let runningIndex = -1;
+
   return (
-    <Dialog open={isOpen} onOpenChange={setSearchOpen}>
-      <DialogContent className={styles.dialogContent}>
-        <div className={styles.inputContainer}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
+        <div className="p-3">
           <Input
             ref={inputRef}
-            placeholder="Type to search"
-            className={styles.searchInput}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault();
-              }
+            placeholder="Search commands..."
+            value={query}
+            aria-label="Search commands"
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setSelectedId(0);
             }}
           />
         </div>
         <Separator />
+        <ScrollArea className="max-h-[min(65vh,28rem)]">
+          {filteredSuggestions.length === 0 && (
+            <div className="p-6 text-sm text-muted-foreground">No commands found.</div>
+          )}
+          {Object.entries(groupedSuggestions).map(([group, items]) => (
+            <div key={group} className="p-2">
+              <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {group}
+              </p>
+              <div role="listbox" aria-label={`${group} commands`}>
+                {items.map((item) => {
+                  runningIndex += 1;
+                  const itemIndex = runningIndex;
+                  const isSelected = selectedId === itemIndex;
 
-        <div className={styles.modalBody}>
-          {suggestions.map((s, i) => (
-            <SearchSuggestion
-              key={s.title}
-              selected={selectedId === i}
-              icon={s.icon}
-              title={s.title}
-            />
+                  return (
+                    <button
+                      key={item.title}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                        isSelected ? "bg-accent text-accent-foreground" : "hover:bg-muted"
+                      )}
+                      onMouseEnter={() => setSelectedId(itemIndex)}
+                      onClick={() => {
+                        item.action({ dispatch, navigate });
+                        setIsOpen(false);
+                      }}
+                    >
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground">
+                        <FontAwesomeIcon icon={item.icon} />
+                      </span>
+                      <span>{item.title}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           ))}
-        </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
 }
 
-interface SearchSuggestionProps {
-  selected: boolean;
-  icon?: IconDefinition;
-  title: string;
-}
-
-function SearchSuggestion({ selected, icon, title }: SearchSuggestionProps) {
-  return (
-    <div
-      className={classNames(styles.suggestion, {
-        [styles.selected]: selected,
-      })}
-    >
-      <FontAwesomeIcon icon={icon!} size="xl" width={"28px"} />
-      <span className={styles.suggestionLabel}>{title}</span>
-    </div>
-  );
-}
-
 interface SearchSuggestion {
   context: AlfredContext;
-  icon?: IconDefinition;
+  group: string;
+  icon: IconDefinition;
   title: string;
   action: (actionProps: SearchSuggestionActionProps) => void;
 }
@@ -186,24 +247,28 @@ interface SearchSuggestionActionProps {
 const globalSuggestions: SearchSuggestion[] = [
   {
     context: AlfredContext.Global,
+    group: "Navigate",
     icon: faUpDown,
     title: "Torrents",
     action: ({ navigate }) => navigate("/"),
   },
   {
     context: AlfredContext.Global,
+    group: "Navigate",
     icon: faPeopleGroup,
     title: "Peers",
     action: ({ navigate }) => navigate("/peers"),
   },
   {
     context: AlfredContext.Global,
+    group: "Navigate",
     icon: faPlug,
     title: "Integrations",
     action: ({ navigate }) => navigate("/integrations"),
   },
   {
     context: AlfredContext.Global,
+    group: "Navigate",
     icon: faGear,
     title: "Settings",
     action: ({ navigate }) => navigate("/settings"),

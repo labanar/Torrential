@@ -1,32 +1,48 @@
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import styles from "./layout.module.css";
 import {
-  IconDefinition,
   faBars,
   faGear,
   faMoon,
   faPlug,
   faSun,
-  faUmbrella,
   faUpDown,
   faUsers,
-  faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useLocation, useNavigate } from "react-router-dom";
 import Alfred from "../components/Alfred/alfred";
 import SignalRService from "../services/signalR";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Theme, applyTheme, resolveInitialTheme } from "@/lib/theme";
+import { cn } from "@/lib/utils";
+
 config.autoAddCss = false;
+
+interface NavItem {
+  label: string;
+  href: string;
+  icon: typeof faUpDown;
+}
+
+const navItems: NavItem[] = [
+  { label: "Torrents", href: "/", icon: faUpDown },
+  { label: "Peers", href: "/peers", icon: faUsers },
+  { label: "Integrations", href: "/integrations", icon: faPlug },
+  { label: "Settings", href: "/settings", icon: faGear },
+];
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState<Theme>(() => resolveInitialTheme());
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const signalRService = new SignalRService(
@@ -40,177 +56,104 @@ export default function RootLayout({
   }, []);
 
   useEffect(() => {
-    if (!isMobileSidebarOpen) {
-      return;
-    }
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsMobileSidebarOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [isMobileSidebarOpen]);
+  const onToggleTheme = useCallback(() => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    applyTheme(nextTheme);
+  }, [theme]);
 
   const alfred = useMemo(() => <Alfred />, []);
 
   return (
-    <div className={styles.root}>
-      <div className={styles.mobileTopBar}>
-        <button
-          type="button"
-          className={styles.mobileMenuButton}
-          onClick={() => setIsMobileSidebarOpen(true)}
-          aria-label="Open navigation menu"
-        >
-          <FontAwesomeIcon icon={faBars} />
-        </button>
-        <span className={styles.mobileTitle}>TORRENTIAL</span>
-      </div>
-      <button
-        type="button"
-        aria-label="Close navigation menu"
-        className={`${styles.mobileBackdrop} ${
-          isMobileSidebarOpen ? styles.mobileBackdropVisible : ""
-        }`}
-        onClick={() => setIsMobileSidebarOpen(false)}
-      />
-      <SideBar
-        isMobileSidebarOpen={isMobileSidebarOpen}
-        closeMobileSidebar={() => setIsMobileSidebarOpen(false)}
-      />
-      {alfred}
-      <div className={styles.divider}>
-        <Separator orientation="vertical" className={styles.verticalDivider} />
-      </div>
-      <div id="main" className={styles.main}>
-        {children}
-      </div>
-    </div>
-  );
-}
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background">
+      <header className="flex h-12 shrink-0 items-center justify-between border-b px-4">
+        <div className="flex items-center gap-6">
+          {/* Mobile hamburger */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 sm:hidden"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open navigation menu"
+          >
+            <FontAwesomeIcon icon={faBars} className="h-4 w-4" />
+          </Button>
 
-interface SideBarProps {
-  isMobileSidebarOpen: boolean;
-  closeMobileSidebar: () => void;
-}
+          <span className="text-sm font-semibold tracking-tight">Torrential</span>
 
-function SideBar({ isMobileSidebarOpen, closeMobileSidebar }: SideBarProps) {
-  const location = useLocation();
-  const [theme, setTheme] = useState<"light" | "dark">(() =>
-    document.documentElement.classList.contains("dark") ? "dark" : "light"
-  );
+          {/* Desktop nav */}
+          <nav className="hidden items-center gap-1 sm:flex">
+            {navItems.map((item) => {
+              const active = location.pathname === item.href;
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => navigate(item.href)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <FontAwesomeIcon icon={item.icon} className="h-3.5 w-3.5" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
-  const toggleTheme = useCallback(() => {
-    const nextTheme = theme === "dark" ? "light" : "dark";
-    setTheme(nextTheme);
-    document.documentElement.classList.toggle("dark", nextTheme === "dark");
-    document.documentElement.style.colorScheme = nextTheme;
-    window.localStorage.setItem("theme", nextTheme);
-  }, [theme]);
-
-  return (
-    <div
-      id="sidebar"
-      className={`${styles.sidebar} ${isMobileSidebarOpen ? styles.sidebarOpen : ""}`}
-    >
-      <div className={styles.sidebarHeader}>
-        <span className={styles.sidebarTitle}>TORRENTIAL</span>
-        <button
-          type="button"
-          className={styles.mobileCloseButton}
-          onClick={closeMobileSidebar}
-          aria-label="Close navigation menu"
-        >
-          <FontAwesomeIcon icon={faXmark} />
-        </button>
-      </div>
-      <FontAwesomeIcon
-        icon={faUmbrella}
-        size={"5x"}
-        style={{
-          textAlign: "center",
-          alignSelf: "center",
-          paddingBottom: "0.1em",
-          paddingTop: "0.2em",
-          opacity: 0.1,
-        }}
-      />
-      <SideBarItem
-        label="TORRENTS"
-        linksTo="/"
-        icon={faUpDown}
-        isActive={location.pathname === "/"}
-        onNavigate={closeMobileSidebar}
-      />
-      <SideBarItem
-        label="PEERS"
-        linksTo="/peers"
-        icon={faUsers}
-        isActive={location.pathname === "/peers"}
-        onNavigate={closeMobileSidebar}
-      />
-      <SideBarItem
-        label="INTEGRATIONS"
-        linksTo="/integrations"
-        icon={faPlug}
-        isActive={location.pathname === "/integrations"}
-        onNavigate={closeMobileSidebar}
-      />
-      <SideBarItem
-        label="SETTINGS"
-        linksTo="/settings"
-        icon={faGear}
-        isActive={location.pathname === "/settings"}
-        onNavigate={closeMobileSidebar}
-      />
-
-      <div className={styles.sidebarFooter}>
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className={styles.themeToggle}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={onToggleTheme}
           aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
         >
-          <FontAwesomeIcon icon={theme === "dark" ? faSun : faMoon} fontSize={24} />
-        </button>
-      </div>
+          <FontAwesomeIcon icon={theme === "dark" ? faSun : faMoon} className="h-4 w-4" />
+        </Button>
+      </header>
+
+      {/* Mobile slide-out nav */}
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <SheetContent side="left" className="w-64 p-0">
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <nav className="flex flex-col gap-1 p-4 pt-12">
+            {navItems.map((item) => {
+              const active = location.pathname === item.href;
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => {
+                    navigate(item.href);
+                    setMobileNavOpen(false);
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <FontAwesomeIcon icon={item.icon} className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </SheetContent>
+      </Sheet>
+
+      {alfred}
+      <main id="main" className="min-h-0 flex-1 overflow-auto">
+        {children}
+      </main>
     </div>
-  );
-}
-
-interface SideBarItemProps {
-  label: string;
-  linksTo: string;
-  icon: IconDefinition;
-  isActive: boolean;
-  onNavigate: () => void;
-}
-
-function SideBarItem({
-  label,
-  linksTo,
-  icon,
-  isActive,
-  onNavigate,
-}: SideBarItemProps) {
-  const navigate = useNavigate();
-
-  return (
-    <button
-      type="button"
-      className={`${styles.sidebarItem} ${isActive ? styles.sidebarItemActive : ""}`}
-      onClick={() => {
-        navigate(linksTo);
-        onNavigate();
-      }}
-    >
-      <span className={styles.sidebarIcon}>
-        <FontAwesomeIcon icon={icon} size={"lg"} />
-      </span>
-      <span className={styles.sidebarItemText}>{label}</span>
-    </button>
   );
 }

@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import styles from "./torrent.module.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCircleArrowDown,
@@ -33,7 +32,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
-import classNames from "classnames";
 import { useHotkeys, useHotkeysContext } from "react-hotkeys-hook";
 import {
   selectTorrentsByInfoHashes,
@@ -52,16 +50,14 @@ import {
 import { PeerSummary, TorrentPreviewSummary, TorrentSummary } from "../../types";
 import { TorrentFilePreviewModal } from "../../components/TorrentPreviewModal/torrent-preview-modal";
 import { setPeers } from "../../store/slices/peersSlice";
-import {
-  selectTorrentForDetail,
-} from "../../store/slices/torrentDetailSlice";
-import {
-  FileUpload,
-  FileUploadElement,
-} from "../../components/FileUpload/file-upload";
+import { selectTorrentForDetail } from "../../store/slices/torrentDetailSlice";
+import { FileUpload, FileUploadElement } from "../../components/FileUpload/file-upload";
 import Layout from "../layout";
 import { AlfredContext, setContext } from "../../store/slices/alfredSlice";
 import { DetailPane } from "./detail-pane";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 export default function TorrentPage() {
   return (
@@ -79,8 +75,8 @@ function Page() {
   const [openedInfoHash, setOpenedInfoHash] = useState<string | null>(null);
   const [detailPaneHeight, setDetailPaneHeight] = useState(320);
   const [isResizingDetailPane, setIsResizingDetailPane] = useState(false);
+  const [filterText, setFilterText] = useState("");
   const splitRootRef = useRef<HTMLDivElement | null>(null);
-  const splitterRef = useRef<HTMLDivElement | null>(null);
   const resizeStartRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
   const memoActionRow = useMemo(() => {
@@ -88,9 +84,11 @@ function Page() {
       <ActionsRow
         selectedTorrents={selectedTorrents}
         setSelectedTorrents={setSelectedTorrents}
+        filterText={filterText}
+        onFilterChange={setFilterText}
       />
     );
-  }, [selectedTorrents]);
+  }, [filterText, selectedTorrents]);
 
   useEffect(() => {
     dispatch(setContext(AlfredContext.TorrentList));
@@ -101,16 +99,10 @@ function Page() {
     enableScope("torrents");
   }, [enableScope]);
 
-  useEffect(() => {
-    console.log("TORRENTS CHANGED");
-  }, [torrents]);
-
   const selectTorrent = (infoHash: string) => {
     if (selectedTorrents.includes(infoHash)) {
-      // If item is already selected, deselect it
       setSelectedTorrents(selectedTorrents.filter((item) => item !== infoHash));
     } else {
-      // Add the item to the selected items
       setSelectedTorrents([...selectedTorrents, infoHash]);
     }
   };
@@ -123,25 +115,22 @@ function Page() {
     try {
       const data = await fetchTorrentsApi();
 
-      const mappedTorrents = data.reduce(
-        (pv: TorrentsState, cv: TorrentApiModel) => {
-          const summary: TorrentSummary = {
-            name: cv.name,
-            infoHash: cv.infoHash,
-            progress: cv.progress,
-            uploadRate: cv.uploadRate,
-            downloadRate: cv.downloadRate,
-            sizeInBytes: cv.totalSizeBytes,
-            status: cv.status,
-            bytesUploaded: cv.bytesUploaded,
-            bytesDownloaded: cv.bytesDownloaded,
-          };
+      const mappedTorrents = data.reduce((pv: TorrentsState, cv: TorrentApiModel) => {
+        const summary: TorrentSummary = {
+          name: cv.name,
+          infoHash: cv.infoHash,
+          progress: cv.progress,
+          uploadRate: cv.uploadRate,
+          downloadRate: cv.downloadRate,
+          sizeInBytes: cv.totalSizeBytes,
+          status: cv.status,
+          bytesUploaded: cv.bytesUploaded,
+          bytesDownloaded: cv.bytesDownloaded,
+        };
 
-          pv[cv.infoHash] = summary;
-          return pv;
-        },
-        {}
-      );
+        pv[cv.infoHash] = summary;
+        return pv;
+      }, {});
       dispatch(setTorrents(mappedTorrents));
 
       data.forEach((torrent: TorrentApiModel) => {
@@ -161,11 +150,9 @@ function Page() {
           []
         );
 
-        dispatch(
-          setPeers({ infoHash: torrent.infoHash, peers: torrentPeers })
-        );
+        dispatch(setPeers({ infoHash: torrent.infoHash, peers: torrentPeers }));
       });
-    } catch (error) {
+    } catch {
       console.log("error fetching torrents");
     }
   }, [dispatch]);
@@ -174,15 +161,22 @@ function Page() {
     fetchTorrents();
   }, [fetchTorrents]);
 
+  const filteredTorrents = useMemo(() => {
+    const normalizedFilter = filterText.trim().toLowerCase();
+    if (!normalizedFilter) {
+      return torrents;
+    }
+
+    return torrents.filter((torrent) => torrent.name.toLowerCase().includes(normalizedFilter));
+  }, [filterText, torrents]);
+
   useHotkeys(
     "up",
     () => {
-      if (torrents.length === 0) return;
+      if (filteredTorrents.length === 0) return;
       let nextId = currentPosition - 1;
-      if (nextId < 0) nextId = torrents.length - 1;
+      if (nextId < 0) nextId = filteredTorrents.length - 1;
       setCurrentPosition(nextId);
-      console.log(nextId);
-      console.log("up from torrents " + nextId);
     },
     {
       scopes: ["torrents"],
@@ -193,12 +187,10 @@ function Page() {
   useHotkeys(
     "down",
     () => {
-      if (torrents.length === 0) return;
+      if (filteredTorrents.length === 0) return;
       let nextId = currentPosition + 1;
-      if (nextId >= torrents.length) nextId = 0;
+      if (nextId >= filteredTorrents.length) nextId = 0;
       setCurrentPosition(nextId);
-      console.log(nextId);
-      console.log("down from torrents " + nextId);
     },
     {
       scopes: ["torrents"],
@@ -209,9 +201,8 @@ function Page() {
   useHotkeys(
     "space",
     () => {
-      if (torrents.length === 0) return;
-      selectTorrent(torrents[currentPosition].infoHash);
-      console.log("space from torrents");
+      if (filteredTorrents.length === 0) return;
+      selectTorrent(filteredTorrents[currentPosition].infoHash);
     },
     {
       scopes: ["torrents"],
@@ -219,7 +210,7 @@ function Page() {
     }
   );
 
-  const focusedInfoHash = torrents[currentPosition]?.infoHash ?? null;
+  const focusedInfoHash = filteredTorrents[currentPosition]?.infoHash ?? null;
   const isDetailPaneOpen = openedInfoHash !== null;
 
   const getPaneHeightBounds = useCallback(() => {
@@ -263,10 +254,10 @@ function Page() {
   }, [clampDetailPaneHeight, isDetailPaneOpen]);
 
   useEffect(() => {
-    if (openedInfoHash && !torrents.some((torrent) => torrent.infoHash === openedInfoHash)) {
+    if (openedInfoHash && !filteredTorrents.some((torrent) => torrent.infoHash === openedInfoHash)) {
       setOpenedInfoHash(null);
     }
-  }, [openedInfoHash, torrents]);
+  }, [openedInfoHash, filteredTorrents]);
 
   useEffect(() => {
     if (!focusedInfoHash && openedInfoHash !== null) {
@@ -287,7 +278,7 @@ function Page() {
   useHotkeys(
     "enter",
     () => {
-      const currentTorrent = torrents[currentPosition];
+      const currentTorrent = filteredTorrents[currentPosition];
       if (!currentTorrent) return;
       setOpenedInfoHash(currentTorrent.infoHash);
     },
@@ -307,6 +298,12 @@ function Page() {
       enableOnFormTags: ["input", "textarea", "select"],
     }
   );
+
+  useEffect(() => {
+    if (currentPosition >= filteredTorrents.length && filteredTorrents.length > 0) {
+      setCurrentPosition(0);
+    }
+  }, [currentPosition, filteredTorrents.length]);
 
   const onSplitterPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!isDetailPaneOpen) return;
@@ -334,53 +331,62 @@ function Page() {
 
   return (
     <TooltipProvider>
-      <div className={`${styles.root} page-shell`} ref={splitRootRef}>
-        <div className={styles.topPane}>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden" ref={splitRootRef}>
+        <div className="flex min-h-0 flex-1 flex-col">
           {memoActionRow}
-          <div className={styles.torrentDivider}>
-            <Separator orientation="horizontal" />
-          </div>
-          <div className={styles.torrentList}>
-            {torrents.map((t, i) => (
-              <TorrentRow
-                toggleSelect={selectTorrent}
-                toggleFocus={() => {
-                  setCurrentPosition(i);
-                  setOpenedInfoHash(t.infoHash);
-                }}
-                isFocused={currentPosition === i}
-                isSelected={isSelected(t.infoHash)}
-                uploadRate={t.uploadRate}
-                downloadRate={t.downloadRate}
-                status={t.status}
-                key={t.infoHash}
-                progress={t.progress ?? 0}
-                infoHash={t.infoHash ?? ""}
-                seeders={
-                  t.peers?.reduce((pv, cv) => {
-                    if (cv.isSeed) return pv + 1;
-                    return pv;
-                  }, 0) ?? 0
-                }
-                leechers={
-                  t.peers?.reduce((pv, cv) => {
-                    if (!cv.isSeed) return pv + 1;
-                    return pv;
-                  }, 0) ?? 0
-                }
-                totalBytes={t.sizeInBytes ?? 0}
-                title={t.name ?? "???"}
-              />
-            ))}
-          </div>
+          <Separator />
+          <ScrollArea className="min-h-0 flex-1">
+              {filteredTorrents.length === 0 && (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  No torrents match your filter.
+                </div>
+              )}
+
+              {filteredTorrents.length > 0 && (
+                <div className="divide-y divide-border">
+                  {filteredTorrents.map((torrent, index) => (
+                    <TorrentRow
+                      toggleSelect={selectTorrent}
+                      toggleFocus={() => {
+                        setCurrentPosition(index);
+                        setOpenedInfoHash(torrent.infoHash);
+                      }}
+                      isFocused={currentPosition === index}
+                      isSelected={isSelected(torrent.infoHash)}
+                      uploadRate={torrent.uploadRate}
+                      downloadRate={torrent.downloadRate}
+                      status={torrent.status}
+                      key={torrent.infoHash}
+                      progress={torrent.progress ?? 0}
+                      infoHash={torrent.infoHash ?? ""}
+                      seeders={
+                        torrent.peers?.reduce((pv, cv) => {
+                          if (cv.isSeed) return pv + 1;
+                          return pv;
+                        }, 0) ?? 0
+                      }
+                      leechers={
+                        torrent.peers?.reduce((pv, cv) => {
+                          if (!cv.isSeed) return pv + 1;
+                          return pv;
+                        }, 0) ?? 0
+                      }
+                      totalBytes={torrent.sizeInBytes ?? 0}
+                      title={torrent.name ?? "???"}
+                    />
+                  ))}
+                </div>
+              )}
+          </ScrollArea>
         </div>
+
         {isDetailPaneOpen && openedInfoHash && (
           <>
             <div
-              ref={splitterRef}
-              className={classNames(styles.splitPaneHandle, {
-                [styles.splitPaneHandleActive]: isResizingDetailPane,
-              })}
+              className={cn(
+                "flex h-4 cursor-ns-resize items-center justify-center border-t text-muted-foreground/50 hover:text-muted-foreground",
+                isResizingDetailPane && "bg-muted/50 text-foreground"
+              )}
               role="separator"
               aria-label="Resize torrent details pane"
               aria-orientation="horizontal"
@@ -409,11 +415,8 @@ function Page() {
             >
               <FontAwesomeIcon icon={faGripLines} />
             </div>
-            <div className={styles.bottomPane} style={{ height: `${detailPaneHeight}px` }}>
-              <DetailPane
-                infoHash={openedInfoHash}
-                onClose={() => setOpenedInfoHash(null)}
-              />
+            <div className="overflow-hidden" style={{ height: `${detailPaneHeight}px` }}>
+              <DetailPane infoHash={openedInfoHash} onClose={() => setOpenedInfoHash(null)} />
             </div>
           </>
         )}
@@ -425,11 +428,15 @@ function Page() {
 interface ActionsRowProps {
   selectedTorrents: string[];
   setSelectedTorrents: (infoHashes: string[]) => void;
+  filterText: string;
+  onFilterChange: (value: string) => void;
 }
 
 const ActionsRow = ({
   selectedTorrents,
   setSelectedTorrents,
+  filterText,
+  onFilterChange,
 }: ActionsRowProps) => {
   const uploadRef = useRef<FileUploadElement | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -490,10 +497,9 @@ const ActionsRow = ({
 
   const stopTorrent = async (infoHash: string) => {
     try {
-      await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/stop`,
-        { method: "POST" }
-      );
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/stop`, {
+        method: "POST",
+      });
     } catch (e) {
       console.log(e);
       console.log("Error stopping torrent");
@@ -502,10 +508,9 @@ const ActionsRow = ({
 
   const startTorrent = async (infoHash: string) => {
     try {
-      await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/start`,
-        { method: "POST" }
-      );
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/start`, {
+        method: "POST",
+      });
     } catch (e) {
       console.log(e);
       console.log("Error stopping torrent");
@@ -518,16 +523,13 @@ const ActionsRow = ({
         deleteFiles,
       };
 
-      await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/delete`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        }
-      );
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/delete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
     } catch (e) {
       console.log(e);
       console.log("Error deleting torrent");
@@ -607,12 +609,8 @@ const ActionsRow = ({
   };
 
   return (
-    <div className={styles.actionBar}>
-      <FileUpload
-        accept=".torrent"
-        ref={uploadRef}
-        onFileChange={(f) => onUpload(f)}
-      />
+    <div className="flex flex-wrap items-center gap-3 p-3">
+      <FileUpload accept=".torrent" ref={uploadRef} onFileChange={(f) => onUpload(f)} />
 
       <TorrentRemoveConfirmationModal
         open={deleteModalOpen}
@@ -635,26 +633,19 @@ const ActionsRow = ({
         onToggleAllFiles={toggleAllFileSelection}
       />
 
-      <div className={styles.actionSearch}>
-        <Input
-          placeholder="Filter"
-          className={styles.actionSearchInput}
-        />
-        {previewError && (
-          <p className={styles.uploadError}>
-            {previewError}
-          </p>
-        )}
+      <div className="min-w-52 flex-1">
+        <Input placeholder="Filter torrents" value={filterText} onChange={(e) => onFilterChange(e.target.value)} />
+        {previewError && <p className="mt-1 text-xs text-destructive">{previewError}</p>}
       </div>
 
-      <div className={styles.actionButtons}>
+      <div className="flex items-center gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               size="icon"
-              variant="outline"
+              variant="ghost"
               disabled={torrentActionsDisabled}
-              className="border-green-600 text-green-600 hover:bg-green-600/10"
+              className="text-emerald-600 hover:bg-emerald-600/10 hover:text-emerald-600"
               aria-label="Start"
               type="button"
               onClick={() => startTorrents()}
@@ -669,10 +660,10 @@ const ActionsRow = ({
           <TooltipTrigger asChild>
             <Button
               size="icon"
-              variant="outline"
+              variant="ghost"
               type="button"
               disabled={torrentActionsDisabled}
-              className="border-amber-500 text-amber-500 hover:bg-amber-500/10"
+              className="text-amber-500 hover:bg-amber-500/10 hover:text-amber-500"
               aria-label="Stop"
               onClick={() => stopTorrents()}
             >
@@ -716,7 +707,6 @@ const ActionsRow = ({
           <TooltipContent>Add Torrent</TooltipContent>
         </Tooltip>
       </div>
-      <div style={{ flexGrow: 1, flexShrink: 1 }}></div>
     </div>
   );
 };
@@ -752,148 +742,86 @@ function TorrentRow({
   toggleSelect,
   toggleFocus,
 }: TorrentRowProps) {
-  const color = useMemo(() => {
-    if (status === "Stopped" || status === "Idle") return "orange";
-    if (status === "Running") return "green";
-    if (status === "Verifying" || status === "Copying") return "blue";
-    return "gray";
+  const statusColorClass = useMemo(() => {
+    if (status === "Stopped" || status === "Idle") return "text-amber-500";
+    if (status === "Running") return "text-emerald-500";
+    if (status === "Verifying" || status === "Copying") return "text-sky-500";
+    return "text-muted-foreground";
   }, [status]);
 
   function prettyPrintBytes(bytes: number) {
     const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
     if (bytes === 0) return "0 Byte";
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    if (i === 0) return bytes + " " + sizes[i]; // For bytes, no decimal
+    if (i === 0) return bytes + " " + sizes[i];
     return (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i];
   }
 
-  const className = useMemo(() => {
-    if (!isFocused) return classNames(styles.torrentContainer);
-
-    return classNames(styles.torrentContainer, styles.torrentContainerSelected);
-  }, [isFocused]);
+  const statusIcon =
+    status === "Running" && progress < 1 ? faCircleArrowDown :
+    status === "Running" && progress >= 1 ? faCircleArrowUp :
+    status === "Stopped" || status === "Idle" ? faCirclePause :
+    faCircleNotch;
 
   return (
-    <div className={className} onClick={() => toggleFocus()}>
-      <div className={styles.torrent}>
-        <div className={styles.torrentCheckbox}>
-          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(infoHash)} />
+    <div
+      className={cn(
+        "cursor-pointer px-4 py-3 transition-colors hover:bg-muted/50",
+        isFocused && "bg-muted/60",
+        isSelected && "bg-accent/40"
+      )}
+      tabIndex={0}
+      role="button"
+      aria-selected={isSelected}
+      onClick={() => toggleFocus()}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          toggleFocus();
+        }
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="pt-1"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(infoHash)} aria-label={`Select ${title}`} />
         </div>
-        <div className={styles.torrentInfo} key={infoHash}>
-          <div className={styles.torrentInfoTitleRow}>
-            <div className={styles.torrentIcon}>
-              {status === "Running" && progress < 1 && (
-                <FontAwesomeIcon
-                  icon={faCircleArrowDown}
-                  size={"1x"}
-                  style={{
-                    paddingRight: "0.8em",
-                    paddingLeft: "0.4em",
-                    color,
-                  }}
-                />
-              )}
-              {status === "Running" && progress >= 1 && (
-                <FontAwesomeIcon
-                  icon={faCircleArrowUp}
-                  size={"1x"}
-                  style={{
-                    paddingRight: "0.8em",
-                    paddingLeft: "0.4em",
-                    color,
-                  }}
-                />
-              )}
-              {(status === "Stopped" || status === "Idle") && (
-                <FontAwesomeIcon
-                  icon={faCirclePause}
-                  size={"1x"}
-                  style={{
-                    paddingRight: "0.8em",
-                    paddingLeft: "0.4em",
-                    color,
-                  }}
-                />
-              )}
-              {(status === "Verifying" || status === "Copying") && (
-                <FontAwesomeIcon
-                  icon={faCircleNotch}
-                  spin
-                  size={"1x"}
-                  style={{
-                    paddingRight: "0.8em",
-                    paddingLeft: "0.4em",
-                    color,
-                  }}
-                />
-              )}
-            </div>
-            <p className={styles.title}>{title}</p>
+
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className={cn("inline-flex h-6 w-6 items-center justify-center", statusColorClass)}>
+              <FontAwesomeIcon icon={statusIcon} spin={statusIcon === faCircleNotch} />
+            </span>
+            <p className="truncate text-sm font-medium">{title}</p>
           </div>
 
-          <p className={styles.progress}>
-            {`${prettyPrintBytes(totalBytes * progress)} of ${prettyPrintBytes(
-              totalBytes
-            )} (${(progress * 100).toFixed(1)}%)`}
+          <p className="text-xs text-muted-foreground">
+            {`${prettyPrintBytes(totalBytes * progress)} of ${prettyPrintBytes(totalBytes)} (${(
+              progress * 100
+            ).toFixed(1)}%)`}
           </p>
-          <Progress
-            value={progress * 100}
-            className={classNames(styles.progressBar, {
-              [styles.progressBarGreen]: color === "green",
-              [styles.progressBarOrange]: color === "orange",
-              [styles.progressBarBlue]: color === "blue",
-              [styles.progressBarGray]: color === "gray",
-            })}
-          />
-          <p className={styles.progressDetails}>
-            <span className={styles.progressMetaItem}>{status}</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-              <span className={styles.progressMetaItem}>
-                <FontAwesomeIcon
-                  icon={faUserGroup}
-                  size={"sm"}
-                  style={{ paddingRight: "0.3em" }}
-                />
-                {`${seeders + leechers}`}
-              </span>
-              </TooltipTrigger>
-              <TooltipContent>{`${seeders + leechers} peers`}</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-              <span className={styles.progressMetaItem}>
-                <FontAwesomeIcon
-                  icon={faSeedling}
-                  size={"sm"}
-                  style={{ paddingRight: "0.3em" }}
-                />
-                {seeders}
-              </span>
-              </TooltipTrigger>
-              <TooltipContent>{`${seeders} seeders`}</TooltipContent>
-            </Tooltip>
-            <span className={styles.progressMetaItem}>
-              <FontAwesomeIcon
-                icon={faDownLong}
-                size={"sm"}
-                style={{ paddingRight: "0.3em" }}
-              />
-              {prettyPrintBytes(downloadRate) + "/s"}
+
+          <Progress value={progress * 100} />
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant="outline">{status}</Badge>
+            <span className="inline-flex items-center gap-1">
+              <FontAwesomeIcon icon={faUserGroup} /> {seeders + leechers}
             </span>
-            <span className={styles.progressMetaItem}>
-              <FontAwesomeIcon
-                icon={faUpLong}
-                size={"sm"}
-                style={{ paddingRight: "0.3em" }}
-              />
-              {prettyPrintBytes(uploadRate) + "/s"}
+            <span className="inline-flex items-center gap-1 text-emerald-500">
+              <FontAwesomeIcon icon={faSeedling} /> {seeders}
             </span>
-          </p>
+            <span className="inline-flex items-center gap-1">
+              <FontAwesomeIcon icon={faDownLong} /> {prettyPrintBytes(downloadRate)}/s
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <FontAwesomeIcon icon={faUpLong} /> {prettyPrintBytes(uploadRate)}/s
+            </span>
+          </div>
         </div>
-      </div>
-      <div className={styles.torrentDivider}>
-        <Separator orientation="horizontal" />
       </div>
     </div>
   );
@@ -925,15 +853,13 @@ function TorrentRemoveConfirmationModal({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent
-        className={`max-w-2xl ${styles.deleteModal} ${styles.deleteModalContent}`}
-      >
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>Are you sure you want remove:</DialogDescription>
         </DialogHeader>
-        <div className={styles.deleteModalBody}>
-          <ul className={styles.deleteModalList}>
+        <div className="space-y-3">
+          <ul className="max-h-64 list-disc space-y-1 overflow-auto pl-6 text-sm">
             {infoHashes.map((hash) => {
               return (
                 <li key={hash}>
@@ -942,16 +868,12 @@ function TorrentRemoveConfirmationModal({
               );
             })}
           </ul>
-          <label className={styles.checkboxLabel}>
-            <Checkbox
-              className={styles.deleteFilesCheckbox}
-              checked={deleteFiles}
-              onCheckedChange={(checked) => setDeleteFiles(checked === true)}
-            />
-            <span>Delete Files on Disk</span>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <Checkbox checked={deleteFiles} onCheckedChange={(checked) => setDeleteFiles(checked === true)} />
+            <span>Delete files on disk</span>
           </label>
         </div>
-        <DialogFooter className={styles.dialogFooterActions}>
+        <DialogFooter>
           <Button
             variant="destructive"
             onClick={() => {

@@ -6,7 +6,7 @@ const config: Config = {
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      padding: "1.25rem",
       screens: {
         "2xl": "1400px",
       },
@@ -51,6 +51,9 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        surface: "0 1px 0 0 hsl(var(--border) / 0.7)",
       },
       keyframes: {
         "accordion-down": {

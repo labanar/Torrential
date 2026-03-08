@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/toaster";
 import PeersPage from "./pages/peers";
 import IntegrationsPage from "./pages/integrations";
 import SettingsPage from "./pages/settings";
+import { applyInitialTheme } from "./lib/theme";
 
 const router = createBrowserRouter([
   {
@@ -29,15 +30,6 @@ const router = createBrowserRouter([
     element: <SettingsPage />,
   },
 ]);
-
-const applyInitialTheme = () => {
-  const savedTheme = window.localStorage.getItem("theme");
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const shouldUseDarkMode = savedTheme ? savedTheme === "dark" : prefersDark;
-
-  document.documentElement.classList.toggle("dark", shouldUseDarkMode);
-  document.documentElement.style.colorScheme = shouldUseDarkMode ? "dark" : "light";
-};
 
 applyInitialTheme();
 
