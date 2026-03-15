@@ -10,6 +10,7 @@ namespace Torrential.Commands
         public required string DownloadPath { get; init; }
         public required string CompletedPath { get; init; }
         public IReadOnlyCollection<long>? SelectedFileIds { get; init; }
+        public int? DesiredSeedTimeDays { get; init; }
     }
 
     public class TorrentAddResponse
@@ -28,13 +29,21 @@ namespace Torrential.Commands
             // Detect pre-existing incomplete data BEFORE metadata save creates the directory
             var recoveryResult = await recoveryDetector.Detect(command.Metadata);
 
+            var seedTimeDays = command.DesiredSeedTimeDays;
+            if (seedTimeDays is null)
+            {
+                var seedSettings = await settingsManager.GetSeedSettings();
+                seedTimeDays = seedSettings.DesiredSeedTimeDays;
+            }
+
             await db.AddAsync(new TorrentConfiguration
             {
                 InfoHash = command.Metadata.InfoHash,
                 DateAdded = DateTimeOffset.UtcNow,
                 CompletedPath = string.IsNullOrEmpty(command.CompletedPath) ? fileSettings.CompletedPath : command.CompletedPath,
                 DownloadPath = string.IsNullOrEmpty(command.DownloadPath) ? fileSettings.DownloadPath : command.DownloadPath,
-                Status = TorrentStatus.Idle
+                Status = TorrentStatus.Idle,
+                DesiredSeedTimeDays = seedTimeDays
             });
 
             //Save the metadata to the file system

@@ -288,6 +288,18 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
   const [isAddLoading, setIsAddLoading] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [completedPathOverride, setCompletedPathOverride] = useState("");
+  const [desiredSeedTimeDays, setDesiredSeedTimeDays] = useState("");
+  const [defaultSeedTimeDays, setDefaultSeedTimeDays] = useState("");
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/seed`)
+      .then(res => res.json())
+      .then(json => {
+        const days = `${json.data.desiredSeedTimeDays}`;
+        setDefaultSeedTimeDays(days);
+      })
+      .catch(() => {});
+  }, []);
 
   const resetPreviewState = () => {
     setPendingDownloadUrl(null);
@@ -298,6 +310,7 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
     setIsAddLoading(false);
     setAddError(null);
     setCompletedPathOverride("");
+    setDesiredSeedTimeDays(defaultSeedTimeDays);
   };
 
   const mapPreview = (model: TorrentPreviewApiModel): TorrentPreviewSummary => ({
@@ -341,6 +354,7 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
       setPreview(previewSummary);
       setSelectedFileIds(previewSummary.files.map((f) => f.id));
       setPreviewModalOpen(true);
+      setDesiredSeedTimeDays(defaultSeedTimeDays);
     } catch {
       toast.error("Failed to preview torrent");
       resetPreviewState();
@@ -359,11 +373,13 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
     setIsAddLoading(true);
 
     try {
+      const seedTime = desiredSeedTimeDays.trim() ? parseInt(desiredSeedTimeDays, 10) : undefined;
       await addTorrentFromUrl(
         pendingDownloadUrl,
         selectedFileIds,
         completedPathOverride.trim() || undefined,
-        pendingIndexerId
+        pendingIndexerId,
+        seedTime
       );
       resetPreviewState();
     } catch {
@@ -397,6 +413,8 @@ function SearchSection({ loading, results, query, hasEnabledIndexers, dispatch }
         addError={addError}
         completedPathOverride={completedPathOverride}
         onCompletedPathChange={setCompletedPathOverride}
+        desiredSeedTimeDays={desiredSeedTimeDays}
+        onDesiredSeedTimeDaysChange={setDesiredSeedTimeDays}
         onClose={resetPreviewState}
         onConfirm={confirmAddTorrent}
         onToggleFile={toggleFileSelection}

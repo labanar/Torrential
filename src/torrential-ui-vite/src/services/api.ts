@@ -219,7 +219,7 @@ export async function previewTorrent(file: File): Promise<TorrentPreviewApiModel
   return result.data;
 }
 
-export async function addTorrent(file: File, selectedFileIds: number[], completedPath?: string): Promise<void> {
+export async function addTorrent(file: File, selectedFileIds: number[], completedPath?: string, desiredSeedTimeDays?: number): Promise<void> {
   const formData = new FormData();
   formData.append("file", file);
   selectedFileIds.forEach((id) => {
@@ -227,6 +227,9 @@ export async function addTorrent(file: File, selectedFileIds: number[], complete
   });
   if (completedPath) {
     formData.append("CompletedPath", completedPath);
+  }
+  if (desiredSeedTimeDays !== undefined) {
+    formData.append("DesiredSeedTimeDays", `${desiredSeedTimeDays}`);
   }
 
   const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/add`, {
@@ -413,6 +416,7 @@ export async function addTorrentFromUrl(
   selectedFileIds?: number[],
   completedPath?: string,
   indexerId?: string | null,
+  desiredSeedTimeDays?: number,
 ): Promise<void> {
   const body: Record<string, unknown> = { url: downloadUrl };
   if (indexerId) {
@@ -423,6 +427,9 @@ export async function addTorrentFromUrl(
   }
   if (completedPath) {
     body.completedPath = completedPath;
+  }
+  if (desiredSeedTimeDays !== undefined) {
+    body.desiredSeedTimeDays = desiredSeedTimeDays;
   }
 
   const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/add-url`, {

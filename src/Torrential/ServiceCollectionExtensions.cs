@@ -69,6 +69,7 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<TorrentThroughputRatesNotifier>();
         services.AddHostedService<BitfieldSyncService>();
         services.AddHostedService<AnnounceService>();
+        services.AddHostedService<SeedTimeEnforcementService>();
         services.AddHostedService<TcpPeerListenerBackgroundService>();
 
         services.AddSingleton<IPostDownloadAction, FileCopyPostDownloadAction>();

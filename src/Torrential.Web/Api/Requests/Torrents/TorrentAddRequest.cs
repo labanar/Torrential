@@ -5,5 +5,6 @@ namespace Torrential.Web.Api.Requests.Torrents
         public required IFormFile File { get; init; }
         public long[]? SelectedFileIds { get; init; }
         public string? CompletedPath { get; init; }
+        public int? DesiredSeedTimeDays { get; init; }
     }
 }

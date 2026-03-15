@@ -66,6 +66,9 @@ namespace Torrential
 
             modelBuilder.Entity<TorrentialSettings>()
                 .ComplexProperty(p => p.ConnectionSettings);
+
+            modelBuilder.Entity<TorrentialSettings>()
+                .ComplexProperty(p => p.SeedSettings);
         }
     }
 
@@ -77,6 +80,9 @@ namespace Torrential
         public TorrentStatus Status { get; set; }
         public DateTimeOffset DateAdded { get; set; }
         public DateTimeOffset? DateCompleted { get; set; }
+        public DateTimeOffset? DateFirstSeeded { get; set; }
+        public int? DesiredSeedTimeDays { get; set; }
+        public long TotalSeededSeconds { get; set; }
     }
 
     public class TorrentPieces
@@ -105,6 +111,7 @@ namespace Torrential
         public FileSettings FileSettings { get; set; } = FileSettings.Default;
         public TcpListenerSettings TcpListenerSettings { get; set; } = TcpListenerSettings.Default;
         public ConnectionSettings ConnectionSettings { get; set; } = ConnectionSettings.Default;
+        public SeedSettings SeedSettings { get; set; } = SeedSettings.Default;
     }
 
     public interface ISettingsSection<T>
@@ -195,5 +202,23 @@ namespace Torrential
 
             return true;
         }
+    }
+
+    public record SeedSettings : ISettingsSection<SeedSettings>
+    {
+        public static string CacheKey => "settings.seed";
+        public static SeedSettings Default { get; } = new()
+        {
+            DesiredSeedTimeDays = 14
+        };
+
+        public static bool Validate(SeedSettings settings)
+        {
+            if (settings.DesiredSeedTimeDays < 0)
+                return false;
+            return true;
+        }
+
+        public required int DesiredSeedTimeDays { get; set; }
     }
 }
