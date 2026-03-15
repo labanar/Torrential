@@ -80,6 +80,9 @@ namespace Torrential.Migrations
                     b.Property<DateTimeOffset?>("DateCompleted")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTimeOffset?>("DateFirstSeeded")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("DesiredSeedTimeDays")
                         .HasColumnType("INTEGER");
 

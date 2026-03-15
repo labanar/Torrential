@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -16,12 +17,20 @@ namespace Torrential.Migrations
                 type: "INTEGER",
                 nullable: true);
 
+            migrationBuilder.AddColumn<DateTimeOffset>(
+                name: "DateFirstSeeded",
+                table: "Torrents",
+                type: "TEXT",
+                nullable: true);
+
             migrationBuilder.AddColumn<int>(
                 name: "SeedSettings_DesiredSeedTimeDays",
                 table: "Settings",
                 type: "INTEGER",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 14);
+
+            migrationBuilder.Sql("UPDATE Settings SET SeedSettings_DesiredSeedTimeDays = 14 WHERE SeedSettings_DesiredSeedTimeDays = 0;");
         }
 
         /// <inheritdoc />
@@ -29,6 +38,10 @@ namespace Torrential.Migrations
         {
             migrationBuilder.DropColumn(
                 name: "DesiredSeedTimeDays",
+                table: "Torrents");
+
+            migrationBuilder.DropColumn(
+                name: "DateFirstSeeded",
                 table: "Torrents");
 
             migrationBuilder.DropColumn(

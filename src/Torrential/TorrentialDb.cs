@@ -80,6 +80,7 @@ namespace Torrential
         public TorrentStatus Status { get; set; }
         public DateTimeOffset DateAdded { get; set; }
         public DateTimeOffset? DateCompleted { get; set; }
+        public DateTimeOffset? DateFirstSeeded { get; set; }
         public int? DesiredSeedTimeDays { get; set; }
     }
 
