@@ -130,7 +130,8 @@ app.MapPost(
                   Metadata = meta,
                   DownloadPath = "",
                   CompletedPath = request.CompletedPath ?? "",
-                  SelectedFileIds = request.SelectedFileIds
+                  SelectedFileIds = request.SelectedFileIds,
+                  DesiredSeedTimeDays = request.DesiredSeedTimeDays
                 });
             }
             catch (Exception ex)
@@ -236,7 +237,8 @@ app.MapPost(
                     Metadata = meta,
                     DownloadPath = "",
                     CompletedPath = request.CompletedPath ?? "",
-                    SelectedFileIds = request.SelectedFileIds
+                    SelectedFileIds = request.SelectedFileIds,
+                    DesiredSeedTimeDays = request.DesiredSeedTimeDays
                 });
             }
             catch (Exception ex)
@@ -474,6 +476,17 @@ app.MapPost("settings/connection", async (ConnectionSettingsUpdateRequest reques
         MaxConnectionsGlobal = request.MaxConnectionsGlobal,
         MaxHalfOpenConnections = request.MaxHalfOpenConnections
     });
+    return ActionResponse.SuccessResponse;
+});
+
+app.MapGet("settings/seed", async (SettingsManager mgr) =>
+{
+    var settings = await mgr.GetSeedSettings();
+    return new SeedSettingsGetResponse(settings);
+});
+app.MapPost("settings/seed", async (SeedSettingsUpdateRequest request, SettingsManager mgr) =>
+{
+    await mgr.SaveSeedSettings(new() { DesiredSeedTimeDays = request.DesiredSeedTimeDays });
     return ActionResponse.SuccessResponse;
 });
 

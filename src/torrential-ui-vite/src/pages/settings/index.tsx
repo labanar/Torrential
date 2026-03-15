@@ -28,6 +28,10 @@ interface TcpListenerSettings {
   enabled: boolean;
 }
 
+interface SeedSettings {
+  desiredSeedTimeDays: string;
+}
+
 export default function SettingsPage() {
   return (
     <Layout>
@@ -158,18 +162,51 @@ function GeneralSettings() {
     }
   }, []);
 
+  const {
+    control: seedSettingsControl,
+    formState: { isDirty: isSeedSettingsDirty },
+    reset: resetSeedSettings,
+  } = useForm<SeedSettings>({
+    defaultValues: {
+      desiredSeedTimeDays: "",
+    },
+  });
+  const seedSettingsValues = useWatch({ control: seedSettingsControl }) as SeedSettings;
+  const fetchSeedSettings = useCallback(async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/seed`);
+      const json = await response.json();
+      const { desiredSeedTimeDays } = json.data;
+      resetSeedSettings({ desiredSeedTimeDays: `${desiredSeedTimeDays}` });
+    } catch (error) {
+      console.error("Failed to fetch seed settings", error);
+    }
+  }, [resetSeedSettings]);
+  const saveSeedSettings = useCallback(async (values: SeedSettings) => {
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/seed`, {
+        method: "POST",
+        body: JSON.stringify({ desiredSeedTimeDays: parseInt(values.desiredSeedTimeDays, 10) }),
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Failed to save seed settings", error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchFilesettings();
     fetchTcpListenerSettings();
     fetchConnectionSettings();
-  }, [fetchConnectionSettings, fetchFilesettings, fetchTcpListenerSettings]);
+    fetchSeedSettings();
+  }, [fetchConnectionSettings, fetchFilesettings, fetchTcpListenerSettings, fetchSeedSettings]);
 
   return (
     <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col gap-6 overflow-auto p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <Button
-          disabled={!isFileSettingsDirty && !isConnectionSettingsDirty && !isTcpListenerSettingsDirty}
+          disabled={!isFileSettingsDirty && !isConnectionSettingsDirty && !isTcpListenerSettingsDirty && !isSeedSettingsDirty}
           aria-label="Save settings"
           onClick={() => {
             if (isFileSettingsDirty) {
@@ -183,6 +220,10 @@ function GeneralSettings() {
             if (isTcpListenerSettingsDirty) {
               saveTcpSettings(tcpListenerSettingsValue);
               resetTcpListenerSettings(tcpListenerSettingsValue);
+            }
+            if (isSeedSettingsDirty) {
+              saveSeedSettings(seedSettingsValues);
+              resetSeedSettings(seedSettingsValues);
             }
           }}
           type="button"
@@ -223,6 +264,12 @@ function GeneralSettings() {
         />
         <RowComponent label="Port">
           <FormNumericInput min={0} control={tcpListenerSettingsControl} fieldName="port" />
+        </RowComponent>
+
+        <Separator />
+        <SectionHeader name="Seeding" />
+        <RowComponent label="Desired seed time (days)">
+          <FormNumericInput min={0} control={seedSettingsControl} fieldName="desiredSeedTimeDays" />
         </RowComponent>
       </section>
     </div>

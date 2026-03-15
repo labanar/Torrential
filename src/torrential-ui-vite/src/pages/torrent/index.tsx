@@ -449,6 +449,18 @@ const ActionsRow = ({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
   const [completedPathOverride, setCompletedPathOverride] = useState("");
+  const [desiredSeedTimeDays, setDesiredSeedTimeDays] = useState("");
+  const [defaultSeedTimeDays, setDefaultSeedTimeDays] = useState("");
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/seed`)
+      .then(res => res.json())
+      .then(json => {
+        const days = `${json.data.desiredSeedTimeDays}`;
+        setDefaultSeedTimeDays(days);
+      })
+      .catch(() => {});
+  }, []);
 
   const resetPreviewState = () => {
     setSelectedFile(null);
@@ -458,6 +470,7 @@ const ActionsRow = ({
     setIsAddLoading(false);
     setAddError(null);
     setCompletedPathOverride("");
+    setDesiredSeedTimeDays(defaultSeedTimeDays);
   };
 
   const mapPreview = (model: TorrentPreviewApiModel): TorrentPreviewSummary => {
@@ -486,6 +499,7 @@ const ActionsRow = ({
       setPreview(previewSummary);
       setSelectedFileIds(previewSummary.files.map((f) => f.id));
       setPreviewModalOpen(true);
+      setDesiredSeedTimeDays(defaultSeedTimeDays);
     } catch (error) {
       console.error("Error previewing torrent file:", error);
       setPreviewError("Failed to preview torrent file.");
@@ -594,7 +608,8 @@ const ActionsRow = ({
     setIsAddLoading(true);
 
     try {
-      await addTorrent(selectedFile, selectedFileIds, completedPathOverride.trim() || undefined);
+      const seedTime = desiredSeedTimeDays.trim() ? parseInt(desiredSeedTimeDays, 10) : undefined;
+      await addTorrent(selectedFile, selectedFileIds, completedPathOverride.trim() || undefined, seedTime);
       resetPreviewState();
     } catch (e) {
       console.error("Error adding torrent:", e);
@@ -627,6 +642,8 @@ const ActionsRow = ({
         addError={addError}
         completedPathOverride={completedPathOverride}
         onCompletedPathChange={setCompletedPathOverride}
+        desiredSeedTimeDays={desiredSeedTimeDays}
+        onDesiredSeedTimeDaysChange={setDesiredSeedTimeDays}
         onClose={closePreviewModal}
         onConfirm={confirmAddTorrent}
         onToggleFile={toggleFileSelection}

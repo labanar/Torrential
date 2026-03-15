@@ -22,6 +22,8 @@ export interface TorrentFilePreviewModalProps {
   addError: string | null;
   completedPathOverride: string;
   onCompletedPathChange: (value: string) => void;
+  desiredSeedTimeDays: string;
+  onDesiredSeedTimeDaysChange: (value: string) => void;
   onToggleFile: (id: number) => void;
   onToggleAllFiles: () => void;
   onConfirm: () => void;
@@ -36,6 +38,8 @@ export function TorrentFilePreviewModal({
   addError,
   completedPathOverride,
   onCompletedPathChange,
+  desiredSeedTimeDays,
+  onDesiredSeedTimeDaysChange,
   onToggleFile,
   onToggleAllFiles,
   onConfirm,
@@ -152,6 +156,20 @@ export function TorrentFilePreviewModal({
             </div>
             <p className="text-xs text-muted-foreground">
               Override where files are moved after download completes.
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Seed Time (days)</Label>
+            <Input
+              type="number"
+              min={0}
+              placeholder="Default from settings"
+              value={desiredSeedTimeDays}
+              onChange={(e) => onDesiredSeedTimeDaysChange(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              How long to seed after the tracker considers us a seed.
             </p>
           </div>
 
