@@ -24,6 +24,7 @@ namespace Torrential.Trackers
         : BackgroundService
     {
         private readonly ConcurrentDictionary<InfoHash, bool> _seedAnnounceRecorded = new();
+        private readonly ConcurrentDictionary<InfoHash, DateTimeOffset> _lastSeedAnnounceTime = new();
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -69,9 +70,12 @@ namespace Torrential.Trackers
                             }
                         }
 
-                        // If we announced as a seed (remaining=0), record DateFirstSeeded
+                        // If we announced as a seed (remaining=0), record DateFirstSeeded and accumulate seeding time
                         if (announced)
+                        {
                             await TryRecordFirstSeedAnnounce(torrent);
+                            await TryAccumulateSeedTime(torrent);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -120,6 +124,48 @@ namespace Torrential.Trackers
                 // Remove from in-memory set so we retry next cycle
                 _seedAnnounceRecorded.TryRemove(meta.InfoHash, out _);
                 logger.LogError(ex, "Failed to record first seed announce for {InfoHash}", meta.InfoHash);
+            }
+        }
+
+        private async Task TryAccumulateSeedTime(TorrentMetadata meta)
+        {
+            if (!bitfields.TryGetVerificationBitfield(meta.InfoHash, out var bitfield))
+                return;
+
+            if (!bitfields.HasAllWantedPieces(meta.InfoHash, bitfield))
+                return;
+
+            var now = DateTimeOffset.UtcNow;
+
+            // First seed announce after app start: just record the timestamp, don't increment
+            if (!_lastSeedAnnounceTime.TryGetValue(meta.InfoHash, out var lastAnnounce))
+            {
+                _lastSeedAnnounceTime[meta.InfoHash] = now;
+                return;
+            }
+
+            var elapsedSeconds = (long)(now - lastAnnounce).TotalSeconds;
+            if (elapsedSeconds <= 0)
+                return;
+
+            _lastSeedAnnounceTime[meta.InfoHash] = now;
+
+            try
+            {
+                using var scope = scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<TorrentialDb>();
+                var torrent = await db.Torrents.FirstOrDefaultAsync(x => x.InfoHash == meta.InfoHash.AsString());
+                if (torrent == null)
+                    return;
+
+                torrent.TotalSeededSeconds += elapsedSeconds;
+                await db.SaveChangesAsync();
+                logger.LogDebug("Accumulated {Seconds}s seeding time for {InfoHash} (total: {Total}s)",
+                    elapsedSeconds, meta.InfoHash, torrent.TotalSeededSeconds);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to accumulate seed time for {InfoHash}", meta.InfoHash);
             }
         }
 

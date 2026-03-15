@@ -47,7 +47,6 @@ internal sealed class SeedTimeEnforcementService(
     private async Task EnforceAsync(CancellationToken ct)
     {
         var globalSeedSettings = await settingsManager.GetSeedSettings();
-        var now = DateTimeOffset.UtcNow;
 
         List<TorrentConfiguration> candidates;
         using (var scope = scopeFactory.CreateScope())
@@ -65,15 +64,14 @@ internal sealed class SeedTimeEnforcementService(
             if (seedTimeDays <= 0)
                 continue;
 
-            var seedingSince = torrent.DateFirstSeeded!.Value;
-            var elapsed = now - seedingSince;
-
-            if (elapsed.TotalDays < seedTimeDays)
+            var requiredSeconds = (long)seedTimeDays * 86400;
+            if (torrent.TotalSeededSeconds < requiredSeconds)
                 continue;
 
+            var elapsedDays = torrent.TotalSeededSeconds / 86400.0;
             logger.LogInformation(
-                "Torrent {InfoHash} has been seeding for {ElapsedDays:F1} days (limit: {LimitDays}), removing",
-                torrent.InfoHash, elapsed.TotalDays, seedTimeDays);
+                "Torrent {InfoHash} has accumulated {ElapsedDays:F1} days of seeding time (limit: {LimitDays}), removing",
+                torrent.InfoHash, elapsedDays, seedTimeDays);
 
             try
             {

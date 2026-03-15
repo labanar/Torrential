@@ -82,6 +82,7 @@ namespace Torrential
         public DateTimeOffset? DateCompleted { get; set; }
         public DateTimeOffset? DateFirstSeeded { get; set; }
         public int? DesiredSeedTimeDays { get; set; }
+        public long TotalSeededSeconds { get; set; }
     }
 
     public class TorrentPieces
