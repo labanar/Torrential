@@ -14,6 +14,12 @@ public class TorrentDetailVm
     public required IEnumerable<PeerSummaryVm> Peers { get; init; }
     public required BitfieldVm Bitfield { get; init; }
     public required IEnumerable<TorrentFileVm> Files { get; init; }
+    public string? DownloadPath { get; init; }
+    public DateTimeOffset DateAdded { get; init; }
+    public DateTimeOffset? DateCompleted { get; init; }
+    public DateTimeOffset? DateFirstSeeded { get; init; }
+    public int? DesiredSeedTimeDays { get; init; }
+    public long TotalSeededSeconds { get; init; }
 }
 
 public class BitfieldVm
