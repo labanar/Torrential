@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 
-type Tab = "peers" | "bitfield" | "files";
+type Tab = "info" | "peers" | "bitfield" | "files";
 
 interface DetailPaneProps {
   infoHash: string;
@@ -25,7 +25,7 @@ interface DetailPaneProps {
 export function DetailPane({ infoHash, onClose }: DetailPaneProps) {
   const dispatch = useAppDispatch();
   const { detail, loading, error } = useAppSelector((s) => s.torrentDetail);
-  const [activeTab, setActiveTab] = useState<Tab>("peers");
+  const [activeTab, setActiveTab] = useState<Tab>("info");
 
   const loadDetail = useCallback(async () => {
     dispatch(fetchDetailStart());
@@ -58,6 +58,12 @@ export function DetailPane({ infoHash, onClose }: DetailPaneProps) {
             size: f.size,
             isSelected: f.isSelected,
           })),
+          downloadPath: data.downloadPath,
+          dateAdded: data.dateAdded,
+          dateCompleted: data.dateCompleted,
+          dateFirstSeeded: data.dateFirstSeeded,
+          desiredSeedTimeDays: data.desiredSeedTimeDays,
+          totalSeededSeconds: data.totalSeededSeconds,
         };
         dispatch(fetchDetailSuccess(mapped));
       } else {
@@ -101,6 +107,7 @@ export function DetailPane({ infoHash, onClose }: DetailPaneProps) {
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as Tab)} className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
       <div className="flex items-center gap-2 px-4 py-2">
         <TabsList className="flex-1 justify-start bg-transparent p-0">
+          <TabsTrigger value="info">Info</TabsTrigger>
           <TabsTrigger value="peers">Peers</TabsTrigger>
           <TabsTrigger value="bitfield">Bitfield</TabsTrigger>
           <TabsTrigger value="files">Files</TabsTrigger>
@@ -111,6 +118,9 @@ export function DetailPane({ infoHash, onClose }: DetailPaneProps) {
       </div>
 
       <div className="min-h-0 flex-1 px-4 pb-4">
+        <TabsContent value="info" className="h-full mt-0">
+          <InfoSection detail={detail} />
+        </TabsContent>
         <TabsContent value="peers" className="h-full mt-0">
           <PeersSection peers={detail.peers} />
         </TabsContent>
@@ -131,6 +141,58 @@ function prettyBytes(bytes: number) {
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   if (i === 0) return bytes + " " + sizes[i];
   return (bytes / Math.pow(1024, i)).toFixed(2) + " " + sizes[i];
+}
+
+function formatSeededTime(totalSeconds: number): string {
+  if (totalSeconds <= 0) return "0m";
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+  return parts.join(" ");
+}
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function InfoSection({ detail }: { detail: TorrentDetail }) {
+  const seedTimeDisplay = formatSeededTime(detail.totalSeededSeconds);
+  const seedTarget = detail.desiredSeedTimeDays != null ? `${detail.desiredSeedTimeDays} days` : "-";
+
+  return (
+    <ScrollArea className="h-full">
+      <div className="space-y-4 py-1">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <InfoPair label="Download Path" value={detail.downloadPath || "-"} />
+          <InfoPair
+            label="Seed Time"
+            value={`${seedTimeDisplay} / ${seedTarget}`}
+          />
+          <InfoPair label="Date Added" value={formatDate(detail.dateAdded)} />
+          <InfoPair
+            label="Date Completed"
+            value={detail.dateCompleted ? formatDate(detail.dateCompleted) : "In progress"}
+          />
+          <InfoPair label="Total Size" value={prettyBytes(detail.totalSizeBytes)} />
+          <InfoPair label="Total Downloaded" value={prettyBytes(detail.bytesDownloaded)} />
+          <InfoPair label="Total Uploaded" value={prettyBytes(detail.bytesUploaded)} />
+        </div>
+      </div>
+    </ScrollArea>
+  );
 }
 
 function PeersSection({ peers }: { peers: TorrentDetailPeer[] }) {

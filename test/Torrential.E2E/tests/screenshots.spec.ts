@@ -30,6 +30,14 @@ async function getElementHeight(page: Page, selector: string) {
 
 async function expectPaneHeightStableAcrossTabs(page: Page, tolerancePx: number) {
   const paneSelector = '[class*="bottomPane"]';
+
+  // Info tab is the default
+  const infoHeight = await getElementHeight(page, paneSelector);
+
+  await page.locator('button:has-text("PEERS")').click();
+  await expect(
+    page.locator('text=Address').or(page.locator('text=No connected peers')).first(),
+  ).toBeVisible();
   const peersHeight = await getElementHeight(page, paneSelector);
 
   await page.locator('button:has-text("BITFIELD")').click();
@@ -42,7 +50,7 @@ async function expectPaneHeightStableAcrossTabs(page: Page, tolerancePx: number)
   ).toBeVisible();
   const filesHeight = await getElementHeight(page, paneSelector);
 
-  const heights = [peersHeight, bitfieldHeight, filesHeight];
+  const heights = [infoHeight, peersHeight, bitfieldHeight, filesHeight];
   const minHeight = Math.min(...heights);
   const maxHeight = Math.max(...heights);
   expect(maxHeight - minHeight).toBeLessThanOrEqual(tolerancePx);
@@ -128,6 +136,12 @@ test.describe('Screenshots', () => {
 
     const listHeightWithPaneOpen = await getElementHeight(page, torrentListSelector);
     expect(listHeightWithPaneOpen).toBeLessThan(listHeightBeforeOpen - 40);
+
+    // Info tab is the default, take screenshot with it visible
+    await page.screenshot({
+      path: screenshotPath(testInfo.project.name, 'torrent-info-tab'),
+      fullPage: true,
+    });
 
     await expectPaneHeightStableAcrossTabs(page, detailHeightTolerancePx);
     await assertNoHorizontalOverflow(page);

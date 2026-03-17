@@ -135,6 +135,12 @@ export interface TorrentDetailApiModel {
   peers: PeerApiModel[];
   bitfield: BitfieldApiModel;
   files: TorrentFileApiModel[];
+  downloadPath: string;
+  dateAdded: string;
+  dateCompleted: string | null;
+  dateFirstSeeded: string | null;
+  desiredSeedTimeDays: number | null;
+  totalSeededSeconds: number;
 }
 
 export interface BitfieldApiModel {

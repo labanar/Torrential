@@ -341,7 +341,7 @@ app.MapGet(
 
 app.MapGet(
     "/torrents/{infoHash}/detail",
-    async (InfoHash infoHash, TorrentMetadataCache cache, PeerSwarm swarms, BitfieldManager bitfieldManager, TorrentStatusCache statusCache, TorrentStats rates, IFileSelectionService fileSelection) =>
+    async (InfoHash infoHash, TorrentMetadataCache cache, PeerSwarm swarms, BitfieldManager bitfieldManager, TorrentStatusCache statusCache, TorrentStats rates, IFileSelectionService fileSelection, TorrentialDb db) =>
     {
         if (!cache.TryGet(infoHash, out var meta))
             return TorrentDetailResponse.ErrorResponse(ErrorCode.Unknown);
@@ -380,6 +380,8 @@ app.MapGet(
             Bitfield = Convert.ToBase64String(bitfieldBytes)
         };
 
+        var torrentConfig = await db.Torrents.FirstOrDefaultAsync(t => t.InfoHash == infoHash.AsString());
+
         var detail = new TorrentDetailVm
         {
             InfoHash = meta.InfoHash,
@@ -394,6 +396,12 @@ app.MapGet(
             Peers = peerSummaries,
             Bitfield = bitfieldVm,
             Files = files,
+            DownloadPath = torrentConfig?.DownloadPath,
+            DateAdded = torrentConfig?.DateAdded ?? DateTimeOffset.MinValue,
+            DateCompleted = torrentConfig?.DateCompleted,
+            DateFirstSeeded = torrentConfig?.DateFirstSeeded,
+            DesiredSeedTimeDays = torrentConfig?.DesiredSeedTimeDays,
+            TotalSeededSeconds = torrentConfig?.TotalSeededSeconds ?? 0,
         };
 
         return new TorrentDetailResponse(detail);

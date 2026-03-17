@@ -41,6 +41,12 @@ export interface TorrentDetail {
   peers: TorrentDetailPeer[];
   bitfield: BitfieldInfo;
   files: TorrentFile[];
+  downloadPath: string;
+  dateAdded: string;
+  dateCompleted: string | null;
+  dateFirstSeeded: string | null;
+  desiredSeedTimeDays: number | null;
+  totalSeededSeconds: number;
 }
 
 export interface TorrentDetailPeer {
