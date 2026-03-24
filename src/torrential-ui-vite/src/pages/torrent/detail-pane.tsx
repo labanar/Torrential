@@ -297,7 +297,7 @@ function BitfieldSection({
         {buckets.map((bucket, i) => (
           <div
             key={i}
-            className="h-1 w-1 rounded-sm bg-emerald-500"
+            className="h-1 w-1 rounded-sm bg-primary"
             style={{ opacity: Math.max(0.15, bucket.ratio) }}
             title={`Pieces ${bucket.startPiece} - ${bucket.endPiece - 1}`}
           />
