@@ -18,14 +18,11 @@ import {
   faCircleArrowUp,
   faCircleNotch,
   faCirclePause,
-  faDownLong,
+  faExclamationTriangle,
   faPause,
   faPlay,
   faPlus,
-  faSeedling,
   faTrash,
-  faUpLong,
-  faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
@@ -53,7 +50,6 @@ import Layout from "../layout";
 import { useLayoutContext, statusFilterLabels } from "../layout";
 import { AlfredContext, setContext } from "../../store/slices/alfredSlice";
 import { DetailPane } from "./detail-pane";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -261,6 +257,9 @@ function Page() {
     }
   }, [currentPosition, filteredTorrents.length]);
 
+  // Get focused torrent status for bottom action bar
+  const focusedTorrent = filteredTorrents[currentPosition] ?? null;
+
   const memoActionRow = useMemo(() => {
     return (
       <ActionsRow
@@ -276,9 +275,8 @@ function Page() {
         {/* Main torrent list area */}
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Section header */}
-          <div className="flex items-center justify-between px-4 py-3">
-            <h2 className="text-sm font-semibold">{statusFilterLabels[statusFilter]}</h2>
-            {memoActionRow}
+          <div className="flex items-center justify-between px-5 py-3">
+            <h2 className="text-sm font-semibold tracking-wide">{statusFilterLabels[statusFilter]}</h2>
           </div>
 
           <ScrollArea className="min-h-0 flex-1">
@@ -289,9 +287,9 @@ function Page() {
             )}
 
             {filteredTorrents.length > 0 && (
-              <div className="divide-y divide-border">
+              <div className="space-y-2 px-4 pb-4">
                 {filteredTorrents.map((torrent, index) => (
-                  <TorrentRow
+                  <TorrentCard
                     toggleSelect={selectTorrent}
                     toggleFocus={() => {
                       setCurrentPosition(index);
@@ -324,16 +322,89 @@ function Page() {
               </div>
             )}
           </ScrollArea>
+
+          {/* Bottom action bar */}
+          <BottomActionBar
+            focusedTorrent={focusedTorrent}
+            actionsRow={memoActionRow}
+          />
         </div>
 
         {/* Right detail pane */}
         {isDetailPaneOpen && openedInfoHash && (
-          <div className="hidden w-[380px] shrink-0 border-l overflow-hidden lg:block">
+          <div className="hidden w-[380px] shrink-0 border-l border-border/50 overflow-hidden lg:block">
             <DetailPane infoHash={openedInfoHash} onClose={() => setOpenedInfoHash(null)} />
           </div>
         )}
       </div>
     </TooltipProvider>
+  );
+}
+
+interface BottomActionBarProps {
+  focusedTorrent: { status: string; progress: number; infoHash: string } | null;
+  actionsRow: React.ReactNode;
+}
+
+function BottomActionBar({ focusedTorrent, actionsRow }: BottomActionBarProps) {
+  const isPaused = focusedTorrent && (focusedTorrent.status === "Stopped" || focusedTorrent.status === "Idle");
+  const isRunning = focusedTorrent && focusedTorrent.status === "Running";
+
+  const startTorrent = async (infoHash: string) => {
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/start`, { method: "POST" });
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
+  const stopTorrent = async (infoHash: string) => {
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/stop`, { method: "POST" });
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
+  return (
+    <div className="relative flex h-14 shrink-0 items-center justify-between border-t border-border/50 bg-card/50 px-5">
+      {/* FAB - Add torrent button */}
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent("trigger-add-torrent"))}
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30 active:scale-95"
+        aria-label="Add Torrent"
+      >
+        <FontAwesomeIcon icon={faPlus} className="h-4 w-4" />
+      </button>
+
+      {/* Hidden actions row for modals/file upload */}
+      <div className="hidden">{actionsRow}</div>
+
+      {/* Context action button */}
+      <div className="flex items-center gap-2">
+        {focusedTorrent && isPaused && (
+          <button
+            type="button"
+            onClick={() => startTorrent(focusedTorrent.infoHash)}
+            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98]"
+          >
+            <FontAwesomeIcon icon={faPlay} className="h-3 w-3" />
+            Resume Torrent
+          </button>
+        )}
+        {focusedTorrent && isRunning && (
+          <button
+            type="button"
+            onClick={() => stopTorrent(focusedTorrent.infoHash)}
+            className="flex items-center gap-2 rounded-lg bg-amber-500/20 px-5 py-2 text-sm font-medium text-amber-400 transition-all hover:bg-amber-500/30 active:scale-[0.98]"
+          >
+            <FontAwesomeIcon icon={faPause} className="h-3 w-3" />
+            Pause Torrent
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -370,7 +441,7 @@ const ActionsRow = ({
       .catch(() => {});
   }, []);
 
-  // Listen for trigger-add-torrent event from header
+  // Listen for trigger-add-torrent event from header and FAB
   useEffect(() => {
     const handler = () => {
       if (uploadRef.current) uploadRef.current.openFilePicker();
@@ -426,57 +497,17 @@ const ActionsRow = ({
     }
   };
 
-  const stopTorrent = async (infoHash: string) => {
-    try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/stop`, {
-        method: "POST",
-      });
-    } catch (e) {
-      console.log(e);
-      console.log("Error stopping torrent");
-    }
-  };
-
-  const startTorrent = async (infoHash: string) => {
-    try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/start`, {
-        method: "POST",
-      });
-    } catch (e) {
-      console.log(e);
-      console.log("Error stopping torrent");
-    }
-  };
-
   const removeTorrent = async (infoHash: string, deleteFiles: boolean) => {
     try {
-      const body = {
-        deleteFiles,
-      };
-
+      const body = { deleteFiles };
       await fetch(`${import.meta.env.VITE_API_BASE_URL}/torrents/${infoHash}/delete`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
     } catch (e) {
       console.log(e);
-      console.log("Error deleting torrent");
     }
-  };
-
-  const stopTorrents = async () => {
-    selectedTorrents.forEach((infoHash) => {
-      stopTorrent(infoHash);
-    });
-  };
-
-  const startTorrents = async () => {
-    selectedTorrents.forEach((infoHash) => {
-      startTorrent(infoHash);
-    });
   };
 
   const removeTorrents = async (deleteFiles: boolean) => {
@@ -486,31 +517,20 @@ const ActionsRow = ({
     setSelectedTorrents([]);
   };
 
-  const torrentActionsDisabled = useMemo(() => {
-    return selectedTorrents.length === 0;
-  }, [selectedTorrents]);
-
   const toggleFileSelection = (id: number) => {
     setSelectedFileIds((current) => {
       if (current.includes(id)) {
         return current.filter((x) => x !== id);
       }
-
       return [...current, id];
     });
   };
 
   const toggleAllFileSelection = () => {
-    if (!preview) {
-      return;
-    }
-
+    if (!preview) return;
     setSelectedFileIds((current) => {
       const allIds = preview.files.map((f) => f.id);
-      if (current.length === allIds.length) {
-        return [];
-      }
-
+      if (current.length === allIds.length) return [];
       return allIds;
     });
   };
@@ -568,81 +588,11 @@ const ActionsRow = ({
       />
 
       {previewError && <p className="text-xs text-destructive">{previewError}</p>}
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            disabled={torrentActionsDisabled}
-            className="h-7 w-7 text-emerald-600 hover:bg-emerald-600/10 hover:text-emerald-600"
-            aria-label="Start"
-            type="button"
-            onClick={() => startTorrents()}
-          >
-            <FontAwesomeIcon icon={faPlay} className="h-3 w-3" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Start</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            type="button"
-            disabled={torrentActionsDisabled}
-            className="h-7 w-7 text-amber-500 hover:bg-amber-500/10 hover:text-amber-500"
-            aria-label="Stop"
-            onClick={() => stopTorrents()}
-          >
-            <FontAwesomeIcon icon={faPause} className="h-3 w-3" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Stop</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size="icon"
-            variant="destructive"
-            type="button"
-            onClick={() => setDeleteModalOpen(true)}
-            disabled={torrentActionsDisabled}
-            className="h-7 w-7"
-            aria-label="Remove"
-          >
-            <FontAwesomeIcon icon={faTrash} className="h-3 w-3" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Delete</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size="icon"
-            type="button"
-            aria-label="Add"
-            className="h-7 w-7"
-            loading={isPreviewLoading}
-            onClick={() => {
-              if (uploadRef === null || uploadRef.current === null) return;
-              uploadRef.current.openFilePicker();
-            }}
-          >
-            <FontAwesomeIcon icon={faPlus} className="h-3 w-3" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Add Torrent</TooltipContent>
-      </Tooltip>
     </div>
   );
 };
 
-interface TorrentRowProps {
+interface TorrentCardProps {
   infoHash: string;
   title: string;
   progress: number;
@@ -658,7 +608,7 @@ interface TorrentRowProps {
   toggleFocus: () => void;
 }
 
-function TorrentRow({
+function TorrentCard({
   infoHash,
   title,
   progress,
@@ -672,14 +622,7 @@ function TorrentRow({
   isSelected,
   toggleSelect,
   toggleFocus,
-}: TorrentRowProps) {
-  const statusColorClass = useMemo(() => {
-    if (status === "Stopped" || status === "Idle") return "text-amber-500";
-    if (status === "Running") return "text-emerald-500";
-    if (status === "Verifying" || status === "Copying") return "text-sky-500";
-    return "text-muted-foreground";
-  }, [status]);
-
+}: TorrentCardProps) {
   function prettyPrintBytes(bytes: number) {
     const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
     if (bytes === 0) return "0 Byte";
@@ -692,26 +635,42 @@ function TorrentRow({
     status === "Running" && progress < 1 ? faCircleArrowDown :
     status === "Running" && progress >= 1 ? faCircleArrowUp :
     status === "Stopped" || status === "Idle" ? faCirclePause :
+    status === "Failed" ? faExclamationTriangle :
     faCircleNotch;
 
   const statusLabel =
     status === "Running" && progress < 1 ? "DOWNLOADING" :
     status === "Running" && progress >= 1 ? "SEEDING" :
     status === "Stopped" || status === "Idle" ? "PAUSED" :
+    status === "Failed" ? "FAILED" :
     status.toUpperCase();
 
   const statusBadgeClass =
-    status === "Running" && progress < 1 ? "bg-primary/20 text-primary border-primary/30" :
-    status === "Running" && progress >= 1 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" :
-    status === "Stopped" || status === "Idle" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
+    status === "Running" && progress < 1 ? "bg-primary/15 text-primary border-primary/25" :
+    status === "Running" && progress >= 1 ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25" :
+    status === "Stopped" || status === "Idle" ? "bg-amber-500/15 text-amber-400 border-amber-500/25" :
+    status === "Failed" ? "bg-red-500/15 text-red-400 border-red-500/25" :
     "bg-muted text-muted-foreground";
+
+  const statusDotColor =
+    status === "Running" && progress < 1 ? "bg-primary" :
+    status === "Running" && progress >= 1 ? "bg-emerald-400" :
+    status === "Stopped" || status === "Idle" ? "bg-amber-400" :
+    status === "Failed" ? "bg-red-400" :
+    "bg-muted-foreground";
+
+  // Estimate time remaining
+  const bytesRemaining = totalBytes * (1 - progress);
+  const etaText = downloadRate > 0 && progress < 1
+    ? formatEta(bytesRemaining / downloadRate)
+    : null;
 
   return (
     <div
       className={cn(
-        "cursor-pointer px-4 py-3 transition-colors hover:bg-muted/50",
-        isFocused && "bg-muted/60",
-        isSelected && "bg-accent/40"
+        "group relative cursor-pointer rounded-lg border border-border/50 bg-card/50 px-4 py-3 transition-all hover:bg-card/80 hover:border-border/70",
+        isFocused && "border-l-2 border-l-primary bg-card/70 border-border/60",
+        isSelected && "bg-primary/5 border-primary/20"
       )}
       tabIndex={0}
       role="button"
@@ -725,24 +684,45 @@ function TorrentRow({
       }}
     >
       <div className="flex items-start gap-3">
-        <div
-          className="pt-1"
-          onClick={(event) => event.stopPropagation()}
-          onKeyDown={(event) => event.stopPropagation()}
-        >
-          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(infoHash)} aria-label={`Select ${title}`} />
+        {/* Status dot */}
+        <div className="flex flex-col items-center gap-1 pt-1">
+          <div
+            className={cn(
+              "opacity-0 transition-opacity group-hover:opacity-100",
+              isSelected && "opacity-100"
+            )}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={() => toggleSelect(infoHash)}
+              aria-label={`Select ${title}`}
+              className="h-3.5 w-3.5"
+            />
+          </div>
+          <div className={cn("h-2 w-2 rounded-full", statusDotColor, isSelected && "hidden")} />
         </div>
 
+        {/* Center content */}
         <div className="min-w-0 flex-1 space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-sm font-medium">{title}</p>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {prettyPrintBytes(downloadRate)}/s
-            </span>
+          <div className="flex items-center justify-between gap-3">
+            <p className="truncate text-sm font-semibold">{title}</p>
+            <div className="shrink-0 text-right">
+              <p className="text-sm font-medium text-primary">
+                {prettyPrintBytes(downloadRate)}/s
+              </p>
+              {etaText && (
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {etaText} left
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className={cn("inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider", statusBadgeClass)}>
+            <span className={cn("inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider", statusBadgeClass)}>
+              <FontAwesomeIcon icon={statusIcon} className="h-2.5 w-2.5" />
               {statusLabel}
             </span>
             <span className="text-xs text-muted-foreground">
@@ -750,23 +730,20 @@ function TorrentRow({
             </span>
           </div>
 
-          <Progress value={progress * 100} className="h-1.5" />
-
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <FontAwesomeIcon icon={faUserGroup} className="h-3 w-3" /> {seeders + leechers}
-            </span>
-            <span className="inline-flex items-center gap-1 text-emerald-500">
-              <FontAwesomeIcon icon={faSeedling} className="h-3 w-3" /> {seeders}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <FontAwesomeIcon icon={faUpLong} className="h-3 w-3" /> {prettyPrintBytes(uploadRate)}/s
-            </span>
-          </div>
+          <Progress value={progress * 100} className="h-1" />
         </div>
       </div>
     </div>
   );
+}
+
+function formatEta(seconds: number): string {
+  if (!isFinite(seconds) || seconds <= 0) return "";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m} min`;
+  return `${Math.floor(seconds)}s`;
 }
 
 interface TorrentRemoveConfirmationModalProps {
